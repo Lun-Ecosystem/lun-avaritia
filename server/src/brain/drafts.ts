@@ -167,8 +167,9 @@ function applyFiche(
     if (!f || f.mergedInto !== undefined) throw new InvalidInputError('Fiche absente.');
     if (p.synthesis && p.synthesis !== f.synthesis) {
       // Edited after the draft was written: the user's text wins.
-      if (f.updatedAt > d.createdAt) skipped = true;
-      else editFiche(db, ficheId, { synthesis: p.synthesis }, now);
+      const edited = db.prepare('SELECT user_edited_at AS at FROM fiches WHERE id = ?').get(ficheId) as Row;
+      if (edited.at !== null && edited.at > d.createdAt) skipped = true;
+      else editFiche(db, ficheId, { synthesis: p.synthesis }, now, 'agent');
     }
   }
   for (const f of p.facts) addFact(db, ficheId, f.text, f.source as Source, now);
@@ -216,13 +217,18 @@ function applyContradiction(
 }
 
 function applyDoublon(db: DatabaseSync, p: Extract<DraftPayload, { kind: 'doublon' }>, now: string) {
-  for (const f of [p.keep, p.merge]) if (!getFiche(db, f)) throw new InvalidInputError('Fiche absente.');
+  if (p.keep === p.merge) throw new InvalidInputError('Une fiche ne fusionne pas avec elle-même.');
+  for (const f of [p.keep, p.merge]) {
+    const fiche = getFiche(db, f);
+    if (!fiche) throw new InvalidInputError('Fiche absente.');
+    if (fiche.mergedInto !== undefined)
+      throw new InvalidInputError(`La fiche « ${fiche.title} » est déjà fusionnée.`);
+  }
   db.prepare('UPDATE facts SET fiche_id = ? WHERE fiche_id = ?').run(p.keep, p.merge);
   db.prepare('UPDATE OR IGNORE links SET from_id = ? WHERE from_id = ?').run(p.keep, p.merge);
   db.prepare('UPDATE OR IGNORE links SET to_id = ? WHERE to_id = ?').run(p.keep, p.merge);
   // What could not move is a duplicate of a link the kept fiche has; links between the two become self-links.
   db.prepare('DELETE FROM links WHERE from_id = ? OR to_id = ? OR from_id = to_id').run(p.merge, p.merge);
-  db.prepare('DELETE FROM links WHERE from_id = to_id').run();
   db.prepare('UPDATE fiches SET merged_into = ?, updated_at = ? WHERE id = ?').run(p.keep, now, p.merge);
   reindex(db, p.merge);
   reindex(db, p.keep);
@@ -243,14 +249,15 @@ export function applyDraft(
     if (payload.kind !== current.payload.kind)
       throw new InvalidInputError('Le type de brouillon ne change pas.');
   }
-  const claim = db
-    .prepare("UPDATE drafts SET status = 'applying' WHERE id = ? AND status = 'pending'")
-    .run(draftId);
-  if (!claim.changes) throw new ConflictError();
   const warnings: string[] = payload.kind === 'import' ? [...payload.warnings] : [];
   let skipped = false;
+  // The claim and the writes share one transaction: any error rolls both back, the draft stays pending.
   db.exec('BEGIN');
   try {
+    const claim = db
+      .prepare("UPDATE drafts SET status = 'applying' WHERE id = ? AND status = 'pending'")
+      .run(draftId);
+    if (!claim.changes) throw new ConflictError();
     const warn: Warn = (w) => warnings.push(w);
     if (payload.kind === 'fiche') skipped = applyFiche(db, current, payload, now, warn);
     else if (payload.kind === 'import') applyImport(db, payload, now, warn);
@@ -262,11 +269,6 @@ export function applyDraft(
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
-    db.prepare("UPDATE drafts SET status = 'failed', decided_at = ?, error = ? WHERE id = ?").run(
-      now,
-      err instanceof Error ? err.message : String(err),
-      draftId,
-    );
     throw err;
   }
   return getDraft(db, draftId)!;
@@ -288,25 +290,32 @@ const CARD_STATUS: Record<DraftStatus, Card['status']> = {
   failed: 'failed',
 };
 
-/** The card a human reads: what will be written, not the payload. */
-export function cardOf(d: Draft): Card {
+/** The card a human reads: names and texts, not ids. */
+export function cardOf(db: DatabaseSync, d: Draft): Card {
   const p = d.payload;
+  const ficheTitle = (n: number) =>
+    ((db.prepare('SELECT title FROM fiches WHERE id = ?').get(n) as Row | undefined)?.title as string) ??
+    `fiche n° ${n}`;
+  const factText = (n: number) =>
+    ((db.prepare('SELECT text FROM facts WHERE id = ?').get(n) as Row | undefined)?.text as string) ??
+    `fait n° ${n}`;
   const lines: string[] = [];
   let title: string;
   if (p.kind === 'fiche') {
     title = p.ficheId === undefined ? `Nouvelle fiche : ${p.title}` : `Enrichir la fiche : ${p.title}`;
     if (p.synthesis) lines.push(`Synthèse : ${p.synthesis}`);
     for (const f of p.facts) lines.push(`Fait : ${f.text}`);
-    for (const l of p.links) lines.push(`Lien : ${l.relation} → ${l.to}`);
+    for (const l of p.links)
+      lines.push(`Lien : ${l.relation} → ${typeof l.to === 'number' ? ficheTitle(l.to) : l.to}`);
     if (d.skippedSynthesis) lines.push('Synthèse non appliquée : la fiche a été modifiée depuis.');
   } else if (p.kind === 'contradiction') {
-    title = `Contradiction sur la fiche n° ${p.ficheId}`;
-    lines.push(`Garder le fait n° ${p.keep}`, `Barrer le fait n° ${p.strike}`, `Raison : ${p.reason}`);
+    title = `Contradiction sur la fiche : ${ficheTitle(p.ficheId)}`;
+    lines.push(`Garder : ${factText(p.keep)}`, `Barrer : ${factText(p.strike)}`, `Raison : ${p.reason}`);
   } else if (p.kind === 'doublon') {
-    title = `Doublon probable : fiches n° ${p.keep} et n° ${p.merge}`;
+    title = `Doublon probable : ${ficheTitle(p.keep)} et ${ficheTitle(p.merge)}`;
     lines.push(
-      `Garder la fiche n° ${p.keep}`,
-      `Fusionner la fiche n° ${p.merge} dedans`,
+      `Garder la fiche : ${ficheTitle(p.keep)}`,
+      `Fusionner dedans : ${ficheTitle(p.merge)}`,
       `Raison : ${p.reason}`,
     );
   } else {

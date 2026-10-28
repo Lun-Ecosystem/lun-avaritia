@@ -77,6 +77,7 @@ const MIGRATIONS: string[] = [
    );
    CREATE VIRTUAL TABLE fiche_search USING fts5(title, synthesis, facts, tokenize = 'unicode61 remove_diacritics 2');`,
   `ALTER TABLE fiches ADD COLUMN merged_into INTEGER REFERENCES fiches(id);
+   ALTER TABLE fiches ADD COLUMN user_edited_at TEXT;
    CREATE TABLE drafts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      kind TEXT NOT NULL,

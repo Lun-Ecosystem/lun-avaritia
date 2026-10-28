@@ -48,7 +48,7 @@ describe('drafts', () => {
     expect(d.skippedSynthesis).toBe(true);
     expect(getFiche(db, f)!.synthesis).toBe('humaine');
     expect(getFiche(db, f)!.facts).toHaveLength(1);
-    expect(cardOf(d).lines.join('\n')).toMatch(/synthèse/i);
+    expect(cardOf(db, d).lines.join('\n')).toMatch(/synthèse/i);
   });
 
   it('applies the synthesis when the fiche is untouched', () => {
@@ -172,9 +172,71 @@ describe('drafts', () => {
   });
 
   it('writes a card for a human', () => {
-    const card = cardOf(getDraft(db, draft())!);
+    const card = cardOf(db, getDraft(db, draft())!);
     expect(card).toMatchObject({ action: 'brain.fiche', effect: 'write', status: 'pending', at: 't1' });
     expect(card.lines.join('\n')).toContain('a un chat');
+  });
+});
+
+describe('drafts review fixes', () => {
+  it('applies a second enrichment synthesis after the first was accepted', () => {
+    const f = fiche('Bob');
+    const a = draft({ ficheId: f, synthesis: 'A' });
+    const b = draft({ ficheId: f, synthesis: 'B' });
+    applyDraft(db, a, undefined, 't2');
+    const d = applyDraft(db, b, undefined, 't3');
+    expect(d.skippedSynthesis).toBe(false);
+    expect(getFiche(db, f)!.synthesis).toBe('B');
+  });
+
+  it('rolls back a failing apply, stays pending, then accepts a corrected input', () => {
+    const id = draft({ ficheId: 999 });
+    expect(() => applyDraft(db, id, undefined, 't2')).toThrow(InvalidInputError);
+    expect(getDraft(db, id)!.status).toBe('pending');
+    const ok = applyDraft(
+      db,
+      id,
+      { kind: 'fiche', typeId, title: 'Bon', synthesis: '', facts: [], links: [] },
+      't3',
+    );
+    expect(ok.status).toBe('done');
+    const id2 = draft({ ficheId: 999 });
+    expect(() => applyDraft(db, id2, undefined, 't2')).toThrow(InvalidInputError);
+    expect(refuseDraft(db, id2, 't3').status).toBe('refused');
+  });
+
+  it('writes human lines for a contradiction, a doublon and a numeric link', () => {
+    const f = fiche('Dora');
+    const g = fiche('Dorah');
+    const a = addFact(db, f, 'vieux fait', src, 't0');
+    const b = addFact(db, f, 'neuf fait', src, 't0');
+    const c = cardOf(
+      db,
+      getDraft(
+        db,
+        addDraft(db, { kind: 'contradiction', ficheId: f, keep: b, strike: a, reason: 'r' }, origin, 't1'),
+      )!,
+    );
+    expect(c.title).toContain('Dora');
+    expect(c.lines).toEqual(expect.arrayContaining(['Garder : neuf fait', 'Barrer : vieux fait']));
+    const dup = cardOf(
+      db,
+      getDraft(db, addDraft(db, { kind: 'doublon', keep: f, merge: g, reason: 'r' }, origin, 't1'))!,
+    );
+    expect(dup.lines.join('\n')).toContain('Dorah');
+    const lk = cardOf(db, getDraft(db, draft({ links: [{ to: g, relation: 'x' }] }))!);
+    expect(lk.lines).toContain('Lien : x → Dorah');
+  });
+
+  it('rejects a merge of an already merged fiche, leaving the draft pending', () => {
+    const k = fiche('K');
+    const m = fiche('M');
+    const n = fiche('N');
+    const first = addDraft(db, { kind: 'doublon', keep: k, merge: m, reason: 'r' }, origin, 't1');
+    applyDraft(db, first, undefined, 't2');
+    const id = addDraft(db, { kind: 'doublon', keep: n, merge: m, reason: 'r' }, origin, 't1');
+    expect(() => applyDraft(db, id, undefined, 't3')).toThrow(InvalidInputError);
+    expect(getDraft(db, id)!.status).toBe('pending');
   });
 });
 

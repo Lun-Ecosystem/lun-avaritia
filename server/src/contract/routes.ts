@@ -150,7 +150,7 @@ export function contractRoutes(deps: AppDeps): Hono {
         : status === 'expired'
           ? []
           : draftsByStatus(db, status as DraftStatus);
-    return c.json({ cards: drafts.map(cardOf) });
+    return c.json({ cards: drafts.map((x) => cardOf(db, x)) });
   });
 
   const decide = async (c: Context, run: (id: number, input: unknown) => ReturnType<typeof applyDraft>) => {
@@ -163,7 +163,7 @@ export function contractRoutes(deps: AppDeps): Hono {
     const parsed = Accept.safeParse(raw);
     if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
     try {
-      return c.json({ card: cardOf(run(Number(c.req.param('id')), parsed.data.input)) });
+      return c.json({ card: cardOf(db, run(Number(c.req.param('id')), parsed.data.input)) });
     } catch (err) {
       if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
       if (err instanceof ConflictError) return c.json({ error: err.message }, 409);

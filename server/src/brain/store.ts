@@ -123,6 +123,7 @@ export function editFiche(
   id: number,
   patch: { title?: string; synthesis?: string },
   now: string,
+  by: 'user' | 'agent' = 'user',
 ): void {
   const f = db.prepare('SELECT title, synthesis FROM fiches WHERE id = ?').get(id) as Row | undefined;
   if (!f) throw new InvalidInputError('Fiche absente.');
@@ -134,12 +135,10 @@ export function editFiche(
     f.title,
     f.synthesis,
   );
-  db.prepare('UPDATE fiches SET title = ?, synthesis = ?, updated_at = ? WHERE id = ?').run(
-    title,
-    patch.synthesis ?? f.synthesis,
-    now,
-    id,
-  );
+  // user_edited_at moves only on the user's edits: drafts compare against it, not updated_at.
+  db.prepare(
+    'UPDATE fiches SET title = ?, synthesis = ?, updated_at = ?, user_edited_at = CASE WHEN ? THEN ? ELSE user_edited_at END WHERE id = ?',
+  ).run(title, patch.synthesis ?? f.synthesis, now, by === 'user' ? 1 : 0, now, id);
   reindex(db, id);
 }
 
