@@ -51,3 +51,9 @@ export function focus(graph: UndirectedGraph<NodeAttrs>, id: number): Set<number
   if (!graph.hasNode(key)) return new Set();
   return new Set([id, ...graph.neighbors(key).map(Number)]);
 }
+
+/** What stands out: the fiche and its neighbours, or `null` (nothing greyed) for no fiche or an unknown one. */
+export function activeSet(graph: UndirectedGraph<NodeAttrs>, id: number | null): Set<number> | null {
+  const near = id === null ? null : focus(graph, id);
+  return near?.size ? near : null;
+}

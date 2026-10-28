@@ -5,6 +5,7 @@ import { fakeApi } from '../memoire/fixtures.ts';
 import Memoire from './Memoire.svelte';
 
 // Counts the loads of the graph module: it must come only with the graph mode.
+// The module cache lives for the whole file: only one test may switch to a WebGL graph, and count from 0.
 const graphe = vi.hoisted(() => ({ loads: 0 }));
 vi.mock('../memoire/Graphe.svelte', async () => {
   graphe.loads++;
@@ -73,7 +74,7 @@ describe('Memoire', () => {
   });
 
   it('loads the graph module only in the graph mode', async () => {
-    webgl.mockReturnValue({} as RenderingContext);
+    webgl.mockReturnValue({ getExtension: () => null } as unknown as RenderingContext);
     show({ fiche: '1' });
     await screen.findByText('Jeanne D.');
     expect(graphe.loads).toBe(0);

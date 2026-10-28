@@ -5,6 +5,7 @@
   import Arbre from '../memoire/Arbre.svelte';
   import FichePanel from '../memoire/FichePanel.svelte';
   import { go } from '../memoire/titles.ts';
+  import { hasWebGL } from '../memoire/webgl.ts';
 
   /*
    * The memory: search and the tree / graph switch on one row, the tree (or the search results) on
@@ -28,15 +29,11 @@
   let query = $state('');
   let centre = $state('');
   // The graph comes with its mode only (Sigma is a chunk apart); no WebGL, no graph.
-  const webgl = () => {
-    const c = document.createElement('canvas');
-    return !!(c.getContext('webgl2') ?? c.getContext('webgl'));
-  };
   let graphe = $state<Promise<typeof import('../memoire/Graphe.svelte')> | null>(null);
   let noWebgl = $state(false);
   $effect(() => {
     if (view !== 'graphe' || graphe || noWebgl) return;
-    if (webgl()) graphe = import('../memoire/Graphe.svelte');
+    if (hasWebGL()) graphe = import('../memoire/Graphe.svelte');
     else noWebgl = true;
   });
   let hits = $state<Hit[] | null>(null);

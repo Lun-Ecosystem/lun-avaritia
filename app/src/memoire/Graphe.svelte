@@ -7,8 +7,9 @@
   import { getContext, untrack } from 'svelte';
   import type { Api } from '../api.ts';
   import { Banner, Chip, EmptyState, icons, Skeleton } from '../lib/ui/index.ts';
+  import { bindShortcuts } from '../lib/ui/shortcuts.ts';
   import FichePanel from './FichePanel.svelte';
-  import { buildGraph, focus, type GraphData, type Palette } from './graph.ts';
+  import { activeSet, buildGraph, type GraphData, type Palette } from './graph.ts';
 
   /*
    * The fiche graph (ADR 0006): Sigma draws, ForceAtlas2 lays out in a worker. Loaded on demand by the
@@ -33,6 +34,7 @@
   let centred = $state<number | null>(null);
   let missing = $state(false);
   let container = $state<HTMLDivElement>();
+  let wrapper = $state<HTMLDivElement>();
   let sigma = $state.raw<Sigma | null>(null);
   let graph = $state.raw<ReturnType<typeof buildGraph> | null>(null);
 
@@ -132,13 +134,19 @@
       });
       const still = last.size > 0 && moved / g.order < span * 0.0005;
       last = new Map(g.mapNodes((key, a) => [key, [a.x, a.y]] as [string, [number, number]]));
-      if (still) stop();
+      if (still) settle();
     }, 300);
-    const timer = setTimeout(stop, 3000);
+    const timer = setTimeout(settle, 3000);
     function stop() {
       layout.stop();
       clearInterval(watch);
       clearTimeout(timer);
+    }
+    // The nodes moved while the layout ran: the camera goes back to the focused fiche.
+    function settle() {
+      stop();
+      const id = untrack(() => focused);
+      if (id !== null) fly(id);
     }
 
     graph = g;
@@ -157,7 +165,7 @@
     const s = sigma;
     const g = graph;
     if (!s || !g) return;
-    const near = focused === null ? null : focus(g, focused);
+    const near = activeSet(g, focused);
     const keep = shown.length ? new Set(shown) : null;
     const css = getComputedStyle(container!);
     const token = (name: string) => css.getPropertyValue(name).trim();
@@ -217,9 +225,26 @@
     if (selected !== null && sigma) untrack(() => fly(selected));
   });
 
+  // Escape closes the panel (from the panel or the graph, not from a field) and gives the graph the focus.
+  $effect(() => {
+    if (!wrapper || selected === null) return;
+    return bindShortcuts(
+      {
+        Escape: () => {
+          onOpen(null);
+          container?.focus();
+        },
+      },
+      wrapper,
+    );
+  });
+
   function fly(id: number) {
     const d = sigma?.getNodeDisplayData(String(id));
-    if (d) void sigma!.getCamera().animate({ x: d.x, y: d.y, ratio: 0.25 }, { duration: 600 });
+    const camera = sigma?.getCamera();
+    // Closer only: a reader already zoomed in further keeps their zoom.
+    if (d && camera)
+      void camera.animate({ x: d.x, y: d.y, ratio: Math.min(camera.ratio, 0.25) }, { duration: 600 });
   }
 </script>
 
@@ -230,7 +255,7 @@
 {:else if data.nodes.length === 0}
   <EmptyState size="grand" tone="neutre" icon={icons.FileText} title="Aucune fiche." />
 {:else}
-  <div class="graphe">
+  <div class="graphe" bind:this={wrapper}>
     {#if types.length}
       <div class="filtres" role="group" aria-label="Filtrer par type">
         {#each types.filter((t) => counts.has(t.id)) as t (t.id)}
@@ -240,7 +265,7 @@
       </div>
     {/if}
     {#if missing}<p class="manque" role="status">Aucune fiche ne correspond.</p>{/if}
-    <div class="scene" bind:this={container} aria-label="Graphe des fiches" role="img"></div>
+    <div class="scene" bind:this={container} aria-label="Graphe des fiches" role="img" tabindex="-1"></div>
     <p class="aide">Clic sur un nœud : la fiche s’ouvre à côté. Contour rouge : fiche à vérifier.</p>
     {#if selected !== null}
       <aside class="panneau" aria-label="Fiche">
@@ -294,7 +319,8 @@
     .panneau {
       position: fixed;
       inset: 0;
-      z-index: 20;
+      /* Over the agent bubble (20), under the Fab (40). */
+      z-index: 30;
       width: auto;
       border: 0;
       border-radius: 0;

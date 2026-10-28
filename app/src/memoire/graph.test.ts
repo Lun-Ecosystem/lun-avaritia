@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraph, focus, nodeSize, type GraphData, type Palette } from './graph.ts';
+import { activeSet, buildGraph, focus, nodeSize, type GraphData, type Palette } from './graph.ts';
 
 const palette: Palette = { node: 'n', edge: 'e', flagged: 'f', accent: 'a', label: 'l' };
 const data: GraphData = {
@@ -45,6 +45,13 @@ describe('graph', () => {
     expect(focus(g, 1)).toEqual(new Set([1, 2, 3]));
     expect(focus(g, 3)).toEqual(new Set([3, 1]));
     expect(focus(g, 42)).toEqual(new Set());
+  });
+
+  it('activeSet: no fiche or an unknown one means no focus, the graph is not greyed', () => {
+    const g = buildGraph(data, palette);
+    expect(activeSet(g, null)).toBeNull();
+    expect(activeSet(g, 42)).toBeNull();
+    expect(activeSet(g, 3)).toEqual(new Set([3, 1]));
   });
 
   it('builds 5 000 nodes and 15 000 edges in under 500 ms', () => {
