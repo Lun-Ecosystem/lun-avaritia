@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { brainDeps } from '../app.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { makeHarness } from '../testing/harness.ts';
+import { setPaused } from '../contract/state.ts';
 import { runPending } from './ingest.ts';
 import { createFiche, getFiche, listTypes, versions } from './store.ts';
 
@@ -33,6 +34,9 @@ describe('fiches, settings, dashboard and export API', () => {
     expect(versions(h.db, id)).toHaveLength(1);
     expect(versions(h.db, id)[0]!.synthesis).toBe('Avant.');
     expect((await req('/api/fiches/999', 'PATCH', { title: 'x' })).status).toBe(400);
+    expect((await req(`/api/fiches/${id}`, 'PATCH', { title: '  ' })).status).toBe(400);
+    expect((await req(`/api/fiches/${id}`, 'PATCH', { synthesis: 'x'.repeat(20_001) })).status).toBe(400);
+    expect(getFiche(h.db, id)!.title).toBe('Client X');
 
     const list = (await (await req('/api/fiches')).json()) as { fiches: { id: number }[] };
     expect(list.fiches.map((f) => f.id)).toEqual([id]);
@@ -77,6 +81,43 @@ describe('fiches, settings, dashboard and export API', () => {
     expect(body.files).toEqual(['client-x.md']);
     expect(body.dir).toBe(join(dataDir, 'export', '2026-11-02'));
     expect(existsSync(join(body.dir, 'client-x.md'))).toBe(true);
+  });
+
+  it('a pause during a pass stops before the next lot', async () => {
+    const replies: unknown[] = [];
+    const fake = fakeProvider(replies);
+    const { h, typeId } = setup();
+    const json = fake.provider.json.bind(fake.provider);
+    // The pause lands while the first lot is being processed.
+    fake.provider.json = async (r) => {
+      const out = await json(r);
+      if (fake.calls.length === 2) setPaused(h.db, true);
+      return out;
+    };
+    const brainProvider = () => ({ provider: fake.provider, model: 'm' });
+    const src = JSON.stringify({ kind: 'core', at: '2026-11-01T18:00:00Z' });
+    for (const id of [1, 2]) {
+      h.db.prepare("INSERT INTO lots (status, created_at) VALUES ('queued', ?)").run(h.clock().toISOString());
+      h.db
+        .prepare('INSERT INTO observations (lot, text, source) VALUES (?, ?, ?)')
+        .run(id, `Fait ${id}.`, src);
+    }
+    replies.push(
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
+      {
+        fiches: [
+          { group: 0, synthesis: 's', facts: [{ text: 'f', observation: 0, replaces: null }], links: [] },
+        ],
+        questions: [],
+      },
+    );
+    await runPending(
+      brainDeps({ db: h.db, clock: h.clock, version: 'x', actions: h.actions, brainProvider }),
+    );
+    const status = (id: number) =>
+      (h.db.prepare('SELECT status FROM lots WHERE id = ?').get(id) as { status: string }).status;
+    expect([status(1), status(2)]).toEqual(['done', 'queued']);
+    expect(fake.calls).toHaveLength(2);
   });
 
   it('a pause processes nothing; resume runs the waiting lots', async () => {

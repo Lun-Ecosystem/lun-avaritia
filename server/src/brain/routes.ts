@@ -67,6 +67,8 @@ export function brainRoutes(deps: AppDeps): Hono {
       (synthesis !== undefined && typeof synthesis !== 'string')
     )
       return c.json({ error: 'title et synthesis : texte attendu' }, 400);
+    if (typeof synthesis === 'string' && synthesis.length > 20_000)
+      return c.json({ error: 'Synthèse trop longue (20 000 caractères au plus)' }, 400);
     const id = Number(c.req.param('id'));
     editFiche(
       deps.db,

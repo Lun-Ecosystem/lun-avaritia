@@ -69,6 +69,7 @@ export async function runPending(deps: BrainDeps): Promise<void> {
     if (!overCap(db, deps.clock()) && deps.provider('tri') && deps.provider('agent'))
       db.exec("UPDATE lots SET status = 'queued', reason = NULL WHERE status = 'held'");
     for (;;) {
+      if (getState(db).paused) return; // a pause during the pass: no further LLM call
       const lot = db.prepare("SELECT id FROM lots WHERE status = 'queued' ORDER BY id LIMIT 1").get() as
         { id: number } | undefined;
       if (!lot) return;

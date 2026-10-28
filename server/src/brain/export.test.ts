@@ -26,12 +26,22 @@ describe('exportMarkdown', () => {
     expect(readdirSync(dir).sort()).toEqual(['studio-exemple-2.md', 'studio-exemple.md']);
     expect([...files].sort()).toEqual(['studio-exemple-2.md', 'studio-exemple.md']);
     const md = readFileSync(join(dir, 'studio-exemple.md'), 'utf8');
-    expect(md).toMatch(/^---\ntype: Personne\n/);
+    expect(md).toMatch(/^---\ntype: "Personne"\n/);
     expect(md).toContain('acedia');
     expect(md).toContain('Un studio fictif.');
     expect(md).toContain('~~Basé à Lyon.~~ (barré le 02/11/2026)');
     expect(md).toContain('- Basé à Nantes.');
     expect(md).toContain('[[Studio  Exemple!]]');
     expect(md).not.toContain('Fantôme');
+  });
+
+  it('caps the file name and avoids Windows device names', () => {
+    const { db } = makeHarness();
+    const typeId = listTypes(db)[0]!.id;
+    const at = '2026-10-01T10:00:00.000Z';
+    for (const title of ['CON', 'Com1', 'x'.repeat(300)])
+      createFiche(db, { typeId, title, synthesis: '' }, at);
+    const files = exportMarkdown(db, mkdtempSync(join(tmpdir(), 'avaritia-export-')));
+    expect(files).toEqual(['con-fiche.md', 'com1-fiche.md', `${'x'.repeat(80)}.md`]);
   });
 });

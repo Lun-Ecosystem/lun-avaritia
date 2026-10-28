@@ -5,13 +5,20 @@ import { getFiche } from './store.ts';
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
 
-const slug = (title: string) =>
-  title
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'fiche';
+const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/;
+
+const slug = (title: string) => {
+  const s =
+    title
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80)
+      .replace(/-+$/, '') || 'fiche';
+  return DEVICE.test(s) ? `${s}-fiche` : s; // Windows refuses these names, even with an extension
+};
 
 /**
  * One Markdown file per live fiche in `dir`; returns the file names.
@@ -47,7 +54,7 @@ export function exportMarkdown(db: DatabaseSync, dir: string): string[] {
     const live = f.links.filter((l) => l.from === id && !getFiche(db, l.to)?.mergedInto);
     const md = [
       '---',
-      `type: ${types.get(f.typeId) ?? ''}`,
+      `type: ${JSON.stringify(types.get(f.typeId) ?? '')}`,
       `created: ${f.createdAt}`,
       `updated: ${f.updatedAt}`,
       'sources:',
