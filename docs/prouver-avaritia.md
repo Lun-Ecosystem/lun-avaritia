@@ -20,8 +20,8 @@ Refonte du site), un lot déjà traité en brouillons, une contradiction (deux a
 - `PATCH /api/fiches/1` avec `{"synthesis":"..."}` : appliqué tout de suite, une version est créée
   (`GET /api/fiches/1`).
 - `PUT /api/settings` avec `{"drafts.cap":0}` : refusé (400) ; avec `{"drafts.cap":20}` : accepté.
-- `POST /api/export` : un fichier `.md` par fiche dans `export/<date>/` ; le fait démenti y est barré et daté.
-- `POST /lun/v1/pause` : un lot en attente n’est plus traité ; `POST /lun/v1/resume` le reprend.
+- `POST /api/export` : un fichier `.md` par fiche dans `export/<date>/` ; le fait démenti n’y apparaît barré et daté qu’après avoir accepté la carte de contradiction (`POST /lun/v1/cards/<id>/accept`).
+- `POST /lun/v1/pause` puis `GET /lun/v1/health` : l’état passe à `paused` ; `POST /lun/v1/resume` le ramène à `ok`. La démo n’a pas de fournisseur : ses lots restent retenus (`no-provider`) quoi qu’il arrive, la reprise du traitement se vérifie avec le core local (partie 2).
 
 ## 2. Avec le core local
 

@@ -14,7 +14,8 @@ export class InputError extends Error {
 export const MAX_DEPOT_CHARS = 200_000;
 
 const PENDING: Record<string, string> = {
-  'cost-cap': 'Plafond de coût mensuel atteint : le texte est gardé, relance le traitement plus tard.',
+  'cost-cap':
+    'Plafond de coût mensuel atteint : le texte est gardé, sans traitement tant que le plafond est atteint.',
   'no-provider': "Aucun modèle d'IA configuré : le texte est gardé, choisis un modèle dans Réglages.",
 };
 

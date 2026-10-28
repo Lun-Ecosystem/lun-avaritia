@@ -149,19 +149,19 @@ describe('/api/llm', () => {
     // No model of the table lacks tool calling today: one is added for the test.
     MODELS.push({ provider: 'openai', id: 'gpt-test-notools', label: 'Sans outils', tools: false });
     try {
-      const pina = await call('PUT', '/choice', {
+      const agentChoice = await call('PUT', '/choice', {
         use: 'agent',
         provider: 'openai',
         model: 'gpt-test-notools',
       });
-      expect(pina.status).toBe(400);
+      expect(agentChoice.status).toBe(400);
       expect(getSetting(h.db, 'llm.agent', null)).toBeNull();
-      const triage = await call('PUT', '/choice', {
+      const triChoice = await call('PUT', '/choice', {
         use: 'tri',
         provider: 'openai',
         model: 'gpt-test-notools',
       });
-      expect(triage.status).toBe(200);
+      expect(triChoice.status).toBe(200);
       expect(getSetting(h.db, 'llm.tri', null)).toEqual({ provider: 'openai', model: 'gpt-test-notools' });
     } finally {
       MODELS.pop();

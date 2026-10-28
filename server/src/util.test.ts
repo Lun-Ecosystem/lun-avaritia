@@ -7,7 +7,7 @@ describe('startLoop', () => {
     const run = vi
       .fn<() => Promise<void>>()
       .mockImplementationOnce(() => new Promise<void>((r) => (release = r)))
-      .mockRejectedValueOnce(new Error('Google 503'))
+      .mockRejectedValueOnce(new Error('Provider 503'))
       .mockResolvedValue(undefined);
     const onError = vi.fn();
     const loop = startLoop(run, { intervalMs: 3_600_000, onError });
@@ -17,7 +17,7 @@ describe('startLoop', () => {
     release();
     await second;
     await loop.runNow();
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Google 503' }));
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider 503' }));
     await loop.runNow();
     expect(run).toHaveBeenCalledTimes(3);
     loop.stop();

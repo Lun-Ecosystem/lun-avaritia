@@ -60,7 +60,7 @@ export function llmEnvFrom(env: NodeJS.ProcessEnv): LlmEnv {
 /** The name of a `.env` expiry variable, for the start-up warnings. */
 export const expiresEnvName = (id: ProviderId) => `${ENV_NAMES[id]}_KEY_EXPIRES`;
 
-/** The degraded reason, same convention as `credit` and `google-reauth`. */
+/** The degraded reason, same convention as `credit`. */
 export const keyReason = (id: ProviderId) => `${id}-key`;
 
 // The settings of a provider live under `<id>.`: the former `anthropic.*` ones are read as they are.
