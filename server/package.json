@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "node --watch --experimental-strip-types src/main.ts",
     "start": "node dist/main.js",
+    "demo": "node --experimental-strip-types --no-warnings src/demo/main.ts",
     "pair-code": "node --experimental-strip-types --no-warnings src/cli/pair-code.ts"
   },
   "dependencies": {

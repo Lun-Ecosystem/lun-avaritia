@@ -43,6 +43,83 @@ const MIGRATIONS: string[] = [
      calls INTEGER NOT NULL,
      purpose TEXT
    );`,
+  `CREATE TABLE fiche_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);
+   INSERT INTO fiche_types (name) VALUES ('Personne'), ('Organisation'), ('Projet'), ('Service'), ('Échange'), ('Note');
+   CREATE TABLE fiches (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     type_id INTEGER NOT NULL REFERENCES fiche_types(id),
+     title TEXT NOT NULL,
+     synthesis TEXT NOT NULL DEFAULT '',
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );
+   CREATE TABLE facts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     fiche_id INTEGER NOT NULL REFERENCES fiches(id),
+     text TEXT NOT NULL,
+     source TEXT NOT NULL,
+     at TEXT NOT NULL,
+     struck_at TEXT,
+     struck_by INTEGER REFERENCES facts(id)
+   );
+   CREATE TABLE links (
+     from_id INTEGER NOT NULL REFERENCES fiches(id),
+     to_id INTEGER NOT NULL REFERENCES fiches(id),
+     relation TEXT NOT NULL,
+     PRIMARY KEY (from_id, to_id, relation)
+   );
+   CREATE TABLE fiche_versions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     fiche_id INTEGER NOT NULL REFERENCES fiches(id),
+     at TEXT NOT NULL,
+     title TEXT NOT NULL,
+     synthesis TEXT NOT NULL
+   );
+   CREATE VIRTUAL TABLE fiche_search USING fts5(title, synthesis, facts, tokenize = 'unicode61 remove_diacritics 2');`,
+  `ALTER TABLE fiches ADD COLUMN merged_into INTEGER REFERENCES fiches(id);
+   ALTER TABLE fiches ADD COLUMN user_edited_at TEXT;
+   CREATE TABLE drafts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     kind TEXT NOT NULL,
+     payload TEXT NOT NULL,
+     lot INTEGER,
+     origin TEXT NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'applying', 'done', 'refused', 'failed')),
+     created_at TEXT NOT NULL,
+     decided_at TEXT,
+     error TEXT,
+     skipped_synthesis INTEGER NOT NULL DEFAULT 0,
+     warnings TEXT NOT NULL DEFAULT '[]'
+   );`,
+  `CREATE TABLE lots (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     status TEXT NOT NULL CHECK (status IN ('queued', 'held', 'running', 'done', 'failed')),
+     reason TEXT,
+     created_at TEXT NOT NULL
+   );
+   CREATE TABLE observations (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     lot INTEGER NOT NULL REFERENCES lots(id),
+     text TEXT NOT NULL,
+     source TEXT NOT NULL
+   );
+   CREATE TABLE runs (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     lot INTEGER NOT NULL REFERENCES lots(id),
+     at TEXT NOT NULL,
+     duration_ms INTEGER NOT NULL,
+     cost REAL NOT NULL,
+     observations INTEGER NOT NULL,
+     drafts INTEGER NOT NULL,
+     questions INTEGER NOT NULL
+   );`,
+  `CREATE TABLE depots (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     type TEXT NOT NULL,
+     bytes BLOB NOT NULL,
+     created_at TEXT NOT NULL
+   );`,
 ];
 
 export function openDb(path: string): DatabaseSync {

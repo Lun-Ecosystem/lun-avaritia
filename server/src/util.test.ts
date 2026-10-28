@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { startLoop } from './util.ts';
+import { parisMonthStart, startLoop } from './util.ts';
 
 describe('startLoop', () => {
   it('runs at once, never twice at a time, and keeps going after an error', async () => {
@@ -7,7 +7,7 @@ describe('startLoop', () => {
     const run = vi
       .fn<() => Promise<void>>()
       .mockImplementationOnce(() => new Promise<void>((r) => (release = r)))
-      .mockRejectedValueOnce(new Error('Google 503'))
+      .mockRejectedValueOnce(new Error('Provider 503'))
       .mockResolvedValue(undefined);
     const onError = vi.fn();
     const loop = startLoop(run, { intervalMs: 3_600_000, onError });
@@ -17,9 +17,17 @@ describe('startLoop', () => {
     release();
     await second;
     await loop.runNow();
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Google 503' }));
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider 503' }));
     await loop.runNow();
     expect(run).toHaveBeenCalledTimes(3);
     loop.stop();
+  });
+});
+
+describe('parisMonthStart', () => {
+  it('starts at midnight Paris on the 1st, across a clock change', () => {
+    expect(parisMonthStart(new Date('2026-11-02T04:00:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
+    expect(parisMonthStart(new Date('2026-03-31T21:30:00Z')).toISOString()).toBe('2026-02-28T23:00:00.000Z');
+    expect(parisMonthStart(new Date('2026-10-31T23:30:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
   });
 });

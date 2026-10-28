@@ -25,7 +25,7 @@ describe('standalone app hosting', () => {
 
   it('forbids framing the HTML pages, the authorization page included', async () => {
     const { app } = makeHarness({ staticDir: appDist() });
-    for (const path of ['/', '/?autoriser=1&client=x', '/agenda', '/index.html']) {
+    for (const path of ['/', '/?autoriser=1&client=x', '/fiches', '/index.html']) {
       const res = await app.request(path);
       expect(res.headers.get('content-security-policy'), path).toBe("frame-ancestors 'none'");
       expect(res.headers.get('x-frame-options'), path).toBe('DENY');
@@ -46,7 +46,7 @@ describe('standalone app hosting', () => {
 
   it('falls back to the shell for app routes but not for the API', async () => {
     const { app } = makeHarness({ staticDir: appDist() });
-    expect(await (await app.request('/agenda')).text()).toContain('Lun’Avaritia');
+    expect(await (await app.request('/fiches')).text()).toContain('Lun’Avaritia');
     const api = await app.request('/api/nope');
     expect(api.headers.get('content-type')).toMatch(/json/);
     const contract = await app.request('/lun/v1/nope');

@@ -51,3 +51,46 @@ export interface ModelChoice {
   provider: ProviderId;
   model: string;
 }
+
+/** A category of fiche (Personne, Projet...), editable by the user. */
+export interface FicheType {
+  id: number;
+  name: string;
+}
+
+export interface Source {
+  kind: 'core' | 'note' | 'depot' | 'import';
+  origin?: string | undefined;
+  ref?: string | undefined;
+  at: string;
+}
+
+/** A sourced statement; a contradicted one is struck and dated, never erased. */
+export interface Fact {
+  id: number;
+  ficheId: number;
+  text: string;
+  source: Source;
+  at: string;
+  struckAt?: string;
+  struckBy?: number;
+}
+
+export interface Link {
+  from: number;
+  to: number;
+  relation: string;
+}
+
+export interface Fiche {
+  id: number;
+  typeId: number;
+  title: string;
+  synthesis: string;
+  createdAt: string;
+  updatedAt: string;
+  facts: Fact[];
+  links: Link[];
+  /** Set when the fiche was merged into another: it is struck, its facts and links moved. */
+  mergedInto?: number;
+}
