@@ -50,7 +50,10 @@
     e.preventDefault();
     over = true;
   }}
-  ondragleave={() => (over = false)}
+  ondragleave={(e) => {
+    // Crossing into a child fires a leave on the zone: not a real exit.
+    if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) over = false;
+  }}
   ondrop={directory ? undefined : drop}
 >
   <span class="rond" aria-hidden="true"><Icon size={20} strokeWidth={ICON_STROKE} /></span>

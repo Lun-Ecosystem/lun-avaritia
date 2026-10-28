@@ -60,6 +60,7 @@
     result = null;
     error = null;
     let drafts = 0;
+    const failed: string[] = [];
     try {
       for (const file of files) {
         const form = new FormData();
@@ -67,11 +68,13 @@
         try {
           drafts += (await api.upload<{ drafts: number }>('/api/depots', form)).drafts;
         } catch (e) {
-          error = files.length > 1 ? `${file.name} : ${message(e)}` : message(e);
-          break;
+          failed.push(files.length > 1 ? `${file.name} : ${message(e)}` : message(e));
         }
       }
-      if (!error)
+      const ok = files.length - failed.length;
+      if (failed.length)
+        error = (files.length > 1 ? `${ok} sur ${files.length} déposés. ` : '') + failed.join(' ');
+      if (ok > 0)
         result = {
           text:
             drafts > 1 ? `${drafts} brouillons créés` : drafts ? 'Brouillon créé' : 'Aucun brouillon créé',
@@ -143,7 +146,8 @@
 
   {#if error}
     <Banner title="Dépôt refusé">{error}</Banner>
-  {:else if result}
+  {/if}
+  {#if result}
     <Banner tone="info" title={result.text}>
       {#if result.link}<a href="/valider">Voir à valider</a>{/if}
     </Banner>

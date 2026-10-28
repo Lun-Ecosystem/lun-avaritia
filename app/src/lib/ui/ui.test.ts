@@ -159,6 +159,20 @@ describe('DropZone', () => {
     expect(onfiles).toHaveBeenCalledOnce();
   });
 
+  it('keeps the drop highlight when the pointer moves onto a child', async () => {
+    const { container } = render(DropZone, { props: { ...props, onfiles: vi.fn() } });
+    const zone = container.querySelector('.zone')!;
+    // jsdom has no DragEvent: the target is set by hand.
+    const leave = (relatedTarget: Node) =>
+      Object.assign(new Event('dragleave', { bubbles: true }), { relatedTarget });
+    await fireEvent.dragOver(zone);
+    expect(zone).toHaveClass('over');
+    await fireEvent(zone, leave(screen.getByText('Déposer')));
+    expect(zone).toHaveClass('over');
+    await fireEvent(zone, leave(document.body));
+    expect(zone).not.toHaveClass('over');
+  });
+
   it('picks a folder with directory', () => {
     render(DropZone, { props: { ...props, directory: true, onfiles: vi.fn() } });
     expect(screen.getByLabelText('Choisir')).toHaveAttribute('webkitdirectory');

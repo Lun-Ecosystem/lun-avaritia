@@ -55,6 +55,22 @@ describe('Dépôts', () => {
     expect(await screen.findByText('PDF non pris en charge en v1')).toBeInTheDocument();
   });
 
+  it('reports every file of a multi-file drop, even when one is refused', async () => {
+    let call = 0;
+    const { upload } = show({
+      upload: () => {
+        if (++call === 2) throw new ApiError(400, 'PDF non pris en charge en v1');
+        return { depot: call, drafts: 1 };
+      },
+    });
+    const files = [new File(['1'], 'a.md'), new File(['x'], 'b.pdf'), new File(['3'], 'c.md')];
+    await userEvent.setup({ applyAccept: false }).upload(screen.getByLabelText('Choisir un document'), files);
+    expect(await screen.findByText('2 brouillons créés')).toBeInTheDocument();
+    expect(screen.getByText('2 sur 3 déposés. b.pdf : PDF non pris en charge en v1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Voir à valider' })).toBeInTheDocument();
+    expect(upload).toHaveBeenCalledTimes(3);
+  });
+
   it('lists the deposits with their pending drafts', async () => {
     show({ rows: [row(2, 'contrat.md', 2, 5), row(1, 'idee.txt', 1, 1)] });
     expect(await screen.findByText('contrat.md')).toBeInTheDocument();
