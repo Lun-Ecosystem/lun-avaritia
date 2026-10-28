@@ -8,6 +8,7 @@
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
+  import Depots from './screens/Depots.svelte';
   import Memoire from './screens/Memoire.svelte';
   import Tableau from './screens/Tableau.svelte';
   import Valider from './screens/Valider.svelte';
@@ -140,6 +141,8 @@
         <Valider {filtre} />
       {:else if route === 'memoire'}
         <Memoire {fiche} {mode} />
+      {:else if route === 'depots'}
+        <Depots />
       {:else}
         <EmptyState
           size="grand"

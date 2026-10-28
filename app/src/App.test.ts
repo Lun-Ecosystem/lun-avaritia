@@ -73,10 +73,10 @@ describe('App', () => {
     const user = userEvent.setup();
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
-    await user.click(within(rail).getByRole('link', { name: /Dépôts/ }));
-    expect(window.location.pathname).toBe('/depots');
-    expect(within(rail).getByRole('link', { name: /Dépôts/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { level: 2, name: 'Dépôts' })).toBeInTheDocument();
+    await user.click(within(rail).getByRole('link', { name: /Réglages/ }));
+    expect(window.location.pathname).toBe('/reglages');
+    expect(within(rail).getByRole('link', { name: /Réglages/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('heading', { level: 2, name: 'Réglages' })).toBeInTheDocument();
 
     history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/'));

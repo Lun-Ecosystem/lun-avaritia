@@ -17,6 +17,8 @@
     confirmLabel: string;
     onconfirm: () => Promise<void>;
     cancelLabel?: string | undefined;
+    /** `danger-plein` for what removes data for good. */
+    confirmVariant?: 'danger' | 'danger-plein' | undefined;
     open?: boolean | undefined;
     /** Optional trigger: spread `props` on a button. */
     trigger?: Snippet<[{ props: Record<string, unknown> }]> | undefined;
@@ -30,6 +32,7 @@
     confirmLabel,
     onconfirm,
     cancelLabel = 'Annuler',
+    confirmVariant = 'danger',
     open = $bindable(false),
     trigger,
     returnFocus,
@@ -105,7 +108,7 @@
                 <Button {...cancelProps} variant="secondaire" disabled={busy}>{cancelLabel}</Button>
               {/snippet}
             </AlertDialog.Cancel>
-            <Button variant="danger" loading={busy} onclick={confirm}>{confirmLabel}</Button>
+            <Button variant={confirmVariant} loading={busy} onclick={confirm}>{confirmLabel}</Button>
           </div>
         </div>
       {/snippet}

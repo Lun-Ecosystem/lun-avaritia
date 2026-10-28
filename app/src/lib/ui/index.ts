@@ -11,6 +11,7 @@ export { default as CommandPalette } from './CommandPalette.svelte';
 export { default as ConfirmDialog } from './ConfirmDialog.svelte';
 export { default as DayGroup } from './DayGroup.svelte';
 export { default as Dialog } from './Dialog.svelte';
+export { default as DropZone } from './DropZone.svelte';
 export { default as EmptyState } from './EmptyState.svelte';
 export { default as Fab } from './Fab.svelte';
 export { default as Field } from './Field.svelte';

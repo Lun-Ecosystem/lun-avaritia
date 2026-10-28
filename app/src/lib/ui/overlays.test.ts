@@ -211,6 +211,13 @@ describe('ConfirmDialog', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
+  it('can confirm with the full danger button', () => {
+    render(ConfirmDialog, {
+      props: { ...props, open: true, onconfirm: vi.fn(), confirmVariant: 'danger-plein' },
+    });
+    expect(screen.getByRole('button', { name: props.confirmLabel })).toHaveClass('danger-plein');
+  });
+
   it('stays open and says why when the action fails', async () => {
     const user = userEvent.setup();
     const onconfirm = vi.fn(() => Promise.reject(new Error('Le serveur ne répond pas.')));

@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import FieldFixture from '../../testing/FieldFixture.svelte';
 import TextAreaFixture from '../../testing/TextAreaFixture.svelte';
 import Badge from './Badge.svelte';
 import Button from './Button.svelte';
+import DropZone from './DropZone.svelte';
 import { Archive } from './Icon.ts';
 import IconButton from './IconButton.svelte';
 import Segmented from './Segmented.svelte';
@@ -133,5 +134,33 @@ describe('TextArea', () => {
     expect(area.tagName).toBe('TEXTAREA');
     await user.type(area, ' suite');
     expect(screen.getByText('Valeur : Texte suite')).toBeInTheDocument();
+  });
+});
+
+describe('DropZone', () => {
+  const props = { title: 'Déposer', label: 'Choisir', icon: Archive };
+
+  it('hands over the chosen files', async () => {
+    const onfiles = vi.fn();
+    render(DropZone, { props: { ...props, onfiles } });
+    const f = new File(['x'], 'a.md');
+    await userEvent.setup().upload(screen.getByLabelText('Choisir'), f);
+    expect(onfiles).toHaveBeenCalledWith([f]);
+  });
+
+  it('hands over dropped files, but not while busy', async () => {
+    const onfiles = vi.fn();
+    const { container, rerender } = render(DropZone, { props: { ...props, onfiles } });
+    const f = new File(['x'], 'a.md');
+    await fireEvent.drop(container.querySelector('.zone')!, { dataTransfer: { files: [f] } });
+    expect(onfiles).toHaveBeenCalledWith([f]);
+    await rerender({ busy: true });
+    await fireEvent.drop(container.querySelector('.zone')!, { dataTransfer: { files: [f] } });
+    expect(onfiles).toHaveBeenCalledOnce();
+  });
+
+  it('picks a folder with directory', () => {
+    render(DropZone, { props: { ...props, directory: true, onfiles: vi.fn() } });
+    expect(screen.getByLabelText('Choisir')).toHaveAttribute('webkitdirectory');
   });
 });
