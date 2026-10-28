@@ -3,13 +3,14 @@
   import { createApi, type Api } from './api.ts';
   import { readAuthorization } from './authorization.ts';
   import Authorize from './Authorize.svelte';
-  import { Button, EmptyState, icons, StandaloneCard } from './lib/ui/index.ts';
+  import { Button, StandaloneCard } from './lib/ui/index.ts';
   import Pair from './Pair.svelte';
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
   import Depots from './screens/Depots.svelte';
   import Memoire from './screens/Memoire.svelte';
+  import Reglages from './screens/Reglages.svelte';
   import Tableau from './screens/Tableau.svelte';
   import Valider from './screens/Valider.svelte';
 
@@ -63,12 +64,17 @@
   let status = $state({ paused: false, core: false });
   let counts = $state({ valider: 0, fiches: 0 });
 
-  $effect(() => {
+  /** Reads the service state again (at pairing, after a pause or a resume in the settings). */
+  async function readHealth() {
     const a = api;
     if (!a) return;
-    a.get<{ status: string; paused?: boolean }>('/lun/v1/health')
+    await a
+      .get<{ status: string; paused?: boolean }>('/lun/v1/health')
       .then((h) => (status.paused = h.status === 'paused' || h.paused === true))
       .catch(() => {});
+  }
+  $effect(() => {
+    void readHealth();
   });
 
   // Rail counters, read again at each change of screen.
@@ -106,14 +112,6 @@
     follow();
   }
 
-  const TITLES: Record<Route, string> = {
-    tableau: 'Tableau de bord',
-    valider: 'À valider',
-    memoire: 'Mémoire',
-    depots: 'Dépôts',
-    reglages: 'Réglages',
-  };
-
   function paired(t: string) {
     saveToken(localStorage, t);
     notice = null;
@@ -144,13 +142,7 @@
       {:else if route === 'depots'}
         <Depots />
       {:else}
-        <EmptyState
-          size="grand"
-          tone="neutre"
-          icon={icons.Clock}
-          title={TITLES[route]}
-          message="Bientôt ici."
-        />
+        <Reglages paused={status.paused} onservice={readHealth} />
       {/if}
     {/key}
   </Shell>

@@ -20,6 +20,8 @@ export interface Option {
   /** Second line of the entry, in the open list only. */
   hint?: string;
   disabled?: boolean;
+  /** Before the label in a segmented control; alone with `iconOnly`, the label naming it. */
+  icon?: IconComponent;
 }
 
 /**

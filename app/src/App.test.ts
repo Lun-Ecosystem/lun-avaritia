@@ -6,7 +6,7 @@ import App from './App.svelte';
 const TOKEN_KEY = 'lunavaritia.token';
 
 /** A fake Lun'Avaritia server: records each call as `METHOD /path`; `revoked` answers 401 to all. */
-function fakeServer({ revoked = false } = {}) {
+function fakeServer({ revoked = false, paused = true } = {}) {
   const calls: string[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -14,7 +14,12 @@ function fakeServer({ revoked = false } = {}) {
     calls.push(key);
     if (key === 'POST /lun/v1/pair') return json({ token: 'tok-2', satellite: {} });
     if (revoked) return json({ error: 'Jeton absent, invalide ou révoqué' }, 401);
-    if (key === 'GET /lun/v1/health') return json({ status: 'paused', version: '0.0.0', agent: true });
+    if (key === 'POST /lun/v1/pause') {
+      paused = true;
+      return json({ status: 'paused' });
+    }
+    if (key === 'GET /lun/v1/health')
+      return json({ status: paused ? 'paused' : 'ok', version: '0.0.0', agent: true });
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
@@ -76,7 +81,7 @@ describe('App', () => {
     await user.click(within(rail).getByRole('link', { name: /Réglages/ }));
     expect(window.location.pathname).toBe('/reglages');
     expect(within(rail).getByRole('link', { name: /Réglages/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { level: 2, name: 'Réglages' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
 
     history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/'));
@@ -93,6 +98,18 @@ describe('App', () => {
     localStorage.setItem(TOKEN_KEY, 'tok-1');
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+  });
+
+  it('Pause in the settings turns the service card of the rail to paused at once', async () => {
+    fakeServer({ paused: false });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', '/reglages');
+    const user = userEvent.setup();
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Pause' }));
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
   });
 

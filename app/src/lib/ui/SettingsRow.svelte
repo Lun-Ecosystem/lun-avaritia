@@ -10,13 +10,15 @@
     label: string;
     /** Help or state under the label. */
     hint?: string | Snippet | undefined;
+    /** Replaces the hint (a refused value), announced. */
+    error?: string | null | undefined;
     /** Before the text (an avatar, an icon). */
     start?: Snippet | undefined;
     children?: Snippet<[{ labelId: string }]> | undefined;
     class?: string | undefined;
   };
 
-  let { label, hint, start, children, class: className }: Props = $props();
+  let { label, hint, error, start, children, class: className }: Props = $props();
   const uid = $props.id();
   const labelId = `${uid}-libelle`;
 </script>
@@ -25,7 +27,9 @@
   {#if start}<span class="debut">{@render start()}</span>{/if}
   <div class="texte">
     <div class="libelle" id={labelId}>{label}</div>
-    {#if typeof hint === 'string'}
+    {#if error}
+      <div class="aide erreur" role="alert">{error}</div>
+    {:else if typeof hint === 'string'}
       <div class="aide">{hint}</div>
     {:else if hint}
       <div class="aide">{@render hint()}</div>
@@ -63,6 +67,9 @@
     margin-top: 2px;
     font-size: 12.5px;
     color: var(--texte-3);
+  }
+  .erreur {
+    color: var(--danger);
   }
   .controle {
     display: flex;

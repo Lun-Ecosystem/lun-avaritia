@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ToggleGroup } from 'bits-ui';
   import { getField } from './field.ts';
+  import { ICON_STROKE } from './Icon.ts';
   import type { DemoState, Option } from './types.ts';
 
   type Props = {
@@ -11,6 +12,8 @@
     disabled?: boolean | undefined;
     size?: 'petit' | 'normal' | undefined;
     onchange?: ((value: string) => void) | undefined;
+    /** Icons only, each option named by its label (a choice of icon). */
+    iconOnly?: boolean | undefined;
     class?: string | undefined;
     /** Forced state of the option `etatValue`, for the catalogue page only. */
     'data-etat'?: DemoState | undefined;
@@ -24,6 +27,7 @@
     disabled = false,
     size = 'normal',
     onchange,
+    iconOnly = false,
     class: className,
     'data-etat': etat,
     etatValue,
@@ -58,10 +62,14 @@
             <button
               {...itemProps}
               type="button"
-              class={['option', { on: pressed }]}
+              class={['option', { on: pressed, icone: iconOnly && option.icon }]}
+              aria-label={iconOnly && option.icon ? option.label : undefined}
               data-etat={option.value === etatValue ? etat : undefined}
             >
-              {option.label}
+              {#if option.icon}
+                <option.icon size={16} strokeWidth={ICON_STROKE} aria-hidden="true" />
+              {/if}
+              {#if !(iconOnly && option.icon)}{option.label}{/if}
             </button>
           {/snippet}
         </ToggleGroup.Item>
@@ -94,6 +102,19 @@
     transition:
       background-color 120ms ease,
       color 120ms ease;
+  }
+  .option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .option.icone {
+    width: 36px;
+    padding: 0;
+  }
+  .petit .option.icone {
+    width: 30px;
   }
   .option:first-child {
     border-left: 0;

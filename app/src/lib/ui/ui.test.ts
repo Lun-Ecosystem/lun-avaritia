@@ -6,9 +6,10 @@ import TextAreaFixture from '../../testing/TextAreaFixture.svelte';
 import Badge from './Badge.svelte';
 import Button from './Button.svelte';
 import DropZone from './DropZone.svelte';
-import { Archive } from './Icon.ts';
+import { Archive, Feather, Moon } from './Icon.ts';
 import IconButton from './IconButton.svelte';
 import Segmented from './Segmented.svelte';
+import SettingsRow from './SettingsRow.svelte';
 import Slider from './Slider.svelte';
 import Switch from './Switch.svelte';
 import { createRawSnippet } from 'svelte';
@@ -52,6 +53,34 @@ describe('Segmented', () => {
     await user.click(screen.getByRole('radio', { name: 'Mois' }));
     expect(onchange).toHaveBeenCalledOnce();
     expect(screen.getByRole('radio', { name: 'Mois' })).toHaveAttribute('aria-checked', 'true');
+  });
+  it('shows icons alone, each named by its label', async () => {
+    const onchange = vi.fn();
+    render(Segmented, {
+      props: {
+        options: [
+          { value: 'feather', label: 'Plume', icon: Feather },
+          { value: 'moon', label: 'Lune', icon: Moon },
+        ],
+        value: 'feather',
+        label: 'Icône',
+        iconOnly: true,
+        onchange,
+      },
+    });
+    const lune = screen.getByRole('radio', { name: 'Lune' });
+    expect(lune).not.toHaveTextContent('Lune');
+    expect(lune.querySelector('svg')).not.toBeNull();
+    await userEvent.setup().click(lune);
+    expect(onchange).toHaveBeenCalledWith('moon');
+  });
+});
+
+describe('SettingsRow', () => {
+  it('an error replaces the hint and is announced', () => {
+    render(SettingsRow, { props: { label: 'Plafond', hint: 'Entre 1 et 100', error: 'Valeur refusée' } });
+    expect(screen.queryByText('Entre 1 et 100')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('Valeur refusée');
   });
 });
 
