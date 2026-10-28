@@ -3,50 +3,22 @@
    Seule source : les dépôts en gardent une copie générée par tools/sync-tokens.mjs. */
 :root {
   /* socle Lun' : identique pour toutes les interfaces */
-  --encre: #0d0b09;
-  --encre-2: #1a1612;
-  --ivoire: #f0ebe1;
-  --papier: #e8e2d6;
-  --lune: #c8c0b0;
-  --lavis: #8a9bae;
-  --rouge: #7a1818;
-  --fond: var(--encre);
-  --surface-1: var(--encre-2);
-  --surface-2: #221d18;
-  --surface-3: #2b251f;
-  --survol: rgba(240, 235, 225, 0.045);
-  --appui: rgba(240, 235, 225, 0.08);
-  --bordure: rgba(200, 192, 176, 0.12);
-  --bordure-forte: rgba(200, 192, 176, 0.24);
-  --texte: var(--ivoire);
-  --texte-2: var(--lune);
-  --texte-3: #958c7e;
+  --encre:#0D0B09; --encre-2:#1A1612; --ivoire:#F0EBE1; --papier:#E8E2D6; --lune:#C8C0B0; --lavis:#8A9BAE; --rouge:#7A1818;
+  --fond:var(--encre); --surface-1:var(--encre-2); --surface-2:#221D18; --surface-3:#2B251F;
+  --survol:rgba(240,235,225,.045); --appui:rgba(240,235,225,.08);
+  --bordure:rgba(200,192,176,.12); --bordure-forte:rgba(200,192,176,.24);
+  --texte:var(--ivoire); --texte-2:var(--lune); --texte-3:#958C7E;
   /* tons : couleur, fond doux, bordure (communs) */
-  --ok: #7cc29b;
-  --ok-doux: rgba(124, 194, 155, 0.12);
-  --ok-bord: rgba(124, 194, 155, 0.38);
-  --attention: #e0b36a;
-  --attention-doux: rgba(224, 179, 106, 0.12);
-  --attention-bord: rgba(224, 179, 106, 0.38);
-  --danger: #e3a0a0;
-  --danger-plein: #7a1818;
-  --danger-doux: rgba(227, 160, 160, 0.1);
-  --danger-bord: rgba(227, 160, 160, 0.38);
-  --info: #8a9bae;
-  --info-doux: rgba(138, 155, 174, 0.12);
-  --info-bord: rgba(138, 155, 174, 0.38);
-  --ia: #b9a7e0;
-  --ia-doux: rgba(185, 167, 224, 0.11);
-  --ia-bord: rgba(185, 167, 224, 0.36);
+  --ok:#7CC29B; --ok-doux:rgba(124,194,155,.12); --ok-bord:rgba(124,194,155,.38);
+  --attention:#E0B36A; --attention-doux:rgba(224,179,106,.12); --attention-bord:rgba(224,179,106,.38);
+  --danger:#E3A0A0; --danger-plein:#7A1818; --danger-doux:rgba(227,160,160,.10); --danger-bord:rgba(227,160,160,.38);
+  --info:#8A9BAE; --info-doux:rgba(138,155,174,.12); --info-bord:rgba(138,155,174,.38);
+  --ia:#B9A7E0; --ia-doux:rgba(185,167,224,.11); --ia-bord:rgba(185,167,224,.36);
   /* forme */
-  --r-1: 6px;
-  --r-2: 10px;
-  --r-3: 14px;
-  --r-rond: 999px;
-  --ombre-1: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --ombre-2: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
-  --serif: 'Cormorant Garamond', Georgia, serif;
-  --sans: 'Inter', system-ui, sans-serif;
+  --r-1:6px; --r-2:10px; --r-3:14px; --r-rond:999px;
+  --ombre-1:0 1px 2px rgba(0,0,0,.35);
+  --ombre-2:0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
+  --serif:'Cormorant Garamond',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
 }
 
 /* monde : seule couche qui change d’une interface à l’autre.
@@ -55,9 +27,6 @@
 
 /* bleu nuit Avaritia jamais en texte : --accent-texte reprend le texte du socle */
 [data-monde='avaritia'] {
-  --accent: #1a3070;
-  --accent-survol: #234090;
-  --accent-texte: var(--texte);
-  --accent-doux: rgba(26, 48, 112, 0.3);
-  --accent-bord: rgba(140, 165, 225, 0.36);
+  --accent:#1A3070; --accent-survol:#234090; --accent-texte:var(--texte);
+  --accent-doux:rgba(26,48,112,.30); --accent-bord:rgba(140,165,225,.36);
 }
