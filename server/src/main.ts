@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
-import { createApp } from './app.ts';
+import { brainDeps, createApp, type AppDeps } from './app.ts';
+import { runPending } from './brain/ingest.ts';
 import { ActionRegistry } from './contract/actions.ts';
 import { bootstrapPairing } from './contract/auth.ts';
 import { pruneEvents } from './contract/events.ts';
@@ -32,7 +33,7 @@ const appDist = resolve(root, 'app/dist');
 const staticDir = existsSync(resolve(appDist, 'index.html')) ? appDist : undefined;
 const secretKey = process.env.AVARITIA_SECRET_KEY || undefined;
 const llmEnv = llmEnvFrom(process.env);
-const app = createApp({
+const appDeps: AppDeps = {
   db,
   clock,
   version,
@@ -41,7 +42,10 @@ const app = createApp({
   secretKey,
   llmEnv,
   checkKey: checkWithProvider,
-});
+};
+const app = createApp(appDeps);
+// Lots left waiting by the last run (a restart is also a chance for the held ones).
+runPending(brainDeps(appDeps)).catch((err) => console.warn('Traitement des lots :', err));
 
 bootstrapPairing(db, clock(), (line) => console.log(line));
 if (!configuredProviders(db, secretKey, llmEnv).length)

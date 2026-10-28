@@ -91,6 +91,28 @@ const MIGRATIONS: string[] = [
      skipped_synthesis INTEGER NOT NULL DEFAULT 0,
      warnings TEXT NOT NULL DEFAULT '[]'
    );`,
+  `CREATE TABLE lots (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     status TEXT NOT NULL CHECK (status IN ('queued', 'held', 'running', 'done', 'failed')),
+     reason TEXT,
+     created_at TEXT NOT NULL
+   );
+   CREATE TABLE observations (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     lot INTEGER NOT NULL REFERENCES lots(id),
+     text TEXT NOT NULL,
+     source TEXT NOT NULL
+   );
+   CREATE TABLE runs (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     lot INTEGER NOT NULL REFERENCES lots(id),
+     at TEXT NOT NULL,
+     duration_ms INTEGER NOT NULL,
+     cost REAL NOT NULL,
+     observations INTEGER NOT NULL,
+     drafts INTEGER NOT NULL,
+     questions INTEGER NOT NULL
+   );`,
 ];
 
 export function openDb(path: string): DatabaseSync {

@@ -12,8 +12,10 @@ import {
   revokeClient,
 } from './contract/auth.ts';
 import { allowAuthorization, denyAuthorization, readAuthorizationRequest } from './contract/authorize.ts';
+import { registerCatalog } from './contract/catalog.ts';
 import { contractRoutes } from './contract/routes.ts';
-import type { KeyChecker, LlmEnv } from './llm/keys.ts';
+import type { BrainDeps } from './brain/process.ts';
+import { choiceFor, makeProvider, providerFor, type KeyChecker, type LlmEnv } from './llm/keys.ts';
 import { llmRoutes, type ModelLister } from './llm/routes.ts';
 import { serveApp } from './static.ts';
 
@@ -35,9 +37,27 @@ export interface AppDeps {
   checkKey?: KeyChecker | undefined;
   /** How the custom endpoint lists its models; its `models.list` by default. */
   listCustomModels?: ModelLister | undefined;
+  /** The brain's providers; the models chosen in Réglages by default (tests inject a fake). */
+  brainProvider?: BrainDeps['provider'] | undefined;
+}
+
+export function brainDeps(deps: AppDeps): BrainDeps {
+  return {
+    db: deps.db,
+    clock: deps.clock,
+    provider:
+      deps.brainProvider ??
+      ((use) => {
+        const env = deps.llmEnv ?? {};
+        const choice = choiceFor(deps.db, deps.secretKey, env, use);
+        const provider = choice && providerFor(deps.db, deps.secretKey, env, choice.provider, makeProvider);
+        return choice && provider ? { provider, model: choice.model } : undefined;
+      }),
+  };
 }
 
 export function createApp(deps: AppDeps): Hono {
+  registerCatalog(deps.actions, brainDeps(deps), deps.log ?? console.warn);
   const app = new Hono();
   app.route('/lun/v1', contractRoutes(deps));
   // Every /api route, whichever module mounts it, is for paired devices only.
