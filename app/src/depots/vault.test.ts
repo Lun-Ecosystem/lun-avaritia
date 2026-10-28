@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readVault } from './vault.ts';
 
 function file(name: string, text: string, path = name) {
@@ -25,6 +25,14 @@ describe('readVault', () => {
   it('flags a vault above 20 000 000 characters', async () => {
     const v = await readVault([file('a.md', 'x'.repeat(20_000_001))]);
     expect(v.tooBig).toBe(true);
+  });
+
+  it('refuses a huge vault by its size, before reading any file', async () => {
+    const huge = file('a.md', 'x');
+    Object.defineProperty(huge, 'size', { value: 60_000_001 });
+    const text = vi.spyOn(huge, 'text');
+    expect((await readVault([huge])).tooBig).toBe(true);
+    expect(text).not.toHaveBeenCalled();
   });
 
   it('flags a vault above 2 000 files', async () => {

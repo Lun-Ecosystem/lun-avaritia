@@ -14,6 +14,9 @@ export async function readVault(files: File[]): Promise<Vault> {
   const notes = files.filter((f) => /\.md$/i.test(f.name));
   const skipped = files.length - notes.length;
   if (notes.length > MAX_FILES) return { files: [], skipped, tooBig: true };
+  // Pre-check before reading: a character takes at most 3 bytes, so more than 3x the limit is too big.
+  if (notes.reduce((n, f) => n + f.size, 0) > MAX_VAULT_CHARS * 3)
+    return { files: [], skipped, tooBig: true };
   const read = await Promise.all(
     notes.map(async (f) => ({ path: f.webkitRelativePath || f.name, text: await f.text() })),
   );
