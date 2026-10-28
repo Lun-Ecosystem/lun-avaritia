@@ -11,7 +11,16 @@ import { dashboard } from './dashboard.ts';
 import { exportMarkdown } from './export.ts';
 import { parseVault } from './obsidian.ts';
 import { readSettings, saveSettings, setting } from './settings.ts';
-import { addType, editFiche, getFiche, listTypes, removeType, renameType, versions } from './store.ts';
+import {
+  addType,
+  editFiche,
+  getFiche,
+  listTypes,
+  neighbors,
+  removeType,
+  renameType,
+  versions,
+} from './store.ts';
 
 const MAX_FILES = 2000;
 const MAX_VAULT_CHARS = 20_000_000;
@@ -101,15 +110,7 @@ export function brainRoutes(deps: AppDeps): Hono {
     } catch {
       return c.json({ error: 'Fiche inconnue' }, 404);
     }
-    const neighbors = deps.db
-      .prepare(
-        `SELECT f.id, f.title, l.relation, 'out' AS direction FROM links l JOIN fiches f ON f.id = l.to_id
-          WHERE l.from_id = ?1 AND f.merged_into IS NULL
-         UNION ALL
-         SELECT f.id, f.title, l.relation, 'in' FROM links l JOIN fiches f ON f.id = l.from_id
-          WHERE l.to_id = ?1 AND f.merged_into IS NULL ORDER BY 1`,
-      )
-      .all(fiche.id);
+    const around = neighbors(deps.db, fiche.id);
     // A fact's source cites its depot (a note is a depot too) by id in `ref`.
     const depots = deps.db
       .prepare(
@@ -120,7 +121,7 @@ export function brainRoutes(deps: AppDeps): Hono {
       .all(fiche.id);
     return c.json({
       fiche,
-      neighbors,
+      neighbors: around,
       depots,
       versions: versions(deps.db, fiche.id),
       ...(fiche.id !== asked && { redirectedFrom: asked }),
