@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
 import Types from './Types.svelte';
 
-function show() {
+function show(opts: { slowPatch?: Promise<void> } = {}) {
   let types = [
     { id: 1, name: 'Personne' },
     { id: 2, name: 'Projet' },
@@ -16,6 +16,7 @@ function show() {
       return { id: 3 };
     }
     if (method === 'PATCH') {
+      await opts.slowPatch;
       types = types.map((t) => (path.endsWith(`/${t.id}`) ? { ...t, name: body!.name } : t));
       return { types };
     }
@@ -49,6 +50,22 @@ describe('Types de fiches', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Renommer' }));
     expect(send).toHaveBeenCalledWith('PATCH', '/api/types/2', { name: 'Chantier' });
     expect(await screen.findByText('Chantier')).toBeInTheDocument();
+  });
+
+  it('a double submit of a rename sends one PATCH', async () => {
+    let release: () => void = () => {};
+    const { send, user } = show({ slowPatch: new Promise<void>((r) => (release = r)) });
+    await screen.findByText('Projet');
+    await user.click(screen.getByRole('button', { name: 'Renommer Projet' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Renommer le type' });
+    const field = within(dialog).getByRole('textbox', { name: 'Nom' });
+    await user.clear(field);
+    await user.type(field, 'Chantier');
+    await user.type(field, '{Enter}');
+    await user.click(within(dialog).getByRole('button', { name: 'Renommer' }));
+    release();
+    expect(await screen.findByText('Chantier')).toBeInTheDocument();
+    expect(send.mock.calls.filter(([m]) => m === 'PATCH')).toHaveLength(1);
   });
 
   it('removing a type in use shows the error of the server', async () => {

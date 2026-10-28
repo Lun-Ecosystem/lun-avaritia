@@ -5,7 +5,6 @@
     Badge,
     Button,
     ConfirmDialog,
-    Dialog,
     Field,
     icons,
     SettingsRow,
@@ -13,6 +12,7 @@
     toast,
     type Tone,
   } from '../lib/ui/index.ts';
+  import Dialog from '../lib/ui/Dialog.svelte';
   import { expiryLine } from './expiry.ts';
   import type { ProviderId, ProviderView } from './types.ts';
 

@@ -6,16 +6,16 @@
     Banner,
     Button,
     ConfirmDialog,
-    Dialog,
     ICON_STROKE,
     icons,
     SettingsCard,
     Skeleton,
     toast,
   } from '../lib/ui/index.ts';
+  import Dialog from '../lib/ui/Dialog.svelte';
 
   /*
-   * What holds an access to Lun'Avaritia (copied from Lun'Avaritia): each device and app, since when
+   * What holds an access to Lun'Avaritia (copied from Lun'Acedia): each device and app, since when
    * (the server keeps no last activity), this browser marked. Removing one asks first and says what
    * follows; removing this browser sends it back to pairing.
    */

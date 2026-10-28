@@ -1,4 +1,8 @@
-/** Base ui components of the Lun' views (plate 10), styled only by the shared tokens. */
+/**
+ * Base ui components of the Lun' views (plate 10), styled only by the shared tokens.
+ * Dialog, Select and Switch are imported from their own files: whatever this barrel names joins the
+ * first load, and only the screens loaded on demand use them (with bits-ui and floating-ui, about 75 kB).
+ */
 export { default as AutoMark } from './AutoMark.svelte';
 export { default as Badge } from './Badge.svelte';
 export { default as Banner } from './Banner.svelte';
@@ -10,7 +14,6 @@ export { default as CodeInput } from './CodeInput.svelte';
 export { default as CommandPalette } from './CommandPalette.svelte';
 export { default as ConfirmDialog } from './ConfirmDialog.svelte';
 export { default as DayGroup } from './DayGroup.svelte';
-export { default as Dialog } from './Dialog.svelte';
 export { default as DropZone } from './DropZone.svelte';
 export { default as EmptyState } from './EmptyState.svelte';
 export { default as Fab } from './Fab.svelte';
@@ -26,7 +29,6 @@ export { default as ProposalCard } from './ProposalCard.svelte';
 export { default as ProposalChip } from './ProposalChip.svelte';
 export { default as Rail } from './Rail.svelte';
 export { default as Segmented } from './Segmented.svelte';
-export { default as Select } from './Select.svelte';
 export { default as ServiceCard } from './ServiceCard.svelte';
 export { default as SettingsCard } from './SettingsCard.svelte';
 export { default as SettingsRow } from './SettingsRow.svelte';
@@ -35,7 +37,6 @@ export { default as Slider } from './Slider.svelte';
 export { default as StatCard } from './StatCard.svelte';
 export { default as StandaloneCard } from './StandaloneCard.svelte';
 export { default as Steps } from './Steps.svelte';
-export { default as Switch } from './Switch.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as TextArea } from './TextArea.svelte';
 export { default as TextInput } from './TextInput.svelte';

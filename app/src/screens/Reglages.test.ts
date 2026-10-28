@@ -20,7 +20,13 @@ const PROVIDERS = [
 ];
 
 /** A fake server: `send` merges a settings patch, `put` lets a test refuse one. */
-function show(opts: { paused?: boolean; refuse?: (body: Record<string, unknown>) => string | null } = {}) {
+function show(
+  opts: {
+    paused?: boolean;
+    refuse?: (body: Record<string, unknown>) => string | null;
+    providers?: () => Promise<unknown>;
+  } = {},
+) {
   let settings = { ...SETTINGS };
   const get = vi.fn(async (path: string): Promise<unknown> => {
     if (path === '/api/settings') return { settings };
@@ -32,7 +38,7 @@ function show(opts: { paused?: boolean; refuse?: (body: Record<string, unknown>)
           { id: 1, name: 'Portable', kind: 'device', createdAt: '2026-10-20T10:00:00Z', current: true },
         ],
       };
-    if (path === '/api/llm/providers') return { providers: PROVIDERS };
+    if (path === '/api/llm/providers') return opts.providers ? opts.providers() : { providers: PROVIDERS };
     if (path.startsWith('/api/llm/models')) return { models: [] };
     if (path === '/api/llm/choice') return { tri: null, agent: null };
     throw new ApiError(404, 'Introuvable');
@@ -134,6 +140,30 @@ describe('Réglages', () => {
     await user.type(cap, '42');
     await user.tab();
     expect(await within(lots).findByRole('alert')).toHaveTextContent('Réglage invalide : trop grand');
+  });
+
+  it('a refused value stays next to its error when another setting is saved', async () => {
+    const { card, send, user } = show();
+    const lots = await card('Lots du core');
+    const cap = await within(lots).findByRole('spinbutton', { name: 'Brouillons maximum par lot' });
+    await user.clear(cap);
+    await user.type(cap, '0');
+    await user.tab();
+    await user.click(within(lots).getByRole('switch', { name: 'Accepter les lots du core' }));
+    await waitFor(() => expect(settingsPuts(send)).toEqual([{ 'core.lots': false }]));
+    expect(within(lots).getByRole('alert')).toHaveTextContent('Entre 1 et 100');
+    expect(cap).toHaveValue(0);
+  });
+
+  it('the model card says it is loading, then offers to retry when the keys cannot be read', async () => {
+    let fail: (e: Error) => void = () => {};
+    const { modelCard } = show({ providers: () => new Promise((_, reject) => (fail = reject)) });
+    const modele = await modelCard();
+    expect(within(modele).queryByText('État des clés inconnu')).toBeNull();
+    expect(within(modele).getByLabelText('Chargement des clés')).toBeInTheDocument();
+    fail(new ApiError(500, 'Erreur'));
+    expect(await within(modele).findByText('État des clés inconnu')).toBeInTheDocument();
+    expect(within(modele).getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
   });
 
   it('the Agent card sets the name, the icon, the tone and the persona', async () => {

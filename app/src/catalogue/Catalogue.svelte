@@ -12,7 +12,6 @@
     CommandPalette,
     ConfirmDialog,
     DayGroup,
-    Dialog,
     EmptyState,
     Fab,
     Field,
@@ -28,7 +27,6 @@
     ProposalChip,
     Rail,
     Segmented,
-    Select,
     ServiceCard,
     SettingsCard,
     SettingsRow,
@@ -36,7 +34,6 @@
     Slider,
     StandaloneCard,
     Steps,
-    Switch,
     Tabs,
     TextInput,
     toast,
@@ -47,6 +44,9 @@
     type PaletteCommand,
     type Tone,
   } from '../lib/ui/index.ts';
+  import Dialog from '../lib/ui/Dialog.svelte';
+  import Select from '../lib/ui/Select.svelte';
+  import Switch from '../lib/ui/Switch.svelte';
   import type { ProposalView } from '../lib/types.ts';
 
   const variants: { value: ButtonVariant; label: string; role: string }[] = [

@@ -1,17 +1,18 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Api } from '../api.ts';
-  import { Badge, Banner, Button, icons, SettingsCard, SettingsRow, Skeleton } from '../lib/ui/index.ts';
+  import { Badge, Banner, Button, icons, SettingsCard, SettingsRow } from '../lib/ui/index.ts';
   import Agent from '../reglages/Agent.svelte';
   import Appareils from '../reglages/Appareils.svelte';
   import Donnees from '../reglages/Donnees.svelte';
   import Lots from '../reglages/Lots.svelte';
+  import Modele from '../reglages/Modele.svelte';
   import { SettingsStore } from '../reglages/settings.svelte.ts';
   import Types from '../reglages/Types.svelte';
 
   /*
    * The settings, in the cards of the mockup (language model, core lots, structure, data), then the
-   * agent, the devices and the service. The card of the model comes on demand: it carries the select.
+   * agent, the devices and the service. The whole screen is loaded on demand by the app.
    */
 
   type Props = {
@@ -30,8 +31,6 @@
     .get<{ monthSpend: number }>('/api/dashboard')
     .then((d) => (spend = d.monthSpend))
     .catch(() => {});
-
-  const modele = import('../reglages/Modele.svelte');
 
   let switching = $state(false);
   let serviceError = $state<string | null>(null);
@@ -60,17 +59,7 @@
   {/if}
 
   <div class="grille">
-    {#await modele}
-      <SettingsCard title="Modèle de langage">
-        <div class="attente"><Skeleton height={120} /></div>
-      </SettingsCard>
-    {:then m}
-      <m.default {store} {spend} />
-    {:catch}
-      <SettingsCard title="Modèle de langage">
-        <SettingsRow label="Réglages du modèle indisponibles" hint="Recharger la page pour réessayer." />
-      </SettingsCard>
-    {/await}
+    <Modele {store} {spend} />
     <Lots {store} />
     <Types />
     <Donnees />
@@ -115,9 +104,6 @@
     grid-template-columns: 1fr 1fr;
     gap: 14px;
     align-items: start;
-  }
-  .attente {
-    padding: 14px 18px;
   }
   .ecran :global(.entree.nombre) {
     width: 104px;

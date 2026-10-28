@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import type { Api } from '../api.ts';
 import type { AgentIcon } from '../agent/icons.ts';
 
@@ -39,6 +40,16 @@ export class SettingsStore {
       .get<{ settings: Settings }>('/api/settings')
       .then((r) => (this.values = r.settings))
       .catch((e: Error) => (this.failure = e.message));
+  }
+
+  /**
+   * The saved value a field shows again after a save, or `undefined` while the field holds a refused
+   * value: that value stays as typed, next to its error. Only the saved values are followed.
+   */
+  shown<K extends SettingKey>(key: K): Settings[K] | undefined {
+    const values = this.values;
+    if (!values || untrack(() => this.errors[key])) return undefined;
+    return values[key];
   }
 
   async save<K extends SettingKey>(key: K, value: Settings[K]): Promise<void> {

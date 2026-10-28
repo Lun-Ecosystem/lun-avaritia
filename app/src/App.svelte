@@ -3,14 +3,12 @@
   import { createApi, type Api } from './api.ts';
   import { readAuthorization } from './authorization.ts';
   import Authorize from './Authorize.svelte';
-  import { Button, StandaloneCard } from './lib/ui/index.ts';
+  import { Banner, Button, Skeleton, StandaloneCard } from './lib/ui/index.ts';
   import Pair from './Pair.svelte';
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
-  import Depots from './screens/Depots.svelte';
   import Memoire from './screens/Memoire.svelte';
-  import Reglages from './screens/Reglages.svelte';
   import Tableau from './screens/Tableau.svelte';
   import Valider from './screens/Valider.svelte';
 
@@ -121,6 +119,18 @@
 
 <svelte:window onclick={navigate} onpopstate={follow} />
 
+<!-- The deposits and the settings come with their screen: they stay out of the first load. -->
+{#snippet loading()}
+  <div class="chargement"><Skeleton height={160} /></div>
+{/snippet}
+{#snippet failed(e: unknown)}
+  <div class="chargement">
+    <Banner title="Écran indisponible">
+      {e instanceof Error && e.message ? e.message : 'Recharger la page pour réessayer.'}
+    </Banner>
+  </div>
+{/snippet}
+
 {#if authorization && 'error' in authorization}
   <div class="refused lun-avaritia" data-monde="avaritia">
     <StandaloneCard title="Demande d’accès refusée">
@@ -140,9 +150,21 @@
       {:else if route === 'memoire'}
         <Memoire {fiche} {mode} />
       {:else if route === 'depots'}
-        <Depots />
+        {#await import('./screens/Depots.svelte')}
+          {@render loading()}
+        {:then m}
+          <m.default />
+        {:catch e}
+          {@render failed(e)}
+        {/await}
       {:else}
-        <Reglages paused={status.paused} onservice={readHealth} />
+        {#await import('./screens/Reglages.svelte')}
+          {@render loading()}
+        {:then m}
+          <m.default paused={status.paused} onservice={readHealth} />
+        {:catch e}
+          {@render failed(e)}
+        {/await}
       {/if}
     {/key}
   </Shell>
@@ -155,6 +177,11 @@
     margin: 0;
     background: var(--fond);
     color-scheme: dark;
+  }
+  .chargement {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
   }
   .refused {
     display: grid;

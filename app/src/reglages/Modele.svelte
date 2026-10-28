@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Api } from '../api.ts';
-  import { SettingsCard, SettingsRow, TextInput, toast } from '../lib/ui/index.ts';
+  import { SettingsCard, SettingsRow, Skeleton, TextInput, toast } from '../lib/ui/index.ts';
   import ModelPicker from './ModelPicker.svelte';
   import Providers from './Providers.svelte';
   import { dollars, num, type SettingsStore } from './settings.svelte.ts';
@@ -9,20 +9,23 @@
 
   /*
    * The language model: the keys of the providers, the model of the lots and of the agent, the
-   * monthly cap with the month spend. Loaded on demand (`import()`): it carries the select of models.
+   * monthly cap with the month spend.
    */
 
   type Use = 'tri' | 'agent';
   let { store, spend }: { store: SettingsStore; spend: number | null } = $props();
 
   const api = getContext<Api>('api');
+  /** `null`: the keys could not be read (Providers offers to retry); `loaded` false: not yet. */
   let providers = $state<ProviderView[] | null>(null);
+  let loaded = $state(false);
   let models = $state<Record<Use, ModelOffer[]>>({ tri: [], agent: [] });
   let choice = $state<Record<Use, ModelChoice | null>>({ tri: null, agent: null });
   let cap = $state('');
 
   $effect(() => {
-    if (store.values) cap = String(store.values['cost.monthlyCap']);
+    const saved = store.shown('cost.monthlyCap');
+    if (saved !== undefined) cap = String(saved);
   });
 
   const message = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Lecture impossible.');
@@ -46,7 +49,8 @@
   api
     .get<{ providers: ProviderView[] }>('/api/llm/providers')
     .then((r) => (providers = r.providers))
-    .catch(() => (providers = null));
+    .catch(() => (providers = null))
+    .finally(() => (loaded = true));
   loadModels();
 
   async function choose(use: Use, next: ModelChoice) {
@@ -60,7 +64,11 @@
 </script>
 
 <SettingsCard title="Modèle de langage">
-  <Providers {api} bind:providers onchange={loadModels} />
+  {#if loaded}
+    <Providers {api} bind:providers onchange={loadModels} />
+  {:else}
+    <div class="attente" role="status" aria-label="Chargement des clés"><Skeleton height={40} /></div>
+  {/if}
   <SettingsRow label="Modèle des lots" hint="Lecture des lots et des dépôts, rédaction des brouillons">
     <ModelPicker
       label="Modèle des lots"
@@ -103,3 +111,10 @@
     {/snippet}
   </SettingsRow>
 </SettingsCard>
+
+<style>
+  .attente {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--bordure);
+  }
+</style>

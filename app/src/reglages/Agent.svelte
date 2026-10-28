@@ -21,9 +21,12 @@
   let name = $state('');
   let persona = $state('');
   $effect(() => {
-    if (!store.values) return;
-    name = store.values['agent.name'];
-    persona = store.values['agent.persona'];
+    const savedName = store.shown('agent.name');
+    if (savedName !== undefined) name = savedName;
+  });
+  $effect(() => {
+    const savedPersona = store.shown('agent.persona');
+    if (savedPersona !== undefined) persona = savedPersona;
   });
 
   const ICON_OPTIONS: Option[] = Object.entries(AGENT_ICONS).map(([value, { label, icon }]) => ({

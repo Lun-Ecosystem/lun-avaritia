@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { SettingsCard, SettingsRow, Switch, TextInput } from '../lib/ui/index.ts';
+  import { SettingsCard, SettingsRow, TextInput } from '../lib/ui/index.ts';
+  import Switch from '../lib/ui/Switch.svelte';
   import { num, type SettingsStore } from './settings.svelte.ts';
 
   /* The lots sent by the core: accepted or not, and how many drafts one lot may leave at most. */
@@ -7,7 +8,8 @@
   let { store }: { store: SettingsStore } = $props();
   let cap = $state('');
   $effect(() => {
-    if (store.values) cap = String(store.values['drafts.cap']);
+    const saved = store.shown('drafts.cap');
+    if (saved !== undefined) cap = String(saved);
   });
 </script>
 

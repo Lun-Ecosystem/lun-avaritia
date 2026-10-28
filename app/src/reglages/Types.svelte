@@ -5,7 +5,6 @@
     Banner,
     Button,
     ConfirmDialog,
-    Dialog,
     Field,
     icons,
     SettingsCard,
@@ -13,6 +12,7 @@
     Skeleton,
     TextInput,
   } from '../lib/ui/index.ts';
+  import Dialog from '../lib/ui/Dialog.svelte';
 
   /*
    * The types of fiche: added, renamed, removed. The server refuses to remove a type still used by a
@@ -31,6 +31,7 @@
   let renaming = $state<FicheType | null>(null);
   let newName = $state('');
   let renameError = $state<string | undefined>();
+  let renamingBusy = $state(false);
   let removing = $state<FicheType | null>(null);
 
   const message = (e: unknown) => (e instanceof Error && e.message ? e.message : 'L’action a échoué.');
@@ -63,7 +64,8 @@
 
   async function rename(e: SubmitEvent) {
     e.preventDefault();
-    if (!renaming || !newName.trim()) return;
+    if (!renaming || !newName.trim() || renamingBusy) return;
+    renamingBusy = true;
     renameError = undefined;
     try {
       types = (
@@ -72,6 +74,8 @@
       renaming = null;
     } catch (err) {
       renameError = message(err);
+    } finally {
+      renamingBusy = false;
     }
   }
 
@@ -129,7 +133,13 @@
   {/snippet}
   {#snippet footer({ close })}
     <Button onclick={close}>Annuler</Button>
-    <Button type="submit" form="{uid}-nom" variant="principal" disabled={!newName.trim()}>Renommer</Button>
+    <Button
+      type="submit"
+      form="{uid}-nom"
+      variant="principal"
+      loading={renamingBusy}
+      disabled={!newName.trim()}>Renommer</Button
+    >
   {/snippet}
 </Dialog>
 

@@ -81,7 +81,10 @@ describe('App', () => {
     await user.click(within(rail).getByRole('link', { name: /Réglages/ }));
     expect(window.location.pathname).toBe('/reglages');
     expect(within(rail).getByRole('link', { name: /Réglages/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
+    // The settings screen comes on demand.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Réglages' }, { timeout: 5000 }),
+    ).toBeInTheDocument();
 
     history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/'));
@@ -109,7 +112,7 @@ describe('App', () => {
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
     expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
-    await user.click(await screen.findByRole('button', { name: 'Pause' }));
+    await user.click(await screen.findByRole('button', { name: 'Pause' }, { timeout: 5000 }));
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
   });
 

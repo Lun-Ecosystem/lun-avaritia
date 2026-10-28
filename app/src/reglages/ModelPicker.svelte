@@ -20,7 +20,8 @@
 </script>
 
 <script lang="ts">
-  import { Badge, Select } from '../lib/ui/index.ts';
+  import { Badge } from '../lib/ui/index.ts';
+  import Select from '../lib/ui/Select.svelte';
   import type { ModelChoice } from './types.ts';
 
   /*
