@@ -1,7 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { InvalidInputError } from '../contract/actions.ts';
-import { getSetting } from '../db.ts';
+import { getState } from '../contract/state.ts';
+import { setting } from './settings.ts';
 import { overCap, processLot, type BrainDeps, type Observation } from './process.ts';
 
 const Iso = z
@@ -31,7 +32,7 @@ export type IngestResult = { lot: number; accepted: number; status: 'queued' | '
 /** Stores a lot and its observations in one transaction; no LLM call. */
 export function ingestLot(deps: BrainDeps, observations: Observation[]): IngestResult {
   const { db } = deps;
-  if (!getSetting(db, 'core.lots', true))
+  if (!setting(db, 'core.lots'))
     throw new InvalidInputError('Les lots du core sont coupés (réglage core.lots) : lot refusé.');
   const held = overCap(db, deps.clock());
   const status = held ? 'held' : 'queued';
@@ -59,7 +60,8 @@ const running = new WeakSet<DatabaseSync>();
  */
 export async function runPending(deps: BrainDeps): Promise<void> {
   const { db } = deps;
-  if (running.has(db)) return;
+  // A pause stops the automatic actions: lots wait, and `resume` runs them again.
+  if (running.has(db) || getState(db).paused) return;
   running.add(db);
   try {
     // A lot left `running` by a crash is replayed.

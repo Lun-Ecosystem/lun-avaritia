@@ -40,6 +40,8 @@ export interface AppDeps {
   listCustomModels?: ModelLister | undefined;
   /** The brain's providers; the models chosen in Réglages by default (tests inject a fake). */
   brainProvider?: BrainDeps['provider'] | undefined;
+  /** The directory of the database file; exports are written under it. */
+  dataDir?: string | undefined;
 }
 
 export function brainDeps(deps: AppDeps): BrainDeps {

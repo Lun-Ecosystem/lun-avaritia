@@ -13,7 +13,8 @@ import {
   refuseDraft,
   type DraftStatus,
 } from '../brain/drafts.ts';
-import { getSetting } from '../db.ts';
+import { setting } from '../brain/settings.ts';
+import { runPending } from '../brain/ingest.ts';
 import { ask, DelegationSchema } from '../brain/agent.ts';
 import { brainDeps } from '../app.ts';
 import { DegradedError, InvalidInputError } from './actions.ts';
@@ -106,6 +107,7 @@ export function contractRoutes(deps: AppDeps): Hono {
   r.post('/resume', (c) => {
     if (!getState(db).paused) return c.json({ error: 'Déjà actif' }, 409);
     setPaused(db, false);
+    runPending(brainDeps(deps)).catch((err) => deps.log?.(`Traitement des lots : ${err}`));
     return c.json({ status: statusOf(getState(db)).status });
   });
 
@@ -148,7 +150,7 @@ export function contractRoutes(deps: AppDeps): Hono {
     if (!STATUSES.includes(status)) return c.json({ error: `Statut inconnu : ${status}` }, 400);
     const drafts =
       status === 'pending'
-        ? queue(db, getSetting(db, 'drafts.cap', 15))
+        ? queue(db, setting(db, 'drafts.cap'))
         : status === 'expired'
           ? []
           : draftsByStatus(db, status as DraftStatus);

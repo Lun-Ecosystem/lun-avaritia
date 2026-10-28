@@ -12,6 +12,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev -w @lun-avaritia/server",
+    "demo": "npm run -s demo -w @lun-avaritia/server",
     "pair-code": "npm run -s pair-code -w @lun-avaritia/server",
     "test": "vitest run",
     "lint": "eslint .",

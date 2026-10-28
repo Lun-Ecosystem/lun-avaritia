@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { recordCost } from '../contract/costs.ts';
-import { getSetting } from '../db.ts';
+import { setting } from './settings.ts';
 import { costOf, priceOf } from '../llm/models.ts';
 import { ProviderError, type LlmProvider } from '../llm/types.ts';
 import type { Fiche, Source } from '../types.ts';
@@ -36,7 +36,6 @@ export type ProcessResult =
   | { status: 'failed'; reason: string; cost: number };
 
 const MAX_QUESTIONS = 5;
-const DEFAULT_CAP = 5;
 
 /** Dollars spent since the Paris month started. */
 export function monthSpend(db: DatabaseSync, now: Date): number {
@@ -47,8 +46,7 @@ export function monthSpend(db: DatabaseSync, now: Date): number {
   ).total;
 }
 
-export const overCap = (db: DatabaseSync, now: Date) =>
-  monthSpend(db, now) >= getSetting(db, 'cost.monthlyCap', DEFAULT_CAP);
+export const overCap = (db: DatabaseSync, now: Date) => monthSpend(db, now) >= setting(db, 'cost.monthlyCap');
 
 const norm = (t: string) =>
   t

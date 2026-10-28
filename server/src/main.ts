@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { brainDeps, createApp, type AppDeps } from './app.ts';
@@ -26,7 +26,8 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
-const db = openDb(resolve(root, process.env.DB_PATH ?? 'data/avaritia.db'));
+const dbPath = resolve(root, process.env.DB_PATH ?? 'data/avaritia.db');
+const db = openDb(dbPath);
 const clock = () => new Date();
 const actions = new ActionRegistry();
 const appDist = resolve(root, 'app/dist');
@@ -42,6 +43,7 @@ const appDeps: AppDeps = {
   secretKey,
   llmEnv,
   checkKey: checkWithProvider,
+  dataDir: dirname(dbPath),
 };
 const app = createApp(appDeps);
 // Lots left waiting by the last run (a restart is also a chance for the held ones).
