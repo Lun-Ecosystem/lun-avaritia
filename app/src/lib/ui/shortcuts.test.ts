@@ -23,6 +23,14 @@ describe('bindShortcuts', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it('a held key triggers once, not on every repeat', () => {
+    const validate = vi.fn();
+    unbind = bindShortcuts({ v: validate });
+    press(document.body, 'v');
+    press(document.body, 'v', { repeat: true });
+    expect(validate).toHaveBeenCalledOnce();
+  });
+
   it('Shift+v triggers Shift+v, never v', () => {
     const validate = vi.fn();
     const validateAll = vi.fn();

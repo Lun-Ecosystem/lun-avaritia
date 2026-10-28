@@ -59,7 +59,7 @@ export function bindShortcuts(
   const anywhere = new Set((opts.fromFields ?? []).map(normalizeCombo));
 
   const onKeydown = (event: Event) => {
-    if (!(event instanceof KeyboardEvent) || event.isComposing) return;
+    if (!(event instanceof KeyboardEvent) || event.isComposing || event.repeat) return;
     const combo = comboOf(event);
     const run = actions.get(combo);
     if (!run) return;
