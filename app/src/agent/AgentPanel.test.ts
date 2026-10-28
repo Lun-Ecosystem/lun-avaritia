@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api.ts';
 import AgentPanel from './AgentPanel.svelte';
-import { agentPanel } from './conversation.svelte.ts';
+import { agentIdentity, agentPanel } from './conversation.svelte.ts';
 
 function show(settings: Record<string, string> | Error = {}, fiche: string | null = null) {
   const get = vi.fn(async () => {
@@ -22,6 +22,7 @@ function show(settings: Record<string, string> | Error = {}, fiche: string | nul
 
 afterEach(() => {
   agentPanel.open = false;
+  Object.assign(agentIdentity, { name: 'Agent', icon: 'sparkles' });
 });
 
 describe('AgentPanel', () => {
@@ -46,6 +47,34 @@ describe('AgentPanel', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Agent' })).toHaveFocus());
+  });
+
+  it('is modal under 760 px: the page is inert and Tab goes round inside the panel', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q }));
+    const page = document.createElement('main');
+    page.innerHTML = '<button>Ailleurs</button>';
+    document.body.append(page);
+    try {
+      show();
+      await userEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+      const dialog = screen.getByRole('dialog', { name: 'Agent' });
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      expect(page.inert).toBe(true);
+      const field = screen.getByRole('textbox', { name: 'Demande à Agent' });
+      await userEvent.type(field, 'x');
+      // Last control: Envoyer. Tab from it comes back to the first one, Fermer.
+      screen.getByRole('button', { name: 'Envoyer' }).focus();
+      await userEvent.tab();
+      expect(screen.getByRole('button', { name: 'Fermer' })).toHaveFocus();
+      await userEvent.tab({ shift: true });
+      expect(screen.getByRole('button', { name: 'Envoyer' })).toHaveFocus();
+      await userEvent.keyboard('{Escape}');
+      expect(page.inert).toBe(false);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Agent' })).toHaveFocus());
+    } finally {
+      page.remove();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('answers a note through Prose, links the drafts and sends the open fiche', async () => {

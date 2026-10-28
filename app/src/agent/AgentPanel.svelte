@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { getContext, tick, untrack } from 'svelte';
+  import { getContext, tick } from 'svelte';
   import type { Api } from '../api.ts';
   import { formatCost } from '../format.ts';
   import { ICON_STROKE, IconButton, icons } from '../lib/ui/index.ts';
   import Prose from '../Prose.svelte';
   import Bulle from './Bulle.svelte';
-  import { agentPanel, Conversation } from './conversation.svelte.ts';
+  import { agentIdentity, agentPanel, Conversation, takeIdentity } from './conversation.svelte.ts';
   import { agentIcon } from './icons.ts';
 
   /*
@@ -16,35 +16,63 @@
   type Props = {
     /** The fiche open in the memory (`?fiche=<id>`), sent as context. */
     fiche?: string | null | undefined;
-    /** The current screen: the name and icon are read again at each change (the settings may have moved). */
-    route?: string | undefined;
   };
 
-  let { fiche = null, route }: Props = $props();
+  let { fiche = null }: Props = $props();
 
   const api = getContext<Api>('api');
   const conversation = new Conversation(api);
-  let name = $state('Agent');
-  let iconName = $state('sparkles');
-  const Icon = $derived(agentIcon(iconName));
+  const name = $derived(agentIdentity.name);
+  const Icon = $derived(agentIcon(agentIdentity.icon));
 
   let text = $state('');
   let bubble = $state<HTMLButtonElement | null>(null);
   let fil = $state<HTMLElement | null>(null);
 
-  $effect(() => {
-    void route;
-    void agentPanel.open;
-    untrack(() =>
-      api
-        .get<{ settings: Record<string, unknown> }>('/api/settings')
-        .then(({ settings }) => {
-          if (typeof settings['agent.name'] === 'string') name = settings['agent.name'];
-          if (typeof settings['agent.icon'] === 'string') iconName = settings['agent.icon'];
-        })
-        .catch(() => {}),
-    );
-  });
+  // Read once; Réglages updates the identity on each save.
+  api
+    .get<{ settings: Record<string, unknown> }>('/api/settings')
+    .then(({ settings }) => takeIdentity(settings))
+    .catch(() => {});
+
+  /** Under 760 px the panel takes the screen: it is modal, the rest of the page is inert. */
+  let modal = $state(false);
+  function holdPage(panel: HTMLElement) {
+    // shortcut: decided at opening, a resize across 760 px while open keeps that mode; reopen to switch.
+    if (!(window.matchMedia?.('(max-width: 759.98px)').matches ?? false)) return;
+    modal = true;
+    const held: HTMLElement[] = [];
+    for (
+      let node: HTMLElement = panel;
+      node.parentElement && node !== document.body;
+      node = node.parentElement
+    )
+      for (const sibling of node.parentElement.children)
+        if (sibling !== node && sibling instanceof HTMLElement && !sibling.inert) {
+          sibling.inert = true;
+          held.push(sibling);
+        }
+    return () => {
+      modal = false;
+      for (const h of held) h.inert = false;
+    };
+  }
+
+  /** Tab and Shift Tab go round inside the panel while it is modal. */
+  function trap(event: KeyboardEvent, panel: HTMLElement) {
+    if (!modal || event.key !== 'Tab') return;
+    const stops = [...panel.querySelectorAll<HTMLElement>('button:not([disabled]), textarea, a[href]')];
+    const first = stops[0];
+    const last = stops.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   // A request handed by another screen (« Écrire une note ») lands in the field.
   $effect(() => {
@@ -87,7 +115,9 @@
     role="dialog"
     aria-label={name}
     tabindex="-1"
-    onkeydown={(e) => e.key === 'Escape' && void close()}
+    aria-modal={modal}
+    onkeydown={(e) => (e.key === 'Escape' ? void close() : trap(e, e.currentTarget))}
+    {@attach holdPage}
   >
     <header>
       <Icon size={16} strokeWidth={ICON_STROKE} aria-hidden="true" />

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
+import AgentPanel from '../agent/AgentPanel.svelte';
 import Reglages from './Reglages.svelte';
 
 const SETTINGS = {
@@ -54,17 +55,15 @@ function show(
     return { status: 'ok' };
   });
   const onservice = vi.fn(async () => {});
-  render(Reglages, {
-    props: { paused: opts.paused ?? false, onservice },
-    context: new Map([['api', { get, send, upload: vi.fn() } as unknown as Api]]),
-  });
+  const api = { get, send, upload: vi.fn() } as unknown as Api;
+  render(Reglages, { props: { paused: opts.paused ?? false, onservice }, context: new Map([['api', api]]) });
   const card = (name: string) => screen.findByRole('region', { name });
   // The card of the model comes by import(): its stand-in is replaced once loaded.
   const modelCard = async () => {
     await screen.findByRole('combobox', { name: 'Modèle des lots' }, { timeout: 5000 });
     return screen.getByRole('region', { name: 'Modèle de langage' });
   };
-  return { get, send, onservice, card, modelCard, user: userEvent.setup() };
+  return { api, get, send, onservice, card, modelCard, user: userEvent.setup() };
 }
 
 const settingsPuts = (send: ReturnType<typeof show>['send']) =>
@@ -192,6 +191,21 @@ describe('Réglages', () => {
     ]);
     const apercu = within(agent).getByRole('img', { name: 'Aperçu de la bulle : Mnémosyne' });
     expect(apercu).toBeInTheDocument();
+  });
+
+  it('a saved name and icon reach the agent bubble at once', async () => {
+    const { api, card, user } = show();
+    render(AgentPanel, { context: new Map([['api', api]]) });
+    const agent = await card('Agent');
+    const name = await within(agent).findByRole('textbox', { name: 'Nom' });
+    await screen.findByRole('button', { name: 'Agent' });
+    await user.clear(name);
+    await user.type(name, 'Mnémosyne');
+    await user.tab();
+    const bubble = await screen.findByRole('button', { name: 'Mnémosyne' });
+    const before = bubble.querySelector('svg')?.outerHTML;
+    await user.click(within(agent).getByRole('radio', { name: 'Plume' }));
+    await waitFor(() => expect(bubble.querySelector('svg')?.outerHTML).not.toBe(before));
   });
 
   it('exports in Markdown and shows the folder written', async () => {

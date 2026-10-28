@@ -144,7 +144,7 @@
 {:else if api}
   <Shell {route} {counts} {status}>
     {#snippet agent()}
-      <AgentPanel fiche={route === 'memoire' ? fiche : null} {route} />
+      <AgentPanel fiche={route === 'memoire' ? fiche : null} />
     {/snippet}
     {#key route}
       {#if route === 'tableau'}

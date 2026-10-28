@@ -63,6 +63,14 @@ export class Conversation {
   }
 }
 
+/** The agent's name and icon (`agent.name`, `agent.icon`), kept by whoever reads or saves the settings. */
+export const agentIdentity = $state({ name: 'Agent', icon: 'sparkles' });
+
+export function takeIdentity(settings: Record<string, unknown>): void {
+  if (typeof settings['agent.name'] === 'string') agentIdentity.name = settings['agent.name'];
+  if (typeof settings['agent.icon'] === 'string') agentIdentity.icon = settings['agent.icon'];
+}
+
 /** The panel, opened from anywhere (« Écrire une note » of an empty memory), with a request to start. */
 export const agentPanel = $state({ open: false, draft: '' });
 

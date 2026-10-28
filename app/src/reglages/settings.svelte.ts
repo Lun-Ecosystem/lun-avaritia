@@ -1,5 +1,6 @@
 import { untrack } from 'svelte';
 import type { Api } from '../api.ts';
+import { takeIdentity } from '../agent/conversation.svelte.ts';
 import type { AgentIcon } from '../agent/icons.ts';
 
 /** The settings of `GET|PUT /api/settings`, bounds as the server checks them. */
@@ -38,7 +39,10 @@ export class SettingsStore {
   load() {
     this.#api
       .get<{ settings: Settings }>('/api/settings')
-      .then((r) => (this.values = r.settings))
+      .then((r) => {
+        this.values = r.settings;
+        takeIdentity({ ...r.settings });
+      })
       .catch((e: Error) => (this.failure = e.message));
   }
 
@@ -62,6 +66,8 @@ export class SettingsStore {
     try {
       const r = await this.#api.send<{ settings: Settings }>('PUT', '/api/settings', { [key]: value });
       this.values = r.settings;
+      // The bubble and the panel follow at once.
+      takeIdentity({ ...r.settings });
     } catch (e) {
       this.errors[key] = e instanceof Error && e.message ? e.message : 'Réglage refusé.';
     }

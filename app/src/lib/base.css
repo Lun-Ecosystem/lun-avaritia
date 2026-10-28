@@ -5,10 +5,9 @@
  */
 /* On :root: the launcher is mounted by the host app, outside the views' roots. */
 :root {
-  /* The agent's bubble: its size and offset, and the room it takes under scrolling lists (none on a phone, where the floating bubble is lifted above the bottom navigation). */
+  /* The agent's bubble: its height and its offset from the corner (lifted above the bottom navigation on a phone, by the shell). */
   --agent-lanceur-h: 44px;
   --agent-lanceur-bas: 22px;
-  --agent-coin: calc(var(--agent-lanceur-h) + var(--agent-lanceur-bas) + 12px);
 }
 
 .lun-avaritia {
@@ -49,10 +48,4 @@
   border: 1px solid var(--bordure);
   border-radius: var(--r-2);
   padding: 0.35rem 0.55rem;
-}
-
-@media (max-width: 759.98px) {
-  :root {
-    --agent-coin: 0px;
-  }
 }
