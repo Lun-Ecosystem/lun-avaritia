@@ -43,6 +43,39 @@ const MIGRATIONS: string[] = [
      calls INTEGER NOT NULL,
      purpose TEXT
    );`,
+  `CREATE TABLE fiche_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);
+   INSERT INTO fiche_types (name) VALUES ('Personne'), ('Organisation'), ('Projet'), ('Service'), ('Échange'), ('Note');
+   CREATE TABLE fiches (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     type_id INTEGER NOT NULL REFERENCES fiche_types(id),
+     title TEXT NOT NULL,
+     synthesis TEXT NOT NULL DEFAULT '',
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );
+   CREATE TABLE facts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     fiche_id INTEGER NOT NULL REFERENCES fiches(id),
+     text TEXT NOT NULL,
+     source TEXT NOT NULL,
+     at TEXT NOT NULL,
+     struck_at TEXT,
+     struck_by INTEGER REFERENCES facts(id)
+   );
+   CREATE TABLE links (
+     from_id INTEGER NOT NULL REFERENCES fiches(id),
+     to_id INTEGER NOT NULL REFERENCES fiches(id),
+     relation TEXT NOT NULL,
+     PRIMARY KEY (from_id, to_id, relation)
+   );
+   CREATE TABLE fiche_versions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     fiche_id INTEGER NOT NULL REFERENCES fiches(id),
+     at TEXT NOT NULL,
+     title TEXT NOT NULL,
+     synthesis TEXT NOT NULL
+   );
+   CREATE VIRTUAL TABLE fiche_search USING fts5(title, synthesis, facts, tokenize = 'unicode61 remove_diacritics 2');`,
 ];
 
 export function openDb(path: string): DatabaseSync {
