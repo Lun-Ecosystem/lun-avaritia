@@ -257,3 +257,27 @@ describe('Valider', () => {
     expect(await screen.findByText('Rien à valider.')).toBeInTheDocument();
   });
 });
+
+describe('Valider, links of a synthesis', () => {
+  it('opens a known [[Titre]] in the memory and leaves an unknown one as text', async () => {
+    const get = vi.fn(async (path: string) =>
+      path === '/api/fiches'
+        ? {
+            fiches: [
+              { id: 4, title: 'Projet Test', typeId: 1, type: 'Projets', updatedAt: '2026-10-28T09:00:00Z' },
+            ],
+          }
+        : {
+            drafts: [fiche(1, 'Client Exemple', { synthesis: 'Voir [[Projet Test]] et [[Sans Fiche]].' })],
+            held: 0,
+          },
+    );
+    const api = { get, send: vi.fn() } as unknown as Api;
+    render(Valider, { props: {}, context: new Map([['api', api]]) });
+    const known = await screen.findByRole('button', { name: 'Projet Test' });
+    expect(screen.getByText('Sans Fiche').tagName).not.toBe('BUTTON');
+    await userEvent.click(known);
+    expect(window.location.search).toBe('?fiche=4');
+    history.replaceState(null, '', '/');
+  });
+});

@@ -1,14 +1,27 @@
 import type { Api } from '../api.ts';
 
-/** The id of the fiche titled `title` (case apart), from the list of the memory; undefined when unknown. */
-export async function ficheIdByTitle(api: Api, title: string): Promise<number | undefined> {
-  const { fiches } = await api.get<{ fiches: { id: number; title: string }[] }>('/api/fiches');
-  const wanted = title.trim().toLowerCase();
-  return fiches.find((f) => f.title.trim().toLowerCase() === wanted)?.id;
+export type Listed = { id: number; title: string; type: string };
+
+/** The fiches of the memory; an unreadable list is an empty one (links stay plain text). */
+export async function listFiches(api: Api): Promise<Listed[]> {
+  try {
+    const r = await api.get<{ fiches?: Listed[] }>('/api/fiches');
+    return r.fiches ?? [];
+  } catch {
+    return [];
+  }
 }
 
-/** Opens `/memoire?fiche=<id>` from any screen: the app follows the address like a back button. */
-export function openFiche(id: number): void {
-  history.pushState(null, '', `/memoire?fiche=${id}`);
+export const titleKey = (title: string) => title.trim().toLowerCase();
+
+/** Id by title (case apart), to know a `[[Titre]]` and open it. */
+export const idsByTitle = (fiches: Listed[]) => new Map(fiches.map((f) => [titleKey(f.title), f.id]));
+
+/** Changes the address like a click on a link of the app: the app follows it and the back button works. */
+export function go(href: string): void {
+  history.pushState(null, '', href);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
+
+/** Opens `/memoire?fiche=<id>` from any screen. */
+export const openFiche = (id: number): void => go(`/memoire?fiche=${id}`);

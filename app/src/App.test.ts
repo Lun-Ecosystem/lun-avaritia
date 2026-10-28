@@ -243,3 +243,40 @@ describe('App, edge cases', () => {
     expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
   });
 });
+
+describe('App, memory address', () => {
+  it('back and forward follow the fiche opened in the memory', async () => {
+    const json = (body: unknown) => new Response(JSON.stringify(body));
+    const fiche = {
+      id: 1,
+      typeId: 1,
+      title: 'Client X',
+      synthesis: '',
+      updatedAt: '2026-10-28T09:00:00Z',
+      facts: [],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/fiches')
+          return json({
+            fiches: [{ id: 1, title: 'Client X', typeId: 1, type: 'Personnes', updatedAt: fiche.updatedAt }],
+          });
+        if (path === '/api/fiches/1') return json({ fiche, versions: [], neighbors: [], depots: [] });
+        return json({ status: 'ok' });
+      }),
+    );
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', '/memoire');
+    const user = userEvent.setup();
+    render(App);
+    await user.click(await screen.findByRole('button', { name: 'Client X' }));
+    expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
+    history.back();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Client X' })).toBeNull());
+    expect(window.location.search).toBe('');
+    history.forward();
+    expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
+  });
+});

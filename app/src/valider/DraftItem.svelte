@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Api } from '../api.ts';
-  import { ficheIdByTitle, openFiche } from '../memoire/titles.ts';
+  import { idsByTitle, listFiches, openFiche, titleKey } from '../memoire/titles.ts';
   import Prose from '../Prose.svelte';
   import { Badge, Button, icons, Kbd, SettingsCard } from '../lib/ui/index.ts';
   import { kindOf, swapped, type DraftPayload, type DraftView } from './drafts.ts';
@@ -30,8 +30,13 @@
 
   const api = getContext<Api>('api');
   /** A [[Fiche]] of the draft opens that fiche in the memory when its title exists. */
-  async function openTitle(title: string) {
-    const id = await ficheIdByTitle(api, title).catch(() => undefined);
+  let ids = $state(new Map<string, number>());
+  $effect(() => {
+    if (draft.payload.kind === 'fiche' && draft.payload.synthesis.includes('[['))
+      void listFiches(api).then((l) => (ids = idsByTitle(l)));
+  });
+  function openTitle(title: string) {
+    const id = ids.get(titleKey(title));
     if (id !== undefined) openFiche(id);
   }
 
@@ -65,7 +70,11 @@
         />
       {:else}
         {#if p.kind === 'fiche'}
-          {#if p.synthesis}<Prose text={p.synthesis} onLink={openTitle} />{/if}
+          {#if p.synthesis}<Prose
+              text={p.synthesis}
+              onLink={openTitle}
+              known={(t) => ids.has(titleKey(t))}
+            />{/if}
           {#if p.facts.length || p.links.length}
             <ul class="lignes">
               {#each p.facts as f, i (i)}

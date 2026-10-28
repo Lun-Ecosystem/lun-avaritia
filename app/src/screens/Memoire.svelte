@@ -4,6 +4,7 @@
   import { Banner, EmptyState, icons, Segmented, Skeleton, TextInput } from '../lib/ui/index.ts';
   import Arbre from '../memoire/Arbre.svelte';
   import FichePanel from '../memoire/FichePanel.svelte';
+  import { go } from '../memoire/titles.ts';
 
   /*
    * The memory: search and the tree / graph switch on one row, the tree (or the search results) on
@@ -26,6 +27,7 @@
   let view = $state(untrack(() => (mode === 'graphe' ? 'graphe' : 'arbre')));
   let query = $state('');
   let hits = $state<Hit[] | null>(null);
+  let searchError = $state<string | null>(null);
 
   // The address changed from outside (back button, a link of another screen).
   $effect(() => {
@@ -46,7 +48,7 @@
     if (selected !== null) q.set('fiche', String(selected));
     if (view === 'graphe') q.set('mode', 'graphe');
     const s = q.toString();
-    history.pushState(null, '', `/memoire${s ? `?${s}` : ''}`);
+    go(`/memoire${s ? `?${s}` : ''}`);
   }
   function open(id: number | null) {
     selected = id;
@@ -58,15 +60,20 @@
     const q = query.trim();
     if (!q) {
       hits = null;
+      searchError = null;
       return;
     }
     const timer = setTimeout(() => {
       api
         .send<{ result: Hit[] }>('POST', '/lun/v1/actions/brain.search', { query: q })
         .then((r) => {
-          if (q === query.trim()) hits = r.result;
+          if (q !== query.trim()) return;
+          hits = r.result;
+          searchError = null;
         })
-        .catch((e: Error) => (failure = e.message));
+        .catch((e: Error) => {
+          if (q === query.trim()) searchError = e.message;
+        });
     }, 250);
     return () => clearTimeout(timer);
   });
@@ -114,6 +121,7 @@
   {:else}
     <div class={['corps', { ouverte: selected !== null }]}>
       <div class="liste">
+        {#if searchError}<p class="erreur" role="alert">{searchError}</p>{/if}
         {#if hits}
           <ul class="resultats" aria-label="Résultats">
             {#each hits as h (h.id)}
@@ -209,6 +217,11 @@
   .extrait {
     color: var(--texte-3);
     font-size: 12px;
+  }
+  .erreur {
+    margin: 0 0 8px;
+    color: var(--danger);
+    font-size: 13px;
   }
   .vide {
     margin: 0;

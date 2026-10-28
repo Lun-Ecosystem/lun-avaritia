@@ -66,4 +66,13 @@ describe('Memoire', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Déposer un document' })).toHaveAttribute('href', '/depots');
   });
+
+  it('keeps the tree and the fiche when the search fails', async () => {
+    const f = show();
+    f.send.mockRejectedValueOnce(new Error('Recherche indisponible'));
+    await screen.findByText('Jeanne D.');
+    await userEvent.type(screen.getByRole('searchbox'), 'x');
+    expect(await screen.findByText('Recherche indisponible')).toBeInTheDocument();
+    expect(screen.getByText('Jeanne D.')).toBeInTheDocument();
+  });
 });

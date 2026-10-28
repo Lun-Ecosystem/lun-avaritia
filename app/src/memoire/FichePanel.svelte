@@ -5,7 +5,7 @@
   import { Badge, Banner, Button, icons, Skeleton } from '../lib/ui/index.ts';
   import Prose from '../Prose.svelte';
   import FicheEdit from './FicheEdit.svelte';
-  import { ficheIdByTitle } from './titles.ts';
+  import { idsByTitle, listFiches, titleKey, type Listed } from './titles.ts';
 
   /* One fiche: synthesis, sourced facts (struck ones kept and dated), links, versions, edition. */
 
@@ -39,11 +39,16 @@
 
   const api = getContext<Api>('api');
   let data = $state<Data | null>(null);
-  let typeName = $state('');
+  let listed = $state<Listed[]>([]);
   let failure = $state<string | null>(null);
   let editing = $state(false);
   let busy = $state(false);
   let saveError = $state<string | undefined>();
+
+  // The list gives the type name and the titles a [[link]] can open; without it the fiche still shows.
+  const ids = $derived(idsByTitle(listed));
+  const typeName = $derived(listed.find((l) => l.id === data?.fiche.id)?.type ?? '');
+  void listFiches(api).then((l) => (listed = l));
 
   $effect(() => {
     const asked = id;
@@ -52,19 +57,16 @@
     editing = false;
     api
       .get<Data>(`/api/fiches/${asked}`)
-      .then(async (d) => {
-        if (asked !== id) return;
-        data = d;
-        const { types } = await api.get<{ types: { id: number; name: string }[] }>('/api/types');
-        if (asked === id) typeName = types.find((t) => t.id === d.fiche.typeId)?.name ?? '';
+      .then((d) => {
+        if (asked === id) data = d;
       })
       .catch((e: Error) => {
         if (asked === id) failure = e.message;
       });
   });
 
-  async function openTitle(title: string) {
-    const found = await ficheIdByTitle(api, title).catch(() => undefined);
+  function openTitle(title: string) {
+    const found = ids.get(titleKey(title));
     if (found !== undefined) onOpen(found);
   }
 
@@ -129,7 +131,11 @@
           >Modifier</Button
         >
       </header>
-      {#if f.synthesis}<Prose text={f.synthesis} onLink={openTitle} />{/if}
+      {#if f.synthesis}<Prose
+          text={f.synthesis}
+          onLink={openTitle}
+          known={(t) => ids.has(titleKey(t))}
+        />{/if}
 
       {#if f.facts.length}
         <h3 class="label">Faits</h3>

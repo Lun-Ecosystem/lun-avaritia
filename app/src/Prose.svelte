@@ -3,9 +3,14 @@
 
   /* A synthesis rendered by Svelte from its tokens, never as HTML. A [[Fiche]] link is a button. */
 
-  type Props = { text: string; onLink?: ((title: string) => void) | undefined };
+  type Props = {
+    text: string;
+    onLink?: ((title: string) => void) | undefined;
+    /** Only a known title is a button; without it every link is one. */
+    known?: ((title: string) => boolean) | undefined;
+  };
 
-  let { text, onLink }: Props = $props();
+  let { text, onLink, known }: Props = $props();
 
   const paras = $derived(
     tokens(text).reduce<Token[][]>(
@@ -27,7 +32,7 @@
         {:else if t.kind === 'strong'}<strong>{t.text}</strong>
         {:else if t.kind === 'em'}<em>{t.text}</em>
         {:else if t.kind === 'link'}
-          {#if onLink}
+          {#if onLink && (!known || known(t.text))}
             <button type="button" class="lien" onclick={() => onLink(t.text)}>{t.text}</button>
           {:else}<span class="lien">{t.text}</span>{/if}
         {:else if t.kind === 'text'}{t.text}{/if}

@@ -80,4 +80,35 @@ describe('FichePanel', () => {
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
   });
+
+  it('shows an unknown [[Titre]] as plain text, not a dead button', async () => {
+    const d = detail();
+    d.fiche.synthesis = 'Voir [[Entreprise Z]] et [[Titre inconnu]].';
+    show({ 1: d });
+    await screen.findByRole('heading', { name: 'Client X' });
+    expect(screen.getAllByRole('button', { name: 'Entreprise Z' }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Titre inconnu').tagName).not.toBe('BUTTON');
+  });
+
+  it('keeps a loaded fiche when the lists fail', async () => {
+    const f = fakeApi();
+    const real = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async (path: string) => {
+      if (path === '/api/types' || path === '/api/fiches') throw new Error('indisponible');
+      return real(path);
+    });
+    render(FichePanel, { props: { id: 1, onOpen: vi.fn() }, context: new Map([['api', f.api]]) });
+    expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
+    expect(screen.queryByText('indisponible')).toBeNull();
+  });
+
+  it('shows a refused save inline and keeps the edit', async () => {
+    const f = fakeApi();
+    f.send.mockRejectedValueOnce(new Error('Synthèse trop longue'));
+    render(FichePanel, { props: { id: 1, onOpen: vi.fn() }, context: new Map([['api', f.api]]) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Modifier' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Synthèse trop longue');
+    expect(screen.getByLabelText('Titre')).toBeInTheDocument();
+  });
 });
