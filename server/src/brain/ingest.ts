@@ -87,7 +87,7 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
       text: string;
       source: string;
     }[]
-  ).map((o) => ({ text: o.text, source: JSON.parse(o.source) }) as Observation);
+  ).map((o): Observation => ({ text: o.text, source: JSON.parse(o.source) }));
   const start = deps.clock().getTime();
   const r = await processLot(deps, observations, { lot: id, source: 'core' }).catch(
     (err): Awaited<ReturnType<typeof processLot>> => ({

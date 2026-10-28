@@ -60,8 +60,8 @@ export interface FicheType {
 
 export interface Source {
   kind: 'core' | 'note' | 'depot' | 'import';
-  origin?: string;
-  ref?: string;
+  origin?: string | undefined;
+  ref?: string | undefined;
   at: string;
 }
 

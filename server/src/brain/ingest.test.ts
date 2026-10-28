@@ -132,4 +132,73 @@ describe('brain.ingest', () => {
   it('has no last run before any pass', () => {
     expect(lastRun(setup().h.db)).toBeUndefined();
   });
+
+  it('runs one pass at a time: two ingests in a row never overlap, and both lots end done', async () => {
+    const t = setup();
+    t.replies.push(...t.goodReplies(), ...t.goodReplies());
+    let active = 0;
+    let peak = 0;
+    const inner = t.fake.provider.json.bind(t.fake.provider);
+    t.fake.provider.json = async (req) => {
+      peak = Math.max(peak, ++active);
+      await new Promise((r) => setTimeout(r, 20));
+      try {
+        return await inner(req);
+      } finally {
+        active--;
+      }
+    };
+    const token = await t.h.pairClient();
+    const post = () =>
+      t.h.app.request('/lun/v1/actions/brain.ingest', {
+        method: 'POST',
+        headers: t.h.auth(token),
+        body: JSON.stringify({ version: 1, observations: [obs('Le client X a signé.')] }),
+      });
+    await Promise.all([post(), post()]);
+    await t.settle();
+    expect(peak).toBe(1);
+    expect(t.status(1).status).toBe('done');
+    expect(t.status(2).status).toBe('done');
+  });
+
+  it('replays a lot left running by a crash', async () => {
+    const t = setup();
+    t.replies.push(...t.goodReplies());
+    t.h.db
+      .prepare("INSERT INTO lots (status, created_at) VALUES ('running', ?)")
+      .run(t.h.clock().toISOString());
+    t.h.db
+      .prepare('INSERT INTO observations (lot, text, source) VALUES (1, ?, ?)')
+      .run('Le client X a signé.', JSON.stringify(obs('x').source));
+    await runPending(
+      brainDeps({
+        db: t.h.db,
+        clock: t.h.clock,
+        version: 'x',
+        actions: t.h.actions,
+        brainProvider: (use) => ({
+          provider: t.fake.provider,
+          model: use === 'tri' ? 'claude-haiku-5-5' : 'claude-sonnet-5-5',
+        }),
+      }),
+    );
+    expect(t.status(1).status).toBe('done');
+  });
+
+  it('keeps a lot held with its reason when no provider is configured', async () => {
+    const h = makeHarness({ brainProvider: () => undefined });
+    const token = await h.pairClient();
+    await h.app.request('/lun/v1/actions/brain.ingest', {
+      method: 'POST',
+      headers: h.auth(token),
+      body: JSON.stringify({ version: 1, observations: [obs('texte')] }),
+    });
+    for (let i = 0; i < 50; i++) {
+      const lot = h.db.prepare('SELECT status, reason FROM lots').get() as { status: string; reason: string };
+      if (lot.status === 'held') return expect(lot.reason).toBe('no-provider');
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    throw new Error('lot never held');
+  });
 });
