@@ -8,6 +8,7 @@
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
+  import Tableau from './screens/Tableau.svelte';
 
   // The app is served by Lun'Avaritia itself (or proxied to it in development).
   const baseUrl = window.location.origin;
@@ -53,6 +54,19 @@
     if (!a) return;
     a.get<{ status: string; paused?: boolean }>('/lun/v1/health')
       .then((h) => (status.paused = h.status === 'paused' || h.paused === true))
+      .catch(() => {});
+  });
+
+  // Rail counters, read again at each change of screen.
+  $effect(() => {
+    const a = api;
+    void route;
+    if (!a) return;
+    a.get<{ pending: { drafts: number } }>('/api/dashboard')
+      .then((d) => (counts.valider = d.pending.drafts))
+      .catch(() => {});
+    a.get<{ fiches: unknown[] }>('/api/fiches')
+      .then((f) => (counts.fiches = f.fiches.length))
       .catch(() => {});
   });
 
@@ -107,13 +121,17 @@
 {:else if api}
   <Shell {route} {counts} {status}>
     {#key route}
-      <EmptyState
-        size="grand"
-        tone="neutre"
-        icon={icons.Clock}
-        title={TITLES[route]}
-        message="Bientôt ici."
-      />
+      {#if route === 'tableau'}
+        <Tableau />
+      {:else}
+        <EmptyState
+          size="grand"
+          tone="neutre"
+          icon={icons.Clock}
+          title={TITLES[route]}
+          message="Bientôt ici."
+        />
+      {/if}
     {/key}
   </Shell>
 {:else}
