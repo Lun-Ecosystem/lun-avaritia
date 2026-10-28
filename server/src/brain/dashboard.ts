@@ -5,6 +5,8 @@ import { monthSpend } from './process.ts';
 export interface Dashboard {
   lastRun: LastRun | undefined;
   pending: { drafts: number; contradictions: number; doublons: number };
+  /** Kept fiches (merged ones don't count): the rail counter. */
+  fiches: number;
   heldLots: number;
   monthSpend: number;
   recent: { at: string; what: string }[];
@@ -26,6 +28,7 @@ export function dashboard(db: DatabaseSync, now: Date): Dashboard {
       ),
       doublons: count(db, `SELECT COUNT(*) AS n FROM drafts WHERE ${PENDING} AND kind = 'doublon'`),
     },
+    fiches: count(db, 'SELECT COUNT(*) AS n FROM fiches WHERE merged_into IS NULL'),
     heldLots: count(db, "SELECT COUNT(*) AS n FROM lots WHERE status = 'held'"),
     monthSpend: monthSpend(db, now),
     recent: db

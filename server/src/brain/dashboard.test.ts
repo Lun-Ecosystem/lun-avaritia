@@ -41,6 +41,7 @@ describe('dashboard', () => {
 
     const d = dashboard(db, clock());
     expect(d.pending).toEqual({ drafts: 4, contradictions: 2, doublons: 1 });
+    expect(d.fiches).toBe(2);
     expect(d.heldLots).toBe(1);
     expect(d.monthSpend).toBeCloseTo(1.5);
     expect(d.lastRun).toBeUndefined();
