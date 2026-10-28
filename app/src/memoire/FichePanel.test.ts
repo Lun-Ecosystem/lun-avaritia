@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { detail, fakeApi } from './fixtures.ts';
+import { detail, fakeApi, list } from './fixtures.ts';
 import FichePanel from './FichePanel.svelte';
 
 function show(details?: Record<number, unknown>, id = 1) {
@@ -12,6 +12,15 @@ function show(details?: Record<number, unknown>, id = 1) {
 }
 
 describe('FichePanel', () => {
+  it('reads no list when the caller gives it, and still opens a linked title', async () => {
+    const { api, get } = fakeApi();
+    const onOpen = vi.fn();
+    render(FichePanel, { props: { id: 1, onOpen, fiches: list }, context: new Map([['api', api]]) });
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Entreprise Z' }))[0]!);
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith(3));
+    expect(get).not.toHaveBeenCalledWith('/api/fiches');
+  });
+
   it('shows title, type and update date', async () => {
     show();
     expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();

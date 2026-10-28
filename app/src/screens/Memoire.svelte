@@ -139,7 +139,7 @@
       {#await graphe}
         <Skeleton height={420} />
       {:then { default: Graphe }}
-        <Graphe {selected} {centre} onOpen={open} />
+        <Graphe {selected} {centre} fiches={fiches ?? undefined} onOpen={open} onSaved={load} />
       {:catch e}
         <Banner title="Graphe indisponible">{e.message}</Banner>
       {/await}
@@ -182,7 +182,13 @@
       <div class="detail">
         {#if selected !== null}
           {#key selected}
-            <FichePanel id={selected} onOpen={open} onClose={() => open(null)} onSaved={load} />
+            <FichePanel
+              id={selected}
+              fiches={fiches ?? undefined}
+              onOpen={open}
+              onClose={() => open(null)}
+              onSaved={load}
+            />
           {/key}
         {:else}
           <p class="vide">Choisir une fiche dans la liste.</p>

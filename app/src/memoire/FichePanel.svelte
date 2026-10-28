@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, untrack } from 'svelte';
   import type { Api } from '../api.ts';
   import { formatDay } from '../format.ts';
   import { Badge, Banner, Button, icons, Skeleton } from '../lib/ui/index.ts';
@@ -33,13 +33,16 @@
     onOpen: (id: number) => void;
     onClose?: (() => void) | undefined;
     /** The title may have changed: the list around has to be read again. */
-    onSaved?: (() => void) | undefined;
+    onSaved?: ((fiche: { id: number; title: string }) => void) | undefined;
+    /** The memory's list, when the caller already holds it: the panel then reads nothing. */
+    fiches?: Listed[] | undefined;
   };
-  let { id, onOpen, onClose, onSaved }: Props = $props();
+  let { id, onOpen, onClose, onSaved, fiches }: Props = $props();
 
   const api = getContext<Api>('api');
   let data = $state<Data | null>(null);
-  let listed = $state<Listed[]>([]);
+  let fetched = $state<Listed[]>([]);
+  const listed = $derived(fiches ?? fetched);
   let failure = $state<string | null>(null);
   let editing = $state(false);
   let busy = $state(false);
@@ -48,7 +51,7 @@
   // The list gives the type name and the titles a [[link]] can open; without it the fiche still shows.
   const ids = $derived(idsByTitle(listed));
   const typeName = $derived(listed.find((l) => l.id === data?.fiche.id)?.type ?? '');
-  void listFiches(api).then((l) => (listed = l));
+  if (!untrack(() => fiches)) void listFiches(api).then((l) => (fetched = l));
 
   $effect(() => {
     const asked = id;
@@ -77,7 +80,7 @@
       const r = await api.send<{ fiche: Fiche; versions: Version[] }>('PATCH', `/api/fiches/${id}`, edit);
       if (data) data = { ...data, fiche: r.fiche, versions: r.versions };
       editing = false;
-      onSaved?.();
+      onSaved?.({ id, title: r.fiche.title });
     } catch (e) {
       saveError = e instanceof Error ? e.message : 'L’enregistrement a échoué.';
     } finally {

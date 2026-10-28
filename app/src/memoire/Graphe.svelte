@@ -9,6 +9,7 @@
   import { Banner, Chip, EmptyState, icons, Skeleton } from '../lib/ui/index.ts';
   import { bindShortcuts } from '../lib/ui/shortcuts.ts';
   import FichePanel from './FichePanel.svelte';
+  import type { Listed } from './titles.ts';
   import { activeSet, buildGraph, flatten, type GraphData, type Palette } from './graph.ts';
 
   /*
@@ -21,8 +22,12 @@
     /** Text of the « Centrer le graphe sur… » field. */
     centre: string;
     onOpen: (id: number | null) => void;
+    /** The memory's list, forwarded to the panel so it reads nothing. */
+    fiches?: Listed[] | undefined;
+    /** A title was saved: the memory reads its list again. */
+    onSaved?: (() => void) | undefined;
   };
-  let { selected, centre, onOpen }: Props = $props();
+  let { selected, centre, onOpen, fiches, onSaved }: Props = $props();
 
   type Type = { id: number; name: string };
 
@@ -54,6 +59,12 @@
   );
   // The focused fiche: the one searched for, else the one open in the panel.
   const focused = $derived(centred ?? selected);
+
+  // A renamed fiche keeps its node: only the label changes (Sigma follows the graph).
+  function saved(fiche: { id: number; title: string }) {
+    if (graph?.hasNode(String(fiche.id))) graph.setNodeAttribute(String(fiche.id), 'label', fiche.title);
+    onSaved?.();
+  }
 
   function toggle(id: number) {
     shown = shown.includes(id) ? shown.filter((t) => t !== id) : [...shown, id];
@@ -277,7 +288,13 @@
     {#if selected !== null}
       <aside class="panneau" aria-label="Fiche">
         {#key selected}
-          <FichePanel id={selected} onOpen={(id) => onOpen(id)} onClose={() => onOpen(null)} />
+          <FichePanel
+            id={selected}
+            {fiches}
+            onOpen={(id) => onOpen(id)}
+            onClose={() => onOpen(null)}
+            onSaved={saved}
+          />
         {/key}
       </aside>
     {/if}
