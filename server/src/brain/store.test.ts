@@ -78,6 +78,15 @@ describe('store', () => {
     expect(listTypes(db).some((t) => t.name === 'Endroit')).toBe(false);
   });
 
+  it('refuses duplicate type names, unknown type ids and an empty title on edit', () => {
+    expect(() => addType(db, 'Personne')).toThrow(InvalidInputError);
+    expect(() => renameType(db, 999, 'X')).toThrow(InvalidInputError);
+    expect(() => removeType(db, 999)).toThrow(InvalidInputError);
+    const f = fiche('Alice');
+    expect(() => editFiche(db, f, { title: '  ' }, 't1')).toThrow(InvalidInputError);
+    expect(versions(db, f)).toHaveLength(0);
+  });
+
   it('refuses a link to a missing fiche and lists neighbors', () => {
     const a = fiche('Alice');
     const b = fiche('Bob');

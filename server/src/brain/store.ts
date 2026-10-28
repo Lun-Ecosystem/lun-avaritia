@@ -203,11 +203,15 @@ export function addType(db: DatabaseSync, name: string): number {
 }
 
 export function renameType(db: DatabaseSync, id: number, name: string): void {
-  guardUnique(() => db.prepare('UPDATE fiche_types SET name = ? WHERE id = ?').run(typeName(name), id));
+  const r = guardUnique(() =>
+    db.prepare('UPDATE fiche_types SET name = ? WHERE id = ?').run(typeName(name), id),
+  );
+  if (!r.changes) throw new InvalidInputError('Type inconnu.');
 }
 
 export function removeType(db: DatabaseSync, id: number): void {
   if (db.prepare('SELECT 1 FROM fiches WHERE type_id = ?').get(id))
     throw new InvalidInputError('Des fiches utilisent ce type.');
-  db.prepare('DELETE FROM fiche_types WHERE id = ?').run(id);
+  if (!db.prepare('DELETE FROM fiche_types WHERE id = ?').run(id).changes)
+    throw new InvalidInputError('Type inconnu.');
 }
