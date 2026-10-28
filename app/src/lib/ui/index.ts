@@ -31,6 +31,7 @@ export { default as SettingsCard } from './SettingsCard.svelte';
 export { default as SettingsRow } from './SettingsRow.svelte';
 export { default as Skeleton } from './Skeleton.svelte';
 export { default as Slider } from './Slider.svelte';
+export { default as StatCard } from './StatCard.svelte';
 export { default as StandaloneCard } from './StandaloneCard.svelte';
 export { default as Steps } from './Steps.svelte';
 export { default as Switch } from './Switch.svelte';

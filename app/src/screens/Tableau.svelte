@@ -2,27 +2,64 @@
   import { getContext } from 'svelte';
   import type { Api } from '../api.ts';
   import { formatCost, formatDuration, formatWhen } from '../format.ts';
-  import { Badge, Banner, EmptyState, icons, ListRow, SettingsCard, Skeleton } from '../lib/ui/index.ts';
+  import {
+    Badge,
+    Banner,
+    EmptyState,
+    icons,
+    ListRow,
+    SettingsCard,
+    Skeleton,
+    StatCard,
+  } from '../lib/ui/index.ts';
 
   interface Dashboard {
     lastRun?: { at: string; durationMs: number; cost: number; observations: number; drafts: number };
     pending: { drafts: number; contradictions: number; doublons: number };
     heldLots: number;
-    monthSpend: number;
     recent: { at: string; what: string }[];
+  }
+  interface QueueDraft {
+    id: number;
+    kind: 'fiche' | 'contradiction' | 'doublon';
+    card: { title: string };
+    payload: { ficheId?: number; facts?: { replaces?: number }[] };
+    createdAt: string;
   }
 
   const api = getContext<Api>('api');
   const now = new Date();
   let data = $state<Dashboard | null>(null);
+  let night = $state<QueueDraft[]>([]);
   let failure = $state<string | null>(null);
 
-  api
-    .get<Dashboard>('/api/dashboard')
-    .then((d) => (data = d))
+  // The last run carries no lot number: its drafts are those created since it started.
+  Promise.all([api.get<Dashboard>('/api/dashboard'), api.get<{ drafts: QueueDraft[] }>('/api/drafts')])
+    .then(([d, q]) => {
+      const since = d.lastRun ? Date.parse(d.lastRun.at) - d.lastRun.durationMs : Infinity;
+      night = q.drafts.filter((x) => Date.parse(x.createdAt) >= since);
+      data = d;
+    })
     .catch((e: Error) => (failure = e.message));
 
   const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  const paris = (d: Date, o: Intl.DateTimeFormatOptions) =>
+    d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', ...o });
+
+  function title(at: string) {
+    const end = new Date(at);
+    const start = new Date(end.getTime() - 24 * 3600_000);
+    return `Nuit du ${paris(start, { day: 'numeric' })} au ${paris(end, { day: 'numeric', month: 'long' })}`;
+  }
+
+  function tag(d: QueueDraft): { label: string; tone: 'danger' | 'info' | 'ok' | 'neutre' } {
+    if (d.kind === 'contradiction' || d.payload.facts?.some((f) => f.replaces !== undefined))
+      return { label: 'contradiction', tone: 'danger' };
+    if (d.kind === 'doublon') return { label: 'doublon ?', tone: 'neutre' };
+    return d.payload.ficheId === undefined
+      ? { label: 'nouvelle', tone: 'ok' }
+      : { label: 'enrichit', tone: 'info' };
+  }
 </script>
 
 <div class="ecran" aria-busy={!data && !failure}>
@@ -42,35 +79,75 @@
       </Banner>
     {/if}
 
-    <SettingsCard title="Dernier traitement">
-      {#snippet aside()}<Badge tone="neutre">{formatCost(data!.monthSpend)} ce mois</Badge>{/snippet}
+    <header class="entete">
+      <h1>{lastRun ? title(lastRun.at) : 'Aucun traitement pour l’instant'}</h1>
       {#if lastRun}
-        <p class="run">
-          {formatWhen(lastRun.at, now)} · {formatDuration(lastRun.durationMs)} · {formatCost(lastRun.cost)} ·
-          {plural(lastRun.observations, 'observation reçue', 'observations reçues')} ·
-          {plural(lastRun.drafts, 'brouillon créé', 'brouillons créés')}
-        </p>
-      {:else}
-        <EmptyState title="Aucun traitement pour l’instant" icon={icons.Clock} />
+        <span class="muted">
+          traité à {paris(new Date(lastRun.at), { hour: '2-digit', minute: '2-digit' })}, {formatDuration(
+            lastRun.durationMs,
+          )}, {formatCost(lastRun.cost)}
+        </span>
       {/if}
-    </SettingsCard>
+    </header>
 
-    <div class="cartes">
-      {#each [{ label: 'Brouillons à valider', n: pending.drafts, href: '/valider' }, { label: 'Contradictions', n: pending.contradictions, href: '/valider?filtre=contradictions' }, { label: 'Doublons probables', n: pending.doublons, href: '/valider?filtre=doublons' }] as c (c.href)}
-        <a class="compteur" href={c.href}>
-          <span class="n">{c.n}</span>
-          <span>{c.label}</span>
-        </a>
-      {/each}
+    <div class="grille">
+      <StatCard
+        label="Brouillons à valider"
+        value={pending.drafts}
+        sub={night.length > 0 ? `dont ${night.length} de cette nuit` : undefined}
+        href="/valider"
+        action="Passer en revue"
+        primary
+      />
+      <StatCard
+        label="Contradictions"
+        value={pending.contradictions}
+        tone={pending.contradictions > 0 ? 'danger' : 'neutre'}
+        sub="une décision attendue sur chacune"
+        href="/valider?filtre=contradictions"
+        action="Trancher"
+      />
+      <StatCard
+        label="Doublons probables"
+        value={pending.doublons}
+        sub="fusion proposée"
+        href="/valider?filtre=doublons"
+        action="Voir"
+      />
     </div>
 
-    <SettingsCard title="Activité récente">
-      {#each data.recent as r (r.at + r.what)}
-        <ListRow>{r.what} <span class="when">{formatWhen(r.at, now)}</span></ListRow>
-      {:else}
-        <EmptyState title="Rien pour l’instant" icon={icons.Inbox} />
-      {/each}
-    </SettingsCard>
+    <div class="deux">
+      <SettingsCard title="Résumé de la nuit">
+        {#if lastRun}
+          <p class="phrase">
+            {plural(lastRun.observations, 'observation reçue', 'observations reçues')}, {plural(
+              lastRun.drafts,
+              'brouillon créé',
+              'brouillons créés',
+            )}.
+          </p>
+          {#each night.slice(0, 5) as d (d.id)}
+            {@const t = tag(d)}
+            <ListRow
+              ><div class="ligne">
+                <span>{d.card.title}</span>
+                <Badge tone={t.tone}>{t.label}</Badge>
+              </div></ListRow
+            >
+          {/each}
+        {:else}
+          <EmptyState title="Rien pour l’instant" icon={icons.Clock} />
+        {/if}
+      </SettingsCard>
+
+      <SettingsCard title="Activité récente">
+        {#each data.recent as r (r.at + r.what)}
+          <ListRow><span class="muted when">{formatWhen(r.at, now)}</span> <span>{r.what}</span></ListRow>
+        {:else}
+          <EmptyState title="Rien pour l’instant" icon={icons.Inbox} />
+        {/each}
+      </SettingsCard>
+    </div>
   {/if}
 </div>
 
@@ -80,38 +157,50 @@
     gap: 16px;
     padding: 24px;
   }
-  .run {
-    margin: 0;
-    padding: 14px 18px;
-    color: var(--texte-2);
+  .entete {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 4px 16px;
   }
-  .cartes {
+  h1 {
+    margin: 0;
+    font: 400 26px/1.2 var(--serif);
+  }
+  .muted {
+    color: var(--texte-2);
+    font-size: 12.5px;
+  }
+  .grille {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    gap: 14px;
   }
-  .compteur {
+  .deux {
     display: grid;
-    gap: 4px;
-    padding: 16px 18px;
-    background: var(--surface-1);
-    border: 1px solid var(--bordure);
-    border-radius: var(--r-3);
-    color: var(--texte);
-    text-decoration: none;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 14px;
+    align-items: start;
   }
-  .compteur:hover {
-    background: var(--survol);
-  }
-  .n {
-    font-size: 28px;
-  }
-  .when {
-    float: right;
+  .phrase {
+    margin: 0;
+    padding: 12px 18px;
     color: var(--texte-2);
   }
+  .ligne {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .when {
+    display: inline-block;
+    min-width: 72px;
+  }
   @media (max-width: 759.98px) {
-    .cartes {
+    .grille,
+    .deux {
       grid-template-columns: 1fr;
     }
   }

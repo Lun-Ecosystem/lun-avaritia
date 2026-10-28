@@ -10,6 +10,8 @@
     icon?: IconComponent | undefined;
     /** Action in progress: keeps its width, shows a spinner, ignores clicks. */
     loading?: boolean | undefined;
+    /** A link looking like the button (same classes), for a navigation. */
+    href?: string | undefined;
     children?: Snippet | undefined;
   };
 
@@ -20,6 +22,7 @@
     loading = false,
     disabled = false,
     type = 'button',
+    href,
     class: className,
     onclick,
     children,
@@ -35,9 +38,11 @@
   };
 </script>
 
-<button
+<svelte:element
+  this={href ? 'a' : 'button'}
+  {href}
   {...rest}
-  {type}
+  type={href ? undefined : type}
   class={['btn', variant, size, className]}
   {disabled}
   aria-busy={loading || undefined}
@@ -50,7 +55,7 @@
     <Icon size={size === 'petit' ? 14 : 16} strokeWidth={ICON_STROKE} aria-hidden="true" />
   {/if}
   {@render children?.()}
-</button>
+</svelte:element>
 
 <style>
   .btn {
@@ -67,6 +72,7 @@
     font: 400 13.5px/1 var(--sans);
     white-space: nowrap;
     cursor: pointer;
+    text-decoration: none;
     transition:
       background-color 120ms ease,
       border-color 120ms ease,
@@ -93,7 +99,7 @@
     background: var(--accent);
     border-color: var(--accent);
   }
-  .principal:enabled:hover,
+  .principal:not(:disabled):hover,
   .principal[data-etat='survol'] {
     background: var(--accent-survol);
     border-color: var(--accent-survol);
@@ -104,7 +110,7 @@
     border-color: var(--accent-bord);
     color: var(--accent-texte);
   }
-  .doux:enabled:hover,
+  .doux:not(:disabled):hover,
   .doux[data-etat='survol'] {
     background: color-mix(in srgb, var(--accent) 36%, transparent);
     border-color: var(--accent-bord);
@@ -115,7 +121,7 @@
     background: var(--surface-2);
     border-color: var(--bordure-forte);
   }
-  .secondaire:enabled:hover,
+  .secondaire:not(:disabled):hover,
   .secondaire[data-etat='survol'] {
     background: var(--surface-3);
     border-color: var(--bordure-forte);
@@ -124,14 +130,14 @@
   .fantome {
     color: var(--texte-2);
   }
-  .fantome:enabled:hover,
+  .fantome:not(:disabled):hover,
   .fantome[data-etat='survol'] {
     background: var(--survol);
     border-color: transparent;
     color: var(--texte);
   }
-  .fantome:enabled:active,
-  .secondaire:enabled:active {
+  .fantome:not(:disabled):active,
+  .secondaire:not(:disabled):active {
     background: var(--appui);
   }
 
@@ -139,7 +145,7 @@
     border-color: var(--danger-bord);
     color: var(--danger);
   }
-  .danger:enabled:hover,
+  .danger:not(:disabled):hover,
   .danger[data-etat='survol'] {
     background: var(--danger-doux);
     border-color: var(--danger-bord);
@@ -149,7 +155,7 @@
     background: var(--danger-plein);
     border-color: var(--danger-plein);
   }
-  .danger-plein:enabled:hover,
+  .danger-plein:not(:disabled):hover,
   .danger-plein[data-etat='survol'] {
     background: color-mix(in srgb, var(--danger-plein) 86%, var(--texte));
     border-color: color-mix(in srgb, var(--danger-plein) 86%, var(--texte));

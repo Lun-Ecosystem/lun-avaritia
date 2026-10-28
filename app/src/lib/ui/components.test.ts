@@ -8,6 +8,7 @@ import ProposalCard from './ProposalCard.svelte';
 import ProposalChip from './ProposalChip.svelte';
 import ServiceCard from './ServiceCard.svelte';
 import StandaloneCard from './StandaloneCard.svelte';
+import StatCard from './StatCard.svelte';
 import Steps from './Steps.svelte';
 import Tabs from './Tabs.svelte';
 
@@ -152,5 +153,25 @@ describe('CommandPalette', () => {
     await user.keyboard('{Control>}k{/Control}');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByPlaceholderText('Rechercher une commande')).toBeNull();
+  });
+});
+
+describe('StatCard', () => {
+  it('names the count first and links to the screen', () => {
+    render(StatCard, {
+      props: {
+        label: 'Contradictions',
+        value: 2,
+        sub: 'une décision attendue',
+        href: '/valider?filtre=contradictions',
+        action: 'Trancher',
+        tone: 'danger',
+      },
+    });
+    expect(screen.getByText('Contradictions')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Contradictions : Trancher' });
+    expect(link).toHaveAttribute('href', '/valider?filtre=contradictions');
+    expect(link).toHaveClass('secondaire');
   });
 });
