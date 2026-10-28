@@ -60,7 +60,8 @@
     upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form),
   } satisfies Api);
 
-  let status = $state({ paused: false, core: false });
+  // v1: health carries no core flag, so `core` stays false (« Core non relié ») until pairing with the core.
+  let status = $state({ paused: false, degraded: false, core: false });
   let counts = $state({ valider: 0, fiches: 0 });
 
   /** Reads the service state again (at pairing, after a pause or a resume in the settings). */
@@ -69,7 +70,10 @@
     if (!a) return;
     await a
       .get<{ status: string; paused?: boolean }>('/lun/v1/health')
-      .then((h) => (status.paused = h.status === 'paused' || h.paused === true))
+      .then((h) => {
+        status.paused = h.status === 'paused' || h.paused === true;
+        status.degraded = h.status === 'degraded';
+      })
       .catch(() => {});
   }
   $effect(() => {
@@ -81,11 +85,11 @@
     const a = api;
     void route;
     if (!a) return;
-    a.get<{ pending: { drafts: number } }>('/api/dashboard')
-      .then((d) => (counts.valider = d.pending.drafts))
-      .catch(() => {});
-    a.get<{ fiches: unknown[] }>('/api/fiches')
-      .then((f) => (counts.fiches = f.fiches.length))
+    a.get<{ pending: { drafts: number }; fiches: number }>('/api/dashboard')
+      .then((d) => {
+        counts.valider = d.pending.drafts;
+        counts.fiches = d.fiches;
+      })
       .catch(() => {});
   });
 

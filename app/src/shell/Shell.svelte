@@ -12,7 +12,7 @@
     route: Route;
     counts: { valider: number; fiches: number };
     /** The service paused by hand; the core linked to this satellite. */
-    status: { paused: boolean; core: boolean };
+    status: { paused: boolean; degraded: boolean; core: boolean };
     /** The agent's bubble, above the screens (it never resizes them). */
     agent?: Snippet | undefined;
     children: Snippet;
@@ -64,7 +64,7 @@
     {#snippet footer()}
       {@render link(items[4]!)}
       <ServiceCard
-        state={status.paused ? 'pause' : 'actif'}
+        state={status.paused ? 'pause' : status.degraded ? 'cle-refusee' : 'actif'}
         detail={status.core ? 'Core relié' : 'Core non relié'}
       />
     {/snippet}

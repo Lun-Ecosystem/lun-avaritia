@@ -106,6 +106,22 @@ describe('App', () => {
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
   });
 
+  it('a degraded service is not shown as active in the rail', async () => {
+    const json = (body: unknown) => new Response(JSON.stringify(body));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (input) =>
+        new URL(String(input)).pathname === '/lun/v1/health'
+          ? json({ status: 'degraded' })
+          : new Response('{}', { status: 404 }),
+      ),
+    );
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+  });
+
   it('Pause in the settings turns the service card of the rail to paused at once', async () => {
     fakeServer({ paused: false });
     localStorage.setItem(TOKEN_KEY, 'tok-1');
@@ -134,7 +150,6 @@ describe('App', () => {
     expect(calls.toSorted()).toEqual([
       'GET /api/dashboard',
       'GET /api/drafts',
-      'GET /api/fiches',
       'GET /api/settings',
       'GET /lun/v1/health',
     ]);
