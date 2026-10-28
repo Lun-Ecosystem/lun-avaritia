@@ -46,8 +46,8 @@ appareil). Sous 760 px, le rail laisse place à la barre du bas.
 6. **Dépôts** : déposer un fichier texte inventé, il apparaît dans la liste ; plusieurs fichiers déposés ensemble
    sont tous signalés.
 7. **Réglages** : fournisseurs et modèles, types de fiches, lots, appareils, données (export, import Obsidian),
-   pause et reprise. Dans « Agent », changer le nom (« Archiviste ») et l’icône (Plume) : la bulle les reprend au
-   changement d’écran.
+   pause et reprise. Dans « Agent », changer le nom (« Archiviste ») et l’icône (Plume) : la bulle et le titre du
+   panneau les reprennent aussitôt.
 8. **Agent** : la bulle en bas à droite, sur chaque écran (au-dessus de la barre du bas sur un téléphone). Elle
    ouvre un panneau de 400 px, plein écran sous 760 px, titré du nom réglé ; `Échap` le ferme et rend le focus à la
    bulle. Sans modèle choisi, l’agent répond qu’il faut en choisir un dans Réglages. Avec un modèle (partie 3),

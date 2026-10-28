@@ -13,7 +13,7 @@
   let { name, icon: Icon, onclick, element = $bindable(null) }: Props = $props();
 </script>
 
-<button bind:this={element} type="button" class="bulle" aria-expanded="false" {onclick}>
+<button bind:this={element} type="button" class="bulle" aria-haspopup="dialog" {onclick}>
   <Icon size={16} strokeWidth={ICON_STROKE} aria-hidden="true" />
   <span class="nom">{name}</span>
 </button>

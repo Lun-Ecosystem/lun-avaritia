@@ -11,7 +11,7 @@ export type Message = {
   cost?: number;
   /** Drafts the answer created, to validate in « À valider ». */
   drafts?: number;
-  /** A failure shown in the thread, never sent back as a turn. */
+  /** A failure shown in the thread (and the request that failed): never sent back as a turn. */
   error?: boolean;
 };
 
@@ -33,14 +33,15 @@ export class Conversation {
     this.#api = api;
   }
 
-  async send(text: string, context?: Record<string, string>): Promise<void> {
+  /** `false` when the request failed: the caller may give it back to the field. */
+  async send(text: string, context?: Record<string, string>): Promise<boolean> {
     const request = text.trim();
-    if (!request || this.asking) return;
+    if (!request || this.asking) return false;
     const history = this.messages
       .filter((m) => !m.error)
       .slice(-MAX_TURNS)
       .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', text: m.text.slice(0, MAX_CHARS) }));
-    this.messages.push({ role: 'user', text: request });
+    const at = this.messages.push({ role: 'user', text: request }) - 1;
     this.asking = true;
     try {
       const r = await this.#api.send<Reply>('POST', '/api/agent', {
@@ -49,10 +50,15 @@ export class Conversation {
         history,
       });
       this.messages.push({ role: 'agent', text: r.summary, cost: r.cost.amount, drafts: r.cards.length });
+      return true;
     } catch (e) {
       const credit = e instanceof ApiError && (e.status === 402 || /crédit/i.test(e.message));
       const text = credit ? CREDIT : e instanceof Error && e.message ? e.message : 'L’agent ne répond pas.';
+      // Out of the next history too: no two user turns in a row (unless the thread was cleared meanwhile).
+      const turn = this.messages[at];
+      if (turn?.role === 'user') turn.error = true;
       this.messages.push({ role: 'agent', text, error: true });
+      return false;
     } finally {
       this.asking = false;
     }

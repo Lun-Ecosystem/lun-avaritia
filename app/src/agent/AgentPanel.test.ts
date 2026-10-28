@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api.ts';
 import AgentPanel from './AgentPanel.svelte';
 import { agentIdentity, agentPanel } from './conversation.svelte.ts';
@@ -20,15 +20,27 @@ function show(settings: Record<string, string> | Error = {}, fiche: string | nul
   return { get, send };
 }
 
+beforeEach(() => {
+  Object.assign(agentIdentity, { name: 'Agent', icon: 'sparkles' });
+});
 afterEach(() => {
   agentPanel.open = false;
-  Object.assign(agentIdentity, { name: 'Agent', icon: 'sparkles' });
 });
 
 describe('AgentPanel', () => {
   it('shows the bubble with the default name and icon when the settings are unreadable', async () => {
     show(new Error('Hors ligne'));
-    expect(await screen.findByRole('button', { name: 'Agent' })).toHaveAttribute('aria-expanded', 'false');
+    expect(await screen.findByRole('button', { name: 'Agent' })).toHaveAttribute('aria-haspopup', 'dialog');
+  });
+
+  it('gives the request back to the field when it fails', async () => {
+    const { send } = show();
+    send.mockRejectedValueOnce(new Error('Réseau coupé'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+    const field = screen.getByRole('textbox', { name: 'Demande à Agent' });
+    await userEvent.type(field, 'note que X{Enter}');
+    expect(await screen.findByText('Réseau coupé')).toBeInTheDocument();
+    expect(field).toHaveValue('note que X');
   });
 
   it('takes the name and icon of the settings, and the panel title carries the name', async () => {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
 import { dismissAll, toasts } from '../lib/ui/toasts.svelte.ts';
+import AgentPanel from '../agent/AgentPanel.svelte';
 import Valider from './Valider.svelte';
 
 const src = { kind: 'core', at: '2026-10-27T22:00:00Z' };
@@ -69,7 +70,7 @@ function show(
   });
   const api = { get, send } as unknown as Api;
   render(Valider, { props: { filtre }, context: new Map([['api', api]]) });
-  return { get, send };
+  return { api, get, send };
 }
 
 const messages = () => toasts().map((t) => t.message);
@@ -160,6 +161,18 @@ describe('Valider', () => {
     await waitFor(() => expect(screen.getAllByRole('region')).toHaveLength(1));
     await user.keyboard('r');
     expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/3/refuse', {});
+  });
+
+  it('V and R typed inside the agent panel stay there', async () => {
+    const user = userEvent.setup();
+    const { api, send } = show([{ drafts: [fiche(1, 'Client Exemple')], held: 0 }]);
+    render(AgentPanel, { context: new Map([['api', api]]) });
+    await screen.findByRole('region');
+    await user.click(screen.getByRole('button', { name: 'Agent' }));
+    screen.getByRole('button', { name: 'Fermer' }).focus();
+    await user.keyboard('vr');
+    expect(send).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
   });
 
   it('a contradiction shows both facts; « Garder l’autre » swaps keep and strike', async () => {

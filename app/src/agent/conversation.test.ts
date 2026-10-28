@@ -40,19 +40,16 @@ describe('Conversation', () => {
     ]);
   });
 
-  it('says the credit is out on a 402 and keeps the error out of the history', async () => {
+  it('says the credit is out on a 402 and keeps the failed turn out of the history', async () => {
     const { send, conversation } = fake(new ApiError(402, 'Payment Required'), reply('Bonjour.'));
-    await conversation.send('Salut');
+    expect(await conversation.send('Salut')).toBe(false);
     expect(conversation.messages.at(-1)).toEqual({
       role: 'agent',
       text: 'Crédit épuisé chez le fournisseur',
       error: true,
     });
-    await conversation.send('Encore');
-    expect(send).toHaveBeenLastCalledWith('POST', '/api/agent', {
-      request: 'Encore',
-      history: [{ role: 'user', text: 'Salut' }],
-    });
+    expect(await conversation.send('Encore')).toBe(true);
+    expect(send).toHaveBeenLastCalledWith('POST', '/api/agent', { request: 'Encore', history: [] });
   });
 
   it('shows the answer of a paused service as it comes', async () => {

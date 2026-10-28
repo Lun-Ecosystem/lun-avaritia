@@ -97,7 +97,10 @@
     const request = text;
     if (!request.trim() || conversation.asking) return;
     text = '';
-    void conversation.send(request, fiche ? { fiche } : undefined);
+    void conversation.send(request, fiche ? { fiche } : undefined).then((ok) => {
+      // A failed request comes back to the field, unless a new one is being typed.
+      if (!ok && !text) text = request;
+    });
   }
 
   function onfieldkey(event: KeyboardEvent) {
@@ -116,7 +119,12 @@
     aria-label={name}
     tabindex="-1"
     aria-modal={modal}
-    onkeydown={(e) => (e.key === 'Escape' ? void close() : trap(e, e.currentTarget))}
+    onkeydown={(e) => {
+      // The screen's shortcuts (V, R on À valider) stay outside the panel.
+      e.stopPropagation();
+      if (e.key === 'Escape') void close();
+      else trap(e, e.currentTarget);
+    }}
     {@attach holdPage}
   >
     <header>
