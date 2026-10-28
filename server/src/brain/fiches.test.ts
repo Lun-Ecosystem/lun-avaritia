@@ -253,6 +253,21 @@ describe('reads for the app: drafts, graph, neighbors', () => {
     expect(g.nodes.find((n) => n.id === t.b)!.flagged).toBe(false);
   });
 
+  it('GET /api/graph: no dangling edge when the kept fiche is itself merged', async () => {
+    const t = fill();
+    const c = createFiche(t.h.db, { typeId: t.typeId, title: 'C', synthesis: '' }, t.now);
+    const d = createFiche(t.h.db, { typeId: t.typeId, title: 'D', synthesis: '' }, t.now);
+    t.h.db.prepare('UPDATE fiches SET merged_into = ? WHERE id = ?').run(c, t.b);
+    t.h.db.prepare('UPDATE fiches SET merged_into = ? WHERE id = ?').run(d, c);
+    const g = (await (await t.req('/api/graph')).json()) as {
+      nodes: { id: number; degree: number }[];
+      edges: { from: number; to: number }[];
+    };
+    const ids = new Set(g.nodes.map((n) => n.id));
+    expect(g.edges.every((e) => ids.has(e.from) && ids.has(e.to))).toBe(true);
+    expect(g.nodes.find((n) => n.id === t.a)!.degree).toBe(0);
+  });
+
   it('GET /api/fiches/:id: neighbors both ways, depots; 401 without a token', async () => {
     const t = fill();
     t.h.db

@@ -53,12 +53,18 @@ export function brainRoutes(deps: AppDeps): Hono {
   // A link of a merged fiche counts for the kept one (one hop, as merges are flattened on apply).
   r.get('/graph', (c) => {
     const kept = (col: string) => `(SELECT COALESCE(merged_into, id) FROM fiches WHERE id = l.${col})`;
-    const edges = deps.db
+    let edges = deps.db
       .prepare(
         `SELECT DISTINCT ${kept('from_id')} AS "from", ${kept('to_id')} AS "to", l.relation
            FROM links l WHERE "from" <> "to"`,
       )
       .all() as { from: number; to: number; relation: string }[];
+    const nodeRows = deps.db
+      .prepare('SELECT id, title, type_id AS typeId FROM fiches WHERE merged_into IS NULL ORDER BY id')
+      .all() as { id: number; title: string; typeId: number }[];
+    // An end that was itself merged away is no node: drop the edge rather than leave it dangling.
+    const ids = new Set(nodeRows.map((n) => n.id));
+    edges = edges.filter((e) => ids.has(e.from) && ids.has(e.to));
     const degree = new Map<number, number>();
     for (const e of edges) for (const n of [e.from, e.to]) degree.set(n, (degree.get(n) ?? 0) + 1);
     const flagged = new Set<number>();
@@ -72,11 +78,7 @@ export function brainRoutes(deps: AppDeps): Hono {
       else if (p.kind === 'fiche' && p.ficheId !== undefined && p.facts.some((f) => f.replaces !== undefined))
         flagged.add(p.ficheId);
     }
-    const nodes = (
-      deps.db
-        .prepare('SELECT id, title, type_id AS typeId FROM fiches WHERE merged_into IS NULL ORDER BY id')
-        .all() as { id: number; title: string; typeId: number }[]
-    ).map((n) => ({ ...n, degree: degree.get(n.id) ?? 0, flagged: flagged.has(n.id) }));
+    const nodes = nodeRows.map((n) => ({ ...n, degree: degree.get(n.id) ?? 0, flagged: flagged.has(n.id) }));
     return c.json({ nodes, edges });
   });
 

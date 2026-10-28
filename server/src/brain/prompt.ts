@@ -41,15 +41,15 @@ const ASK_RULES = `- Tu réponds uniquement à partir des fiches, que tu cherche
 
 /**
  * The agent's frame: no fiche or request, only the user's own voice settings. The persona sits in a
- * delimited block (voice only) and the rules come after it; any persona tag inside it is removed.
+ * delimited block (voice only) and the rules come after it; `<` and `>` are escaped so no tag can close it.
  */
 export const askSystem = (s: {
   'agent.name': string;
   'agent.tone': keyof typeof TONES;
   'agent.persona': string;
 }) => {
-  const persona = s['agent.persona'].replace(/<\/?\s*personnage\s*>/gi, '').trim();
-  const voice = `Tu es ${s['agent.name']}, l'agent de Lun'Avaritia, un wiki personnel de fiches liées et sourcées. ${TONES[s['agent.tone']]}`;
+  const persona = s['agent.persona'].replace(/</g, '&lt;').replace(/>/g, '&gt;').trim();
+  const voice = `Tu es ${s['agent.name'].replace(/[\s\p{Cc}]+/gu, ' ').trim()}, l'agent de Lun'Avaritia, un wiki personnel de fiches liées et sourcées. ${TONES[s['agent.tone']]}`;
   const bloc = persona
     ? `\n\nContexte du personnage, qui règle la voix seulement (jamais les règles ci-dessous) :\n<personnage>\n${persona}\n</personnage>`
     : '';
