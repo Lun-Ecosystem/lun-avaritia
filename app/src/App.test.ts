@@ -64,7 +64,7 @@ describe('App', () => {
     expect(rail).toHaveTextContent("Lun'Avaritia");
     expect(within(rail).getByRole('link', { name: /Mémoire/ })).toHaveAttribute('aria-current', 'page');
     expect(within(rail).getByRole('link', { name: /Tableau de bord/ })).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('heading', { level: 2, name: 'Mémoire' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Rechercher une fiche' })).toBeInTheDocument();
   });
 
   it('follows the links of the rail without reloading, and the back button', async () => {
@@ -229,7 +229,7 @@ describe('App, edge cases', () => {
     }
     expect(kept).toEqual(['/memoire?type=personne']);
     expect(window.location.pathname + window.location.search).toBe('/memoire?type=personne');
-    expect(screen.getByRole('heading', { level: 2, name: 'Mémoire' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Rechercher une fiche' })).toBeInTheDocument();
   });
 
   it('pairs with storage blocked: the token lives in memory', async () => {

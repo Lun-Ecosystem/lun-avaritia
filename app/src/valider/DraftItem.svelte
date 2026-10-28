@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
+  import type { Api } from '../api.ts';
+  import { ficheIdByTitle, openFiche } from '../memoire/titles.ts';
   import Prose from '../Prose.svelte';
   import { Badge, Button, icons, Kbd, SettingsCard } from '../lib/ui/index.ts';
   import { kindOf, swapped, type DraftPayload, type DraftView } from './drafts.ts';
@@ -24,6 +27,13 @@
   };
 
   let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactivate }: Props = $props();
+
+  const api = getContext<Api>('api');
+  /** A [[Fiche]] of the draft opens that fiche in the memory when its title exists. */
+  async function openTitle(title: string) {
+    const id = await ficheIdByTitle(api, title).catch(() => undefined);
+    if (id !== undefined) openFiche(id);
+  }
 
   const p = $derived(draft.payload);
   const kind = $derived(kindOf(p));
@@ -55,7 +65,7 @@
         />
       {:else}
         {#if p.kind === 'fiche'}
-          {#if p.synthesis}<Prose text={p.synthesis} />{/if}
+          {#if p.synthesis}<Prose text={p.synthesis} onLink={openTitle} />{/if}
           {#if p.facts.length || p.links.length}
             <ul class="lignes">
               {#each p.facts as f, i (i)}

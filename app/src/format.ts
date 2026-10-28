@@ -22,3 +22,6 @@ export function formatWhen(iso: string, now: Date): string {
   if (day(d) === day(new Date(now.getTime() - 24 * 3600_000))) return `hier ${time}`;
   return part(d, { day: '2-digit', month: '2-digit' });
 }
+
+/** `28/10` (Paris time). */
+export const formatDay = (iso: string): string => part(new Date(iso), { day: '2-digit', month: '2-digit' });

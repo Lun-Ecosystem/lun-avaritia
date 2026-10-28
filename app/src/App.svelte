@@ -8,6 +8,7 @@
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
+  import Memoire from './screens/Memoire.svelte';
   import Tableau from './screens/Tableau.svelte';
   import Valider from './screens/Valider.svelte';
 
@@ -20,9 +21,14 @@
   let route = $state(routeFromPath(window.location.pathname));
   // `?filtre=` of the queue: a link to the same screen changes it without a new screen.
   let filtre = $state(new URLSearchParams(window.location.search).get('filtre'));
+  let fiche = $state(new URLSearchParams(window.location.search).get('fiche'));
+  let mode = $state(new URLSearchParams(window.location.search).get('mode'));
   function follow() {
     route = routeFromPath(window.location.pathname);
-    filtre = new URLSearchParams(window.location.search).get('filtre');
+    const q = new URLSearchParams(window.location.search);
+    filtre = q.get('filtre');
+    fiche = q.get('fiche');
+    mode = q.get('mode');
   }
 
   // An app asks for access (`GET /lun/v1/authorize`): the request waits here, through pairing if needed.
@@ -132,6 +138,8 @@
         <Tableau />
       {:else if route === 'valider'}
         <Valider {filtre} />
+      {:else if route === 'memoire'}
+        <Memoire {fiche} {mode} />
       {:else}
         <EmptyState
           size="grand"
