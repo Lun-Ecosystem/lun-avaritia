@@ -244,11 +244,14 @@
   });
 
   function fly(id: number) {
-    const d = sigma?.getNodeDisplayData(String(id));
-    const camera = sigma?.getCamera();
+    const s = sigma;
+    const key = String(id);
+    if (!s || !graph?.hasNode(key)) return;
+    // From the graph's own coordinates: right after a reducer change, the display cache still holds raw ones.
+    const { x, y } = s.viewportToFramedGraph(s.graphToViewport(graph.getNodeAttributes(key)));
+    const camera = s.getCamera();
     // Closer only: a reader already zoomed in further keeps their zoom.
-    if (d && camera)
-      void camera.animate({ x: d.x, y: d.y, ratio: Math.min(camera.ratio, 0.25) }, { duration: 600 });
+    void camera.animate({ x, y, ratio: Math.min(camera.ratio, 0.25) }, { duration: 600 });
   }
 </script>
 
@@ -299,6 +302,10 @@
     border-radius: var(--r-2);
     background: var(--fond);
     overflow: hidden;
+  }
+  /* Where Escape parks the focus, not a control: no ring around the whole graph. */
+  .scene:focus {
+    outline: none;
   }
   .aide,
   .manque {

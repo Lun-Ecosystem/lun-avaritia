@@ -25,18 +25,21 @@ export const nodeSize = (degree: number): number => Math.min(10, 2 + 0.8 * Math.
 
 /**
  * A translucent token (`rgba(…, .12)`) made opaque on the stage color (`#rrggbb`): Sigma blends as if
- * colors were premultiplied, so a light color at 12 % would be drawn nearly at full strength. The stage
- * is `#rrggbb` or the `rgb(r, g, b)` of a computed background.
+ * colors were premultiplied, so a light color at 12 % would be drawn nearly at full strength. The color
+ * is `rgba(…)` or the `#rrggbbaa` the build minifies it into; the stage is `#rrggbb` or `rgb(r, g, b)`.
  */
 export function flatten(color: string, stage: string): string {
-  const m = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(color.trim());
-  if (!m) return color;
+  const c = color.trim();
+  const m = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(c);
+  const hex = /^#[\da-f]{8}$/i.test(c) ? [1, 3, 5, 7].map((i) => parseInt(c.slice(i, i + 2), 16)) : null;
+  const rgba = m ? m.slice(1).map(Number) : hex ? [...hex.slice(0, 3), hex[3]! / 255] : null;
+  if (!rgba) return color;
   const s = stage.trim();
   const bg = s.startsWith('#')
     ? [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16))
     : (s.match(/\d+/g) ?? []).map(Number);
-  const a = Number(m[4]);
-  return `rgb(${[1, 2, 3].map((i) => Math.round(Number(m[i]) * a + bg[i - 1]! * (1 - a))).join(',')})`;
+  const a = rgba[3]!;
+  return `rgb(${[0, 1, 2].map((i) => Math.round(rgba[i]! * a + bg[i]! * (1 - a))).join(',')})`;
 }
 
 /** One node per fiche, one edge per linked pair; an edge towards an absent fiche is dropped. */

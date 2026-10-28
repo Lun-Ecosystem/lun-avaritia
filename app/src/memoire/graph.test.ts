@@ -40,6 +40,11 @@ describe('graph', () => {
     expect(flatten('rgb(1,2,3)', '#100D0A')).toBe('rgb(1,2,3)');
   });
 
+  it('flattens the #rrggbbaa form the production build minifies rgba() into', () => {
+    expect(flatten('#c8c0b01f', '#100D0A')).toBe('rgb(38,35,30)');
+    expect(flatten('#C8C0B080', '#000000')).toBe('rgb(100,96,88)');
+  });
+
   it('nodeSize grows as a root between 2 and 10 (small dots at overview)', () => {
     expect(nodeSize(0)).toBe(2);
     expect(nodeSize(10000)).toBe(10);
