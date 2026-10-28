@@ -81,10 +81,14 @@ export function listDepots(db: DatabaseSync) {
   return db
     .prepare(
       `SELECT d.id, d.name, d.type, length(d.bytes) AS size, d.created_at AS createdAt,
+        (SELECT COUNT(*) FROM drafts dr WHERE dr.kind = 'fiche' AND dr.status = 'pending' AND EXISTS (
+           SELECT 1 FROM json_each(dr.payload, '$.facts')
+            WHERE json_extract(value, '$.source.kind') IN ('depot', 'note')
+              AND json_extract(value, '$.source.ref') = CAST(d.id AS TEXT))) AS pending,
         (SELECT COUNT(*) FROM drafts dr WHERE dr.kind = 'fiche' AND EXISTS (
            SELECT 1 FROM json_each(dr.payload, '$.facts')
             WHERE json_extract(value, '$.source.kind') IN ('depot', 'note')
-              AND json_extract(value, '$.source.ref') = CAST(d.id AS TEXT))) AS drafts
+              AND json_extract(value, '$.source.ref') = CAST(d.id AS TEXT))) AS total
        FROM depots d ORDER BY d.id DESC`,
     )
     .all();

@@ -1,12 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { vault } from '../testing/load-vault.ts';
 import { parseVault } from './obsidian.ts';
-
-const dir = join(import.meta.dirname, '../testing/vault');
-export const vault = readdirSync(dir, { recursive: true, encoding: 'utf8' })
-  .filter((p) => p.endsWith('.md'))
-  .map((p) => ({ path: p.replaceAll('\\', '/'), text: readFileSync(join(dir, p), 'utf8') }));
 
 describe('parseVault', () => {
   const { notes, warnings } = parseVault(vault);

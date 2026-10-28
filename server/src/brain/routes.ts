@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { brainDeps, type AppDeps } from '../app.ts';
 import { addDraft } from './drafts.ts';
-import { addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
+import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { parseVault } from './obsidian.ts';
 
 const MAX_FILES = 2000;
@@ -17,6 +18,9 @@ async function jsonBody(c: Context): Promise<Record<string, unknown> | undefined
   }
 }
 
+const limit = (maxSize: number) =>
+  bodyLimit({ maxSize, onError: (c) => c.json({ error: 'Envoi trop volumineux' }, 413) });
+
 export function brainRoutes(deps: AppDeps): Hono {
   const r = new Hono();
   r.onError((err, c) =>
@@ -25,14 +29,14 @@ export function brainRoutes(deps: AppDeps): Hono {
       : c.json({ error: err.message }, 500),
   );
 
-  r.post('/notes', async (c) => {
+  r.post('/notes', limit(1_000_000), async (c) => {
     const body = await jsonBody(c);
     if (typeof body?.text !== 'string') return c.json({ error: 'text attendu' }, 400);
     return c.json(await addNote(brainDeps(deps), body.text));
   });
 
   r.get('/depots', (c) => c.json({ depots: listDepots(deps.db) }));
-  r.post('/depots', async (c) => {
+  r.post('/depots', limit(1_000_000), async (c) => {
     let file: unknown;
     try {
       file = (await c.req.formData()).get('file');
@@ -40,6 +44,7 @@ export function brainRoutes(deps: AppDeps): Hono {
       return c.json({ error: 'Envoi multipart attendu (champ « file »)' }, 400);
     }
     if (!(file instanceof File)) return c.json({ error: 'Champ « file » attendu' }, 400);
+    if (file.size > MAX_DEPOT_CHARS * 4) return c.json({ error: 'Document trop long.' }, 400);
     const bytes = new Uint8Array(await file.arrayBuffer());
     return c.json(await addDepot(brainDeps(deps), { name: file.name, type: file.type, bytes }));
   });
@@ -49,7 +54,7 @@ export function brainRoutes(deps: AppDeps): Hono {
     return c.body(null, 204);
   });
 
-  r.post('/import', async (c) => {
+  r.post('/import', limit(25_000_000), async (c) => {
     const files = (await jsonBody(c))?.files;
     if (
       !Array.isArray(files) ||

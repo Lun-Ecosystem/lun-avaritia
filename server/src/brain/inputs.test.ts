@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { recordCost } from '../contract/costs.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
+import { vault } from '../testing/load-vault.ts';
 import { makeHarness } from '../testing/harness.ts';
 import { applyDraft } from './drafts.ts';
-import { vault } from './obsidian.test.ts';
 import { getFiche, listTypes } from './store.ts';
 
 function setup(withProvider = true) {
@@ -63,7 +63,7 @@ describe('notes and depots', () => {
     const res = await t.upload('compte-rendu.md', 'text/markdown', '# Réunion\nLe client X a signé.');
     expect(await res.json()).toEqual({ depot: 1, drafts: 1 });
     const list = (await (await t.req('/api/depots')).json()) as { depots: unknown[] };
-    expect(list.depots).toMatchObject([{ id: 1, name: 'compte-rendu.md', drafts: 1 }]);
+    expect(list.depots).toMatchObject([{ id: 1, name: 'compte-rendu.md', pending: 1, total: 1 }]);
     expect((await t.req('/api/depots/1', { method: 'DELETE' })).status).toBe(204);
     expect((await t.req('/api/depots/1', { method: 'DELETE' })).status).toBe(404);
     expect(t.count('drafts')).toBe(1);
@@ -78,6 +78,16 @@ describe('notes and depots', () => {
     expect((await t.upload('a.txt', 'text/plain', new Uint8Array([0xff, 0xfe, 0xfd]))).status).toBe(400);
     expect((await t.upload('big.txt', 'text/plain', 'x'.repeat(200_001))).status).toBe(400);
     expect(t.count('depots')).toBe(0);
+  });
+
+  it('answers 413 to an oversize body before buffering it, storing nothing', async () => {
+    const t = setup();
+    const big = 'x'.repeat(1_100_000);
+    expect((await t.upload('big.txt', 'text/plain', big)).status).toBe(413);
+    expect((await t.req('/api/notes', { method: 'POST', json: { text: big } })).status).toBe(413);
+    const vaultBig = { files: [{ path: 'a.md', text: 'x'.repeat(26_000_000) }] };
+    expect((await t.req('/api/import', { method: 'POST', json: vaultBig })).status).toBe(413);
+    expect(t.count('depots') + t.count('drafts')).toBe(0);
   });
 
   it('maps pending and failed outcomes, keeping the text', async () => {
