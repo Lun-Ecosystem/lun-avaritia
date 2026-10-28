@@ -48,6 +48,22 @@ describe('fiches, settings, dashboard and export API', () => {
     expect(one.versions).toHaveLength(1);
   });
 
+  it('GET on a merged fiche redirects to the kept one; PATCH on it is a 400', async () => {
+    const { h, typeId, req } = setup();
+    const now = h.clock().toISOString();
+    const kept = createFiche(h.db, { typeId, title: 'Gardée', synthesis: '' }, now);
+    const ghost = createFiche(h.db, { typeId, title: 'Doublon', synthesis: '' }, now);
+    h.db.prepare('UPDATE fiches SET merged_into = ? WHERE id = ?').run(kept, ghost);
+    const one = (await (await req(`/api/fiches/${ghost}`)).json()) as {
+      fiche: { id: number };
+      redirectedFrom: number;
+    };
+    expect(one.fiche.id).toBe(kept);
+    expect(one.redirectedFrom).toBe(ghost);
+    expect((await req(`/api/fiches/${ghost}`, 'PATCH', { title: 'x' })).status).toBe(400);
+    expect(getFiche(h.db, ghost)!.title).toBe('Doublon');
+  });
+
   it('manages the types, answering 400 on a refusal', async () => {
     const { req } = setup();
     expect((await req('/api/types', 'POST', { name: 'Lieu' })).status).toBe(200);

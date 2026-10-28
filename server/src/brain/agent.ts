@@ -1,3 +1,4 @@
+import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { InvalidInputError } from '../contract/actions.ts';
 import { recordCost } from '../contract/costs.ts';
@@ -47,15 +48,21 @@ export function searchAction({ query, limit }: z.infer<typeof SearchSchema>, dep
   }));
 }
 
+/** The fiche an id lands on: a merged fiche follows its merges to the kept one. */
+export function keptFiche(db: DatabaseSync, id: number) {
+  let fiche = getFiche(db, id);
+  // The guard stops a (never expected) merge cycle.
+  for (let i = 0; fiche?.mergedInto !== undefined && i < 10; i++) fiche = getFiche(db, fiche.mergedInto);
+  if (!fiche || fiche.mergedInto !== undefined) throw new InvalidInputError(`Fiche inconnue : ${id}`);
+  return fiche;
+}
+
 /**
  * The fiche with its active facts only. A fiche merged into another redirects to the kept one (the answer
  * says `redirectedFrom`), so a link to an old id still lands somewhere.
  */
 export function readAction({ id }: z.infer<typeof IdSchema>, deps: Pick<BrainDeps, 'db'>) {
-  let fiche = getFiche(deps.db, id);
-  // The guard stops a (never expected) merge cycle.
-  for (let i = 0; fiche?.mergedInto !== undefined && i < 10; i++) fiche = getFiche(deps.db, fiche.mergedInto);
-  if (!fiche || fiche.mergedInto !== undefined) throw new InvalidInputError(`Fiche inconnue : ${id}`);
+  const fiche = keptFiche(deps.db, id);
   const live = (n: number) => getFiche(deps.db, n)?.mergedInto === undefined;
   return {
     id: fiche.id,
@@ -72,8 +79,7 @@ export function readAction({ id }: z.infer<typeof IdSchema>, deps: Pick<BrainDep
 }
 
 export function neighborsAction({ id }: z.infer<typeof IdSchema>, deps: Pick<BrainDeps, 'db'>) {
-  if (!getFiche(deps.db, id)) throw new InvalidInputError(`Fiche inconnue : ${id}`);
-  return neighbors(deps.db, id);
+  return neighbors(deps.db, keptFiche(deps.db, id).id);
 }
 
 // --- Requests ---------------------------------------------------------------------------------------

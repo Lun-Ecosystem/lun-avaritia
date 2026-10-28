@@ -147,6 +147,16 @@ describe('read actions', () => {
     expect(n.result).toEqual([]);
     expect((await run(t.h, 'brain.read', { id: 9999 })).status).toBe(400);
   });
+
+  it('brain.neighbors on a merged id answers for the kept fiche', async () => {
+    const t = setup();
+    const ghost = createFiche(t.h.db, { typeId: t.typeId, title: 'Doublon X', synthesis: '' }, NOW);
+    t.h.db.prepare('UPDATE fiches SET merged_into = ? WHERE id = ?').run(t.x, ghost);
+    const n = (await (await run(t.h, 'brain.neighbors', { id: ghost })).json()) as {
+      result: { id: number }[];
+    };
+    expect(n.result.map((r) => r.id)).toEqual([t.y]);
+  });
 });
 
 describe('ask', () => {

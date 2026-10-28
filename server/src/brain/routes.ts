@@ -4,7 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { join } from 'node:path';
 import { InvalidInputError } from '../contract/actions.ts';
 import { brainDeps, type AppDeps } from '../app.ts';
-import { ask, ChatSchema } from './agent.ts';
+import { ask, ChatSchema, keptFiche } from './agent.ts';
 import { addDraft } from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { dashboard } from './dashboard.ts';
@@ -54,9 +54,18 @@ export function brainRoutes(deps: AppDeps): Hono {
     }),
   );
   r.get('/fiches/:id', (c) => {
-    const fiche = getFiche(deps.db, Number(c.req.param('id')));
-    if (!fiche) return c.json({ error: 'Fiche inconnue' }, 404);
-    return c.json({ fiche, versions: versions(deps.db, fiche.id) });
+    const asked = Number(c.req.param('id'));
+    let fiche;
+    try {
+      fiche = keptFiche(deps.db, asked);
+    } catch {
+      return c.json({ error: 'Fiche inconnue' }, 404);
+    }
+    return c.json({
+      fiche,
+      versions: versions(deps.db, fiche.id),
+      ...(fiche.id !== asked && { redirectedFrom: asked }),
+    });
   });
   // The user's own edit: applied at once, versioned (the agent never goes through here).
   r.patch('/fiches/:id', limit(1_000_000), async (c) => {
@@ -70,6 +79,8 @@ export function brainRoutes(deps: AppDeps): Hono {
     if (typeof synthesis === 'string' && synthesis.length > 20_000)
       return c.json({ error: 'Synthèse trop longue (20 000 caractères au plus)' }, 400);
     const id = Number(c.req.param('id'));
+    if (getFiche(deps.db, id)?.mergedInto !== undefined)
+      return c.json({ error: 'Fiche fusionnée : modifie la fiche gardée' }, 400);
     editFiche(
       deps.db,
       id,
