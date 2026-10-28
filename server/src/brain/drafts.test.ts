@@ -57,6 +57,16 @@ describe('drafts', () => {
     expect(getFiche(db, f)!.synthesis).toBe('agent');
   });
 
+  it('refuses a replacement of a fact that is not active on the fiche, and stays pending', () => {
+    const f = fiche('Bob');
+    const g = fiche('Carl');
+    const foreign = addFact(db, g, 'ailleurs', src, 't0');
+    const id = draft({ ficheId: f, title: 'Bob', facts: [{ text: 'neuf', source: src, replaces: foreign }] });
+    expect(() => applyDraft(db, id, undefined, 't2')).toThrow(InvalidInputError);
+    expect(getDraft(db, id)!.status).toBe('pending');
+    expect(getFiche(db, f)!.facts).toHaveLength(0);
+  });
+
   it('strikes the losing fact on an accepted contradiction', () => {
     const f = fiche('C');
     const a = addFact(db, f, 'vieux', src, 't0');

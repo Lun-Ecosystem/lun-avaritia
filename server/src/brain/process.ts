@@ -100,7 +100,9 @@ const AgentShape = z.strictObject({
     z.strictObject({
       group: z.number(),
       synthesis: z.string(),
-      facts: z.array(z.strictObject({ text: z.string(), observation: z.number() })),
+      facts: z.array(
+        z.strictObject({ text: z.string(), observation: z.number(), replaces: z.number().nullable() }),
+      ),
       links: z.array(z.strictObject({ to: z.string(), relation: z.string() })),
     }),
   ),
@@ -150,10 +152,13 @@ function agentSchema(groups: Group[], pairs: [number, number][]) {
       done.add(f.group);
       if (f.synthesis.length > 4000) ctx.addIssue('synthèse trop longue');
       if (!f.facts.length) ctx.addIssue(`groupe ${f.group} sans fait`);
+      const active = new Set(g.fiche?.facts.filter((x) => !x.struckAt).map((x) => x.id));
       for (const x of f.facts) {
         if (!short(x.text, 300) || x.text.includes('\n'))
           ctx.addIssue('un fait tient en une phrase non vide');
         if (!g.observations.includes(x.observation)) ctx.addIssue(`source ${x.observation} hors du groupe`);
+        if (x.replaces !== null && !active.delete(x.replaces))
+          ctx.addIssue(`fait remplacé ${x.replaces} absent de la fiche ou déjà remplacé`);
       }
       for (const l of f.links)
         if (!short(l.to, 120) || !short(l.relation, 60)) ctx.addIssue('lien vide ou trop long');
@@ -186,8 +191,12 @@ async function ask<T>(
   let reason = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     let value: unknown;
+    // The retry says what was wrong; `reason` holds only our own checks' messages, never data.
+    const user = attempt
+      ? `${req.user}\n\nTa réponse précédente était invalide : ${reason.slice(0, 300)}`
+      : req.user;
     try {
-      const res = await choice.provider.json({ ...req, model: choice.model, schema: jsonSchema });
+      const res = await choice.provider.json({ ...req, user, model: choice.model, schema: jsonSchema });
       const price = priceOf(deps.db, choice.provider.id, choice.model);
       const amount = price ? costOf(price, res.usage) : 0;
       recordCost(
@@ -214,7 +223,7 @@ async function ask<T>(
 }
 
 /** Two calls: the tri groups the observations, the agent drafts a fiche per group and a few questions. */
-export async function process(
+export async function processLot(
   deps: BrainDeps,
   observations: Observation[],
   origin: { lot?: number; source: Source['kind'] },
@@ -253,6 +262,8 @@ export async function process(
       paid,
     );
 
+    // shortcut: the cap is checked before each call, so one pass may still exceed it by its own tri call.
+    if (overCap(db, deps.clock())) return { status: 'pending', reason: 'cost-cap', cost: paid.cost };
     const groups = groupsOf(db, triOut);
     const pairs = duplicatePairs(db, groups);
     const agentOut: AgentOut = await ask(
@@ -301,12 +312,18 @@ export async function process(
         typeId: g.typeId,
         title: g.title,
         synthesis: f.synthesis,
-        facts: f.facts.map((x) => ({ text: x.text.trim(), source: observations[x.observation]!.source })),
+        facts: f.facts.map((x) => ({
+          text: x.text.trim(),
+          source: observations[x.observation]!.source,
+          ...(x.replaces !== null && { replaces: x.replaces }),
+        })),
         links: f.links.map((l) => ({ to: l.to.trim(), relation: l.relation.trim() })),
       };
     });
     const asked = askedBefore(db);
+    // Over the cap, contradictions go first (the stable sort keeps the model's order otherwise).
     const questions = agentOut.questions
+      .sort((a, b) => Number(a.kind !== 'contradiction') - Number(b.kind !== 'contradiction'))
       .filter((q) => !asked.has(questionKey(q)) && asked.add(questionKey(q)))
       .slice(0, MAX_QUESTIONS);
     const now = deps.clock().toISOString();

@@ -46,7 +46,8 @@ export const DraftPayloadSchema = z.discriminatedUnion('kind', [
     typeId: id,
     title: z.string(),
     synthesis: z.string(),
-    facts: z.array(z.object({ text: z.string().min(1), source: SourceSchema })),
+    // `replaces`: an active fact of the same fiche that the new fact supersedes (struck on apply).
+    facts: z.array(z.object({ text: z.string().min(1), source: SourceSchema, replaces: id.optional() })),
     links: z.array(z.object({ to: z.union([id, z.string().min(1)]), relation: z.string().min(1) })),
   }),
   z.object({ kind: z.literal('contradiction'), ficheId: id, keep: id, strike: id, reason: z.string() }),
@@ -126,7 +127,11 @@ export function queue(db: DatabaseSync, limit: number): Draft[] {
     db
       .prepare(
         `SELECT * FROM drafts WHERE status IN ('pending', 'applying')
-          ORDER BY CASE kind WHEN 'contradiction' THEN 0 WHEN 'doublon' THEN 1 ELSE 2 END, id LIMIT ?`,
+          ORDER BY CASE
+            WHEN kind = 'contradiction' THEN 0
+            WHEN kind = 'fiche' AND EXISTS (SELECT 1 FROM json_each(payload, '$.facts')
+                                            WHERE json_extract(value, '$.replaces') IS NOT NULL) THEN 0
+            WHEN kind = 'doublon' THEN 1 ELSE 2 END, id LIMIT ?`,
       )
       .all(limit) as Row[]
   ).map(toDraft);
@@ -172,7 +177,16 @@ function applyFiche(
       else editFiche(db, ficheId, { synthesis: p.synthesis }, now, 'agent');
     }
   }
-  for (const f of p.facts) addFact(db, ficheId, f.text, f.source as Source, now);
+  for (const f of p.facts) {
+    if (f.replaces !== undefined) {
+      const old = db.prepare('SELECT fiche_id, struck_at FROM facts WHERE id = ?').get(f.replaces) as
+        Row | undefined;
+      if (!old || old.fiche_id !== ficheId || old.struck_at !== null)
+        throw new InvalidInputError(`Le fait remplacé n° ${f.replaces} n'est plus actif sur cette fiche.`);
+    }
+    const added = addFact(db, ficheId, f.text, f.source as Source, now);
+    if (f.replaces !== undefined) strikeFact(db, f.replaces, added, now);
+  }
   for (const l of p.links) {
     const target = resolve(db, l.to);
     if (target === undefined) warn(`Lien « ${l.relation} » vers « ${l.to} » : fiche introuvable.`);
@@ -304,7 +318,10 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
   if (p.kind === 'fiche') {
     title = p.ficheId === undefined ? `Nouvelle fiche : ${p.title}` : `Enrichir la fiche : ${p.title}`;
     if (p.synthesis) lines.push(`Synthèse : ${p.synthesis}`);
-    for (const f of p.facts) lines.push(`Fait : ${f.text}`);
+    for (const f of p.facts)
+      lines.push(
+        f.replaces === undefined ? `Fait : ${f.text}` : `Remplace : ${factText(f.replaces)} → ${f.text}`,
+      );
     for (const l of p.links)
       lines.push(`Lien : ${l.relation} → ${typeof l.to === 'number' ? ficheTitle(l.to) : l.to}`);
     if (d.skippedSynthesis) lines.push('Synthèse non appliquée : la fiche a été modifiée depuis.');

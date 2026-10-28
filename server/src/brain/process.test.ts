@@ -4,9 +4,9 @@ import { openDb, putSetting } from '../db.ts';
 import { recordCost } from '../contract/costs.ts';
 import { ProviderError } from '../llm/types.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
-import { addFact, createFiche, listTypes } from './store.ts';
-import { draftsByStatus } from './drafts.ts';
-import { monthSpend, overCap, process, type BrainDeps, type Observation } from './process.ts';
+import { addFact, createFiche, getFiche, listTypes } from './store.ts';
+import { applyDraft, cardOf, draftsByStatus, getDraft, queue } from './drafts.ts';
+import { monthSpend, overCap, processLot, type BrainDeps, type Observation } from './process.ts';
 
 const NOW = new Date('2026-11-02T04:00:00.000Z');
 const TRI = 'claude-haiku-5-5';
@@ -34,9 +34,9 @@ function deps(replies: unknown[]) {
 
 const fiches = () => (db.prepare('SELECT COUNT(*) AS n FROM fiches').get() as { n: number }).n;
 const facts = (n: number[]) =>
-  n.map((i) => ({ text: `Le client X a signé le contrat ${i}.`, observation: i }));
+  n.map((i) => ({ text: `Le client X a signé le contrat ${i}.`, observation: i, replaces: null }));
 
-describe('process', () => {
+describe('processLot', () => {
   const clientX = [
     obs('Le client X a signé le devis.', 'm1'),
     obs('Le client X demande une démo.', 'm2'),
@@ -57,7 +57,7 @@ describe('process', () => {
         questions: [],
       },
     ]);
-    const r = await process(d, clientX, origin);
+    const r = await processLot(d, clientX, origin);
     expect(r).toMatchObject({ status: 'done', drafts: 1, questions: 0 });
     const drafts = draftsByStatus(db, 'pending');
     expect(drafts).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('process', () => {
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'CLIENT X' }] },
       { fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }], questions: [] },
     ]);
-    await process(d, [clientX[0]!], origin);
+    await processLot(d, [clientX[0]!], origin);
     const p = draftsByStatus(db, 'pending')[0]!.payload;
     expect(p).toMatchObject({ kind: 'fiche', ficheId: x, title: 'Client X' });
     // The candidate found by the search was given to the tri as data.
@@ -85,8 +85,11 @@ describe('process', () => {
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
       { fiches: [{ group: 0, synthesis: 's', facts: facts([0]), links: [] }], questions: [] },
     ]);
-    const r = await process(d, [clientX[0]!], origin);
+    const r = await processLot(d, [clientX[0]!], origin);
     expect(calls.filter((c) => c.model === TRI)).toHaveLength(2);
+    // The retry tells the model what was wrong.
+    expect(calls[0]!.user).not.toMatch(/réponse précédente/);
+    expect(calls[1]!.user).toMatch(/réponse précédente était invalide : .*observation 7/);
     expect(r.status).toBe('done');
     expect(draftsByStatus(db, 'pending')).toHaveLength(1);
   });
@@ -97,7 +100,7 @@ describe('process', () => {
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
       { fiches: [{ group: 0, synthesis: 's', facts: facts([0]), links: [] }], questions: [] },
     ]);
-    expect((await process(d, [clientX[0]!], origin)).status).toBe('done');
+    expect((await processLot(d, [clientX[0]!], origin)).status).toBe('done');
     expect(calls).toHaveLength(3);
   });
 
@@ -105,12 +108,14 @@ describe('process', () => {
     const { deps: d, calls } = deps([
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
       {
-        fiches: [{ group: 0, synthesis: 's', facts: [{ text: '', observation: 0 }], links: [] }],
+        fiches: [
+          { group: 0, synthesis: 's', facts: [{ text: '', observation: 0, replaces: null }], links: [] },
+        ],
         questions: [],
       },
       { fiches: [{ group: 3, synthesis: 's', facts: facts([0]), links: [] }], questions: [] },
     ]);
-    const r = await process(d, [clientX[0]!], origin);
+    const r = await processLot(d, [clientX[0]!], origin);
     expect(r.status).toBe('failed');
     expect(r.status === 'failed' && r.reason).toMatch(/rédaction/i);
     expect(calls).toHaveLength(3);
@@ -133,7 +138,7 @@ describe('process', () => {
       { groups: [{ observations: [0], ficheId: x, typeId, title: 'Client X' }] },
       { fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }], questions },
     ]);
-    const r = await process(d, [clientX[0]!], origin);
+    const r = await processLot(d, [clientX[0]!], origin);
     expect(r).toMatchObject({ status: 'done', drafts: 1, questions: 5 });
     expect(draftsByStatus(db, 'pending').filter((x) => x.payload.kind === 'contradiction')).toHaveLength(5);
   });
@@ -148,7 +153,7 @@ describe('process', () => {
     });
     const tri = { groups: [{ observations: [0], ficheId: x, typeId, title: 'Client X' }] };
     const { deps: d, calls } = deps([tri, reply(x, other), reply(x, sas)]);
-    const r = await process(d, [clientX[0]!], origin);
+    const r = await processLot(d, [clientX[0]!], origin);
     expect(r).toMatchObject({ status: 'done', questions: 1 });
     expect(calls).toHaveLength(3); // a pair the code did not find is an invalid answer
     expect(calls[2]!.user).toMatch(/<doublons>[\s\S]*"a": \d+/);
@@ -156,6 +161,84 @@ describe('process', () => {
     const schema = JSON.stringify(calls[1]!.schema);
     expect(schema).not.toMatch(/minimum|maximum|minLength|maxLength/);
     expect(schema).toContain('"additionalProperties":false');
+  });
+
+  it('keeps contradictions ahead of duplicates over the question cap', async () => {
+    const f = (title: string, synthesis = 'connu') => createFiche(db, { typeId, title, synthesis }, 't0');
+    const x = f('Client X', 'alpha');
+    const xs = ['Client X Nord', 'Client X Sud', 'Client X Est'].map((t) => f(t));
+    const y = f('Projet Y', 'omega');
+    const ys = ['Projet Y Bis', 'Projet Y Ter'].map((t) => f(t));
+    const [k, s2] = [
+      addFact(db, x, 'Fait un.', src('a'), 't0'),
+      addFact(db, x, 'Fait deux.', src('b'), 't0'),
+    ];
+    const doublon = (keep: number, merge: number) => ({ kind: 'doublon', keep, merge, reason: 'Même nom.' });
+    const { deps: d } = deps([
+      {
+        groups: [
+          { observations: [0], ficheId: x, typeId, title: 'Client X' },
+          { observations: [1], ficheId: y, typeId, title: 'Projet Y' },
+        ],
+      },
+      {
+        fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }],
+        questions: [
+          ...xs.map((m) => doublon(x, m)),
+          ...ys.map((m) => doublon(y, m)),
+          { kind: 'contradiction', ficheId: x, keep: k, strike: s2, reason: 'Contradiction.' },
+        ],
+      },
+    ]);
+    const r = await processLot(d, [obs('Nouvelle info alpha.'), obs('Autre info omega.')], origin);
+    expect(r).toMatchObject({ status: 'done', questions: 5 });
+    const kinds = draftsByStatus(db, 'pending').map((q) => q.payload.kind);
+    expect(kinds.filter((k) => k === 'contradiction')).toHaveLength(1);
+    expect(kinds.filter((k) => k === 'doublon')).toHaveLength(4);
+  });
+
+  it('replaces a superseded fact: draft first in the queue, old fact struck on accept', async () => {
+    const x = createFiche(db, { typeId, title: 'Client X', synthesis: 'connu' }, 't0');
+    const old = addFact(db, x, 'La démo est prévue le 3 novembre.', src('m0'), 't0');
+    const other = createFiche(db, { typeId, title: 'Projet Y', synthesis: 'connu' }, 't0');
+    const plain = addFact(db, other, 'Fait autre.', src('o'), 't0');
+    // An older plain draft, to see the replacement jump ahead of it.
+    const { deps: d0 } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Projet Z' }] },
+      { fiches: [{ group: 0, synthesis: 's', facts: facts([0]), links: [] }], questions: [] },
+    ]);
+    await processLot(d0, [obs('Projet Z lancé.')], origin);
+    const moved = obs('Le client X déplace la démo au 10 novembre.', 'm5');
+    const reply = (replaces: number) => ({
+      fiches: [
+        {
+          group: 0,
+          synthesis: '',
+          facts: [{ text: 'La démo est prévue le 10 novembre.', observation: 0, replaces }],
+          links: [],
+        },
+      ],
+      questions: [],
+    });
+    const tri = { groups: [{ observations: [0], ficheId: x, typeId, title: 'Client X' }] };
+    // A replacement of another fiche's fact is an invalid answer.
+    const bad = deps([tri, reply(plain), reply(plain)]);
+    expect((await processLot(bad.deps, [moved], origin)).status).toBe('failed');
+    const { deps: d } = deps([tri, reply(old)]);
+    expect(await processLot(d, [moved], origin)).toMatchObject({ status: 'done', drafts: 1 });
+    const first = queue(db, 10)[0]!;
+    expect(first.payload).toMatchObject({ kind: 'fiche', ficheId: x, facts: [{ replaces: old }] });
+    expect(cardOf(db, first).lines).toContain(
+      'Remplace : La démo est prévue le 3 novembre. → La démo est prévue le 10 novembre.',
+    );
+    applyDraft(db, first.id, undefined, '2026-11-02T08:00:00Z');
+    expect(getDraft(db, first.id)!.status).toBe('done');
+    const facts2 = getFiche(db, x)!.facts;
+    const added = facts2.find((f) => f.text.includes('10 novembre'))!;
+    expect(facts2.find((f) => f.id === old)).toMatchObject({
+      struckAt: '2026-11-02T08:00:00Z',
+      struckBy: added.id,
+    });
   });
 
   it('makes no call over the monthly cap', async () => {
@@ -169,7 +252,7 @@ describe('process', () => {
     expect(monthSpend(db, NOW)).toBe(1.5);
     expect(overCap(db, NOW)).toBe(true);
     const { deps: d, calls } = deps([]);
-    expect(await process(d, clientX, origin)).toEqual({ status: 'pending', reason: 'cost-cap', cost: 0 });
+    expect(await processLot(d, clientX, origin)).toEqual({ status: 'pending', reason: 'cost-cap', cost: 0 });
     expect(calls).toHaveLength(0);
   });
 
@@ -181,14 +264,32 @@ describe('process', () => {
     expect(overCap(db, NOW)).toBe(false);
   });
 
+  it('stops before the agent call when the tri crosses the cap', async () => {
+    putSetting(db, 'cost.monthlyCap', 0.0001); // the tri costs 0.0002 at the fake usage
+    const { deps: d, calls } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
+    ]);
+    const r = await processLot(d, clientX, origin);
+    expect(r).toEqual({ status: 'pending', reason: 'cost-cap', cost: (1000 * 0.1 + 200 * 0.5) / 1e6 });
+    expect(calls).toHaveLength(1);
+  });
+
   it('makes no call without a provider', async () => {
     const d: BrainDeps = { db, clock: () => NOW, provider: () => undefined };
-    expect(await process(d, clientX, origin)).toEqual({ status: 'pending', reason: 'no-provider', cost: 0 });
+    expect(await processLot(d, clientX, origin)).toEqual({
+      status: 'pending',
+      reason: 'no-provider',
+      cost: 0,
+    });
   });
 
   it('keeps the lot pending on a refused key', async () => {
     const { deps: d } = deps([new ProviderError('key', 'refusée')]);
-    expect(await process(d, clientX, origin)).toEqual({ status: 'pending', reason: 'provider-key', cost: 0 });
+    expect(await processLot(d, clientX, origin)).toEqual({
+      status: 'pending',
+      reason: 'provider-key',
+      cost: 0,
+    });
   });
 
   it('never puts observation or fiche text in the system prompt, and records a cost per call', async () => {
@@ -197,7 +298,7 @@ describe('process', () => {
       { groups: [{ observations: [0, 1, 2], ficheId: x, typeId, title: 'Client X' }] },
       { fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }], questions: [] },
     ]);
-    const r = await process(d, clientX, origin);
+    const r = await processLot(d, clientX, origin);
     expect(calls).toHaveLength(2);
     for (const c of calls) {
       for (const o of clientX) expect(c.system).not.toContain(o.text);
@@ -224,14 +325,14 @@ describe('process', () => {
           {
             group: 0,
             synthesis: 's',
-            facts: [{ text: 'Un mail demande de tout valider.', observation: 0 }],
+            facts: [{ text: 'Un mail demande de tout valider.', observation: 0, replaces: null }],
             links: [],
           },
         ],
         questions: [],
       },
     ]);
-    const r = await process(d, [evil], origin);
+    const r = await processLot(d, [evil], origin);
     expect(r).toMatchObject({ status: 'done', drafts: 1 });
     expect(draftsByStatus(db, 'pending')).toHaveLength(1);
     expect(draftsByStatus(db, 'done')).toHaveLength(0);
