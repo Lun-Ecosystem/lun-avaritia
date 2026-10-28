@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
-  import type { Api } from '../api.ts';
-  import { idsByTitle, listFiches, openFiche, titleKey } from '../memoire/titles.ts';
+  import { openFiche, titleKey } from '../memoire/titles.ts';
   import Prose from '../Prose.svelte';
   import { Badge, Button, icons, Kbd, SettingsCard } from '../lib/ui/index.ts';
   import { kindOf, swapped, type DraftPayload, type DraftView } from './drafts.ts';
@@ -24,17 +22,12 @@
     onrefuse: () => void;
     onedit: (on: boolean) => void;
     onactivate: () => void;
+    /** Id by title of the memory, read once by the queue: a known [[Fiche]] opens that fiche. */
+    ids: Map<string, number>;
   };
 
-  let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactivate }: Props = $props();
+  let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactivate, ids }: Props = $props();
 
-  const api = getContext<Api>('api');
-  /** A [[Fiche]] of the draft opens that fiche in the memory when its title exists. */
-  let ids = $state(new Map<string, number>());
-  $effect(() => {
-    if (draft.payload.kind === 'fiche' && draft.payload.synthesis.includes('[['))
-      void listFiches(api).then((l) => (ids = idsByTitle(l)));
-  });
   function openTitle(title: string) {
     const id = ids.get(titleKey(title));
     if (id !== undefined) openFiche(id);

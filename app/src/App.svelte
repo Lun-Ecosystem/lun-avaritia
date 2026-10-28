@@ -8,6 +8,7 @@
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
+  import AgentPanel from './agent/AgentPanel.svelte';
   import Memoire from './screens/Memoire.svelte';
   import Tableau from './screens/Tableau.svelte';
   import Valider from './screens/Valider.svelte';
@@ -142,6 +143,9 @@
   <Authorize {api} request={authorization.request} />
 {:else if api}
   <Shell {route} {counts} {status}>
+    {#snippet agent()}
+      <AgentPanel fiche={route === 'memoire' ? fiche : null} {route} />
+    {/snippet}
     {#key route}
       {#if route === 'tableau'}
         <Tableau />

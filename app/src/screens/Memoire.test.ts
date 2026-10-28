@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentPanel } from '../agent/conversation.svelte.ts';
 import { fakeApi } from '../memoire/fixtures.ts';
 import Memoire from './Memoire.svelte';
 
@@ -98,6 +99,10 @@ describe('Memoire', () => {
       await screen.findByText('Aucune fiche. Écrire une note ou déposer un document.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Déposer un document' })).toHaveAttribute('href', '/depots');
+    await userEvent.click(screen.getByRole('button', { name: 'Écrire une note' }));
+    expect(agentPanel).toEqual({ open: true, draft: 'note que ' });
+    agentPanel.open = false;
+    agentPanel.draft = '';
   });
 
   it('keeps the tree and the fiche when the search fails', async () => {

@@ -319,7 +319,7 @@
     .panneau {
       position: fixed;
       inset: 0;
-      /* Over the agent bubble (20), under the Fab (40). */
+      /* Over the agent bubble (20), under the open agent panel (45). */
       z-index: 30;
       width: auto;
       border: 0;

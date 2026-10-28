@@ -1,7 +1,8 @@
 <script lang="ts">
   import { getContext, untrack } from 'svelte';
   import type { Api } from '../api.ts';
-  import { Banner, EmptyState, icons, Segmented, Skeleton, TextInput } from '../lib/ui/index.ts';
+  import { Banner, Button, EmptyState, icons, Segmented, Skeleton, TextInput } from '../lib/ui/index.ts';
+  import { openAgent } from '../agent/conversation.svelte.ts';
   import Arbre from '../memoire/Arbre.svelte';
   import FichePanel from '../memoire/FichePanel.svelte';
   import { go } from '../memoire/titles.ts';
@@ -151,8 +152,10 @@
       title="Aucune fiche. Écrire une note ou déposer un document."
       message="Les fiches naissent de ce que l’on valide."
     >
-      <a href="/depots">Écrire une note</a>
-      <a href="/depots">Déposer un document</a>
+      <Button variant="principal" icon={icons.Pencil} onclick={() => openAgent('note que ')}>
+        Écrire une note
+      </Button>
+      <Button href="/depots" variant="fantome">Déposer un document</Button>
     </EmptyState>
   {:else}
     <div class={['corps', { ouverte: selected !== null }]}>

@@ -109,11 +109,10 @@
     min-height: 0;
     overflow: auto;
   }
+  /* No box of its own: the bubble (20) and the open panel (45) each stack on their own. */
   .agent {
-    position: fixed;
-    right: var(--agent-lanceur-bas);
-    bottom: var(--agent-lanceur-bas);
-    z-index: 20;
+    display: contents;
+    --agent-bas: var(--agent-lanceur-bas);
   }
   .coque :global(.nav-mobile) {
     display: none;
@@ -132,7 +131,7 @@
     }
     /* Above the bottom navigation. */
     .agent {
-      bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 14px);
+      --agent-bas: calc(68px + env(safe-area-inset-bottom, 0px) + 14px);
     }
   }
 </style>

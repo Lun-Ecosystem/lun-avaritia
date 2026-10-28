@@ -280,4 +280,21 @@ describe('Valider, links of a synthesis', () => {
     expect(window.location.search).toBe('?fiche=4');
     history.replaceState(null, '', '/');
   });
+
+  it('reads the fiches once for every draft with a link', async () => {
+    const get = vi.fn(async (path: string) =>
+      path === '/api/fiches'
+        ? { fiches: [{ id: 4, title: 'Projet Test', type: 'Projets' }] }
+        : {
+            drafts: [
+              fiche(1, 'Client Exemple', { synthesis: 'Voir [[Projet Test]].' }),
+              fiche(2, 'Client Autre', { synthesis: 'Aussi [[Projet Test]].' }),
+            ],
+            held: 0,
+          },
+    );
+    render(Valider, { props: {}, context: new Map([['api', { get, send: vi.fn() } as unknown as Api]]) });
+    expect(await screen.findAllByRole('button', { name: 'Projet Test' })).toHaveLength(2);
+    expect(get.mock.calls.filter(([p]) => p === '/api/fiches')).toHaveLength(1);
+  });
 });

@@ -5,7 +5,7 @@
  */
 /* On :root: the launcher is mounted by the host app, outside the views' roots. */
 :root {
-  /* The agent's bubble: its size and offset, and the room it takes under scrolling lists (none on a phone, where it is a top-bar button). */
+  /* The agent's bubble: its size and offset, and the room it takes under scrolling lists (none on a phone, where the floating bubble is lifted above the bottom navigation). */
   --agent-lanceur-h: 44px;
   --agent-lanceur-bas: 22px;
   --agent-coin: calc(var(--agent-lanceur-h) + var(--agent-lanceur-bas) + 12px);
@@ -51,7 +51,7 @@
   padding: 0.35rem 0.55rem;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 759.98px) {
   :root {
     --agent-coin: 0px;
   }

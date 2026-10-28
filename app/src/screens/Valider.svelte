@@ -3,6 +3,7 @@
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { ApiError, type Api } from '../api.ts';
   import { Banner, bindShortcuts, Button, EmptyState, icons, Skeleton, toast } from '../lib/ui/index.ts';
+  import { idsByTitle, listFiches } from '../memoire/titles.ts';
   import DraftItem from '../valider/DraftItem.svelte';
   import { matches, type DraftPayload, type DraftView } from '../valider/drafts.ts';
 
@@ -34,6 +35,16 @@
       .catch((e: Error) => (failure = e.message));
   }
   load();
+
+  // The titles of the memory, read once when a fiche draft first links to another ([[Fiche]]).
+  let ids = $state(new Map<string, number>());
+  let titlesRead = false;
+  $effect(() => {
+    if (titlesRead || !queue?.some((d) => d.payload.kind === 'fiche' && d.payload.synthesis.includes('[[')))
+      return;
+    titlesRead = true;
+    void listFiches(api).then((l) => (ids = idsByTitle(l)));
+  });
 
   const shown = $derived((queue ?? []).filter((d) => matches(d, filtre)));
   const active = $derived(shown.find((d) => d.id === chosen) ?? shown[0]);
@@ -101,6 +112,7 @@
         onrefuse={() => decide(d, 'refuse')}
         onedit={(on) => (editing = on ? d.id : null)}
         onactivate={() => (chosen = d.id)}
+        {ids}
       />
     {:else}
       <EmptyState
