@@ -193,9 +193,13 @@
 </div>
 
 <style>
+  /* The screen holds the viewport: the search row stays, the tree and the fiche scroll each on its own. */
   .ecran {
     display: grid;
-    align-content: start;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: start;
+    box-sizing: border-box;
+    height: 100%;
     gap: 16px;
     padding: 22px 26px;
   }
@@ -212,18 +216,24 @@
   }
   .corps {
     display: flex;
+    align-self: stretch;
     gap: 18px;
     position: relative;
+    min-height: 0;
   }
   .liste {
     flex: none;
     width: 260px;
     padding-right: 14px;
     border-right: 1px solid var(--bordure);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .detail {
     flex: 1;
     min-width: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .resultats {
     display: grid;
