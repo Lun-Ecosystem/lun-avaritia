@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { startLoop } from './util.ts';
+import { parisMonthStart, startLoop } from './util.ts';
 
 describe('startLoop', () => {
   it('runs at once, never twice at a time, and keeps going after an error', async () => {
@@ -21,5 +21,13 @@ describe('startLoop', () => {
     await loop.runNow();
     expect(run).toHaveBeenCalledTimes(3);
     loop.stop();
+  });
+});
+
+describe('parisMonthStart', () => {
+  it('starts at midnight Paris on the 1st, across a clock change', () => {
+    expect(parisMonthStart(new Date('2026-11-02T04:00:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
+    expect(parisMonthStart(new Date('2026-03-31T21:30:00Z')).toISOString()).toBe('2026-02-28T23:00:00.000Z');
+    expect(parisMonthStart(new Date('2026-10-31T23:30:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
   });
 });

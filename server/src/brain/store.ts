@@ -160,7 +160,7 @@ export function searchFiches(
     .prepare(
       `SELECT f.id, f.title, t.name AS type, snippet(fiche_search, -1, '', '', '…', 12) AS excerpt
          FROM fiche_search JOIN fiches f ON f.id = fiche_search.rowid JOIN fiche_types t ON t.id = f.type_id
-        WHERE fiche_search MATCH ? ORDER BY rank LIMIT ?`,
+        WHERE fiche_search MATCH ? AND f.merged_into IS NULL ORDER BY rank LIMIT ?`,
     )
     .all(terms.join(' '), limit) as unknown as { id: number; title: string; type: string; excerpt: string }[];
 }

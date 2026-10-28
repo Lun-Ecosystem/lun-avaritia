@@ -61,3 +61,10 @@ export function parisDayStart(now: Date): Date {
   // The offset can differ at midnight from the one at `now` (the clocks change at night).
   return new Date(midnight - parisOffset(midnight - o));
 }
+
+/** The instant at which the calendar month of `now`, in Paris, began. */
+export function parisMonthStart(now: Date): Date {
+  const day = Number(new Intl.DateTimeFormat('en-GB', { timeZone: PARIS, day: 'numeric' }).format(now));
+  // From noon of today, whole days back land on noon of the 1st whatever the clock changes.
+  return parisDayStart(new Date(parisDayStart(now).getTime() + 12 * 3_600_000 - (day - 1) * 86_400_000));
+}
