@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    AutoMark,
     Badge,
     Banner,
     bindShortcuts,
@@ -9,22 +8,14 @@
     Checkbox,
     Chip,
     CodeInput,
-    CommandPalette,
     ConfirmDialog,
-    DayGroup,
     EmptyState,
-    Fab,
     Field,
     IconButton,
     icons,
     Kbd,
     ListRow,
-    Menu,
-    NavGroup,
     NavLink,
-    Popover,
-    ProposalCard,
-    ProposalChip,
     Rail,
     Segmented,
     ServiceCard,
@@ -34,20 +25,16 @@
     Slider,
     StandaloneCard,
     Steps,
-    Tabs,
     TextInput,
     toast,
     Toaster,
     type ButtonVariant,
-    type MenuSection,
     type NavItem,
-    type PaletteCommand,
     type Tone,
   } from '../lib/ui/index.ts';
   import Dialog from '../lib/ui/Dialog.svelte';
   import Select from '../lib/ui/Select.svelte';
   import Switch from '../lib/ui/Switch.svelte';
-  import type { ProposalView } from '../lib/types.ts';
 
   const variants: { value: ButtonVariant; label: string; role: string }[] = [
     { value: 'principal', label: 'Principal', role: 'L’action attendue, une seule par zone.' },
@@ -103,58 +90,12 @@
     'Ctrl+k': 'Ctrl K',
   };
 
-  // 06 to 10: proposals, layers, structures, navigation (sample data, no real address).
-  const proposal = (boxId: string | null, confidence: number): ProposalView => ({
-    boxId,
-    tagIds: [],
-    confidence,
-    status: 'pending',
-  });
+  // 06 to 09: layers, structures, navigation (sample data, no real address).
   let lastAction = $state<string | null>(null);
   const act = (what: string) => () => (lastAction = what);
 
-  /** Colors of the sample boxes: data values, as the server sends them. */
-  const boxColors = {
-    factures: 'var(--lavis)',
-    administratif: 'var(--attention)',
-    newsletters: 'var(--ok)',
-  };
-
-  const sortSections: MenuSection[] = [
-    { title: 'Suggéré', items: [{ id: 'factures', label: 'Factures', icon: icons.Sparkles, tone: 'ia' }] },
-    {
-      title: 'Boîtes',
-      items: [
-        { id: 'administratif', label: 'Administratif', color: boxColors.administratif, shortcut: '2' },
-        { id: 'newsletters', label: 'Newsletters', color: boxColors.newsletters, shortcut: '3' },
-      ],
-    },
-    { fixed: true, items: [{ id: 'nouvelle', label: 'Nouvelle boîte…', icon: icons.Plus }] },
-  ];
-  const moreSections: MenuSection[] = [
-    {
-      title: 'Ranger dans',
-      items: [
-        { id: 'factures', label: 'Factures', icon: icons.Folder, shortcut: '1' },
-        { id: 'administratif', label: 'Administratif', icon: icons.Folder, shortcut: '2' },
-        { id: 'newsletters', label: 'Newsletters', icon: icons.Folder, shortcut: '3' },
-      ],
-    },
-    {
-      items: [
-        { id: 'nouvelle', label: 'Nouvelle boîte…', icon: icons.Plus },
-        { id: 'corbeille', label: 'Corbeille', icon: icons.Trash, tone: 'danger' },
-      ],
-    },
-  ];
-  let menuChoice = $state<string | null>(null);
-
   let dialogOpen = $state(false);
   let confirmOpen = $state(false);
-  let correctOpen = $state(false);
-  let correctAnchor = $state<HTMLElement | null>(null);
-  let correctBox = $state('administratif');
-  let remember = $state(false);
 
   const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
   function toastUndo() {
@@ -168,40 +109,6 @@
       },
     });
   }
-
-  let tab = $state('tout');
-  const tabs = [
-    { value: 'tout', label: 'Tout' },
-    { value: 'non-lus', label: 'Non lus', count: 12 },
-    { value: 'ia', label: 'Proposés par l’IA' },
-    { value: 'seuls', label: 'Rangés seuls' },
-  ];
-
-  let paletteOpen = $state(false);
-  const commands: PaletteCommand[] = [
-    {
-      id: 'ranger',
-      label: 'Ranger la sélection dans Factures',
-      group: 'Action',
-      icon: icons.Folder,
-      run: act('Ranger dans Factures'),
-    },
-    {
-      id: 'chercher',
-      label: 'Chercher « fac » dans les mails',
-      group: 'Recherche',
-      icon: icons.Search,
-      run: act('Chercher'),
-    },
-    {
-      id: 'reglages',
-      label: 'Réglages, Boîtes et étiquettes',
-      group: 'Aller à',
-      icon: icons.Settings,
-      run: act('Aller aux réglages'),
-    },
-    { id: 'pause', label: 'Mettre le tri en pause', group: 'Action', icon: icons.Pause, run: act('Pause') },
-  ];
 
   const mobileNav: NavItem[] = [
     { href: '#mail', label: 'Mail', icon: icons.Mail },
@@ -547,9 +454,7 @@
         <span class="num">05</span>
         <h2 id="s-clavier">Clavier</h2>
       </header>
-      <p class="pourquoi">
-        Les raccourcis ne s’activent jamais dans un champ de saisie, sauf Ctrl K dans la palette.
-      </p>
+      <p class="pourquoi">Les raccourcis ne s’activent jamais dans un champ de saisie.</p>
       <div class="grille g2">
         <div class="planche col">
           <h3>Essai</h3>
@@ -586,127 +491,24 @@
       </div>
     </section>
 
-    <!-- 06 L'IA -->
-    <section class="bloc" aria-labelledby="s-ia">
-      <header>
-        <span class="num">06</span>
-        <h2 id="s-ia">L’IA visible et contrôlable</h2>
-      </header>
-      <p class="pourquoi">
-        La proposition dit ce que l’IA veut faire, avec quelle confiance, et se valide ou se corrige en un
-        geste. Version compacte dans la liste, version complète dans la lecture.
-      </p>
-      <div class="grille g2">
-        <div class="planche col">
-          <h3>Dans la liste (compacte)</h3>
-          <div class="ligne">
-            <ProposalChip
-              proposal={proposal('spam', 70)}
-              boxName="Spam"
-              onvalidate={act('Valider : Spam')}
-              oncorrect={act('Corriger : Spam')}
-            />
-            <ProposalChip
-              proposal={proposal('factures', 92)}
-              boxName="Factures"
-              tagNames={['Urgent']}
-              onvalidate={act('Valider : Factures + Urgent')}
-              oncorrect={act('Corriger : Factures + Urgent')}
-            />
-          </div>
-          <div class="ligne">
-            <AutoMark boxName="Newsletters" /><span class="legende">déjà fait seul, annulable</span>
-          </div>
-          <div class="ligne">
-            <ProposalChip proposal={proposal(null, 40)} boxName="" onvalidate={act('')} oncorrect={act('')} />
-            <span class="legende">au lieu de « Aucune boîte ? »</span>
-          </div>
-          <p class="sortie" aria-live="polite">
-            {#if lastAction}Dernière action : <b>{lastAction}</b>{:else}Aucune action.{/if}
-          </p>
-        </div>
-        <div class="planche col">
-          <h3>Dans la lecture (complète)</h3>
-          <ProposalCard
-            proposal={proposal('spam', 70)}
-            boxName="Spam"
-            reason="Expéditeur inconnu, aucun échange précédent, objet générique."
-            threshold={95}
-            onvalidate={act('Valider : Spam')}
-            oncorrect={(anchor) => {
-              correctAnchor = anchor;
-              correctOpen = true;
-            }}
-            onkeep={act('Garder en réception')}
-          />
-          <p class="regle">
-            <b>Règle :</b> la justification vient du classifieur (160 caractères au plus) ; sous le seuil d’auto-rangement,
-            la carte dit pourquoi elle attend. « Ranger ailleurs… » ouvre la bulle de correction.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 07 Calques -->
+    <!-- 06 Calques -->
     <section class="bloc" aria-labelledby="s-calques">
       <header>
-        <span class="num">07</span>
-        <h2 id="s-calques">Ce qui flotte : menus, info-bulles, dialogues, toasts</h2>
+        <span class="num">06</span>
+        <h2 id="s-calques">Ce qui flotte : info-bulles, dialogues, toasts</h2>
       </header>
       <p class="pourquoi">
         Tout ce qui flotte passe par un calque au-dessus de l’application : placé seul, retourné s’il manque
         de place, fermé par Échap et au clic dehors, focus clavier gardé.
       </p>
       <div class="grille g2">
-        <div class="planche">
-          <h3>Menu ancré dans un conteneur qui coupe</h3>
-          <div class="scene">
-            <div class="scene-gauche">
-              <ListRow selected>
-                <div class="l1"><span class="de">Free Mobile</span><span class="heure">09:12</span></div>
-                <div class="l2"><b>Votre facture</b> · disponible</div>
-              </ListRow>
-              <div class="ligne scene-actions">
-                <Menu
-                  sections={sortSections}
-                  filter="Filtrer les boîtes"
-                  onselect={(id) => (menuChoice = id)}
-                >
-                  {#snippet trigger({ props })}
-                    <Button {...props} variant="secondaire" size="petit" icon={icons.Folder}
-                      >Ranger dans</Button
-                    >
-                  {/snippet}
-                </Menu>
-                <Menu sections={moreSections} onselect={(id) => (menuChoice = id)} label="Plus d’actions">
-                  {#snippet trigger({ props })}
-                    <IconButton {...props} icon={icons.Ellipsis} label="Plus d’actions" size="petit" />
-                  {/snippet}
-                </Menu>
-              </div>
-            </div>
-            <div class="scene-droite">Lecture</div>
-          </div>
-          <p class="regle">
-            <b>Preuve :</b> la scène coupe ce qui dépasse (overflow hidden, 260 px de haut) ; le menu ouvert
-            la dépasse en entier. Choix reçu : <b>{menuChoice ?? 'aucun'}</b>.
-          </p>
-        </div>
         <div class="planche col">
-          <h3>Info-bulle, bulle, dialogues</h3>
+          <h3>Info-bulle, dialogues</h3>
           <div class="ligne">
             <IconButton icon={icons.Archive} label="Archiver" shortcut="E" />
             <span class="legende">survoler ou atteindre au clavier</span>
           </div>
           <div class="ligne">
-            <Popover label="Corriger la proposition" width={290}>
-              {#snippet trigger({ props })}
-                <Button {...props} variant="secondaire" size="petit">Corriger…</Button>
-              {/snippet}
-              {#snippet children({ close })}
-                {@render corriger(close)}
-              {/snippet}
-            </Popover>
             <Button variant="secondaire" size="petit" onclick={() => (dialogOpen = true)}
               >Ouvrir un dialogue</Button
             >
@@ -733,10 +535,10 @@
       </div>
     </section>
 
-    <!-- 08 Structures -->
+    <!-- 07 Structures -->
     <section class="bloc" aria-labelledby="s-structures">
       <header>
-        <span class="num">08</span>
+        <span class="num">07</span>
         <h2 id="s-structures">Structures : listes, cartes de réglages, états vides, chargement</h2>
       </header>
       <p class="pourquoi">
@@ -745,44 +547,34 @@
       </p>
       <div class="grille g2">
         <div class="planche flush">
-          <h3 class="flush-titre">Lignes de liste, groupées par jour</h3>
-          <DayGroup label="Aujourd’hui">
-            <ListRow onopen={act('Ouvrir : Free Mobile')}>
-              {#snippet start()}<Checkbox aria-label="Sélectionner" /><span class="avatar">FM</span>{/snippet}
-              <div class="l1">
-                <span class="de">Free Mobile</span>
-                <ProposalChip
-                  proposal={proposal('factures', 92)}
-                  boxName="Factures"
-                  onvalidate={act('Valider : Factures')}
-                  oncorrect={act('Corriger : Factures')}
-                />
-                <span class="heure">09:12</span>
-              </div>
-              <div class="l2">
-                <b>Votre facture d’octobre est disponible</b> · Montant 19,99 €, prélevé le 5 novembre
-              </div>
-            </ListRow>
-            <ListRow selected>
-              {#snippet start()}<Checkbox aria-label="Sélectionner" checked /><span class="avatar">CT</span
-                >{/snippet}
-              <div class="l1"><span class="de">Compte test</span><span class="heure">00:28</span></div>
-              <div class="l2"><b>Essai de clé</b> · Message de test envoyé depuis un téléphone</div>
-            </ListRow>
-          </DayGroup>
-          <DayGroup label="Hier">
-            <ListRow read data-etat="survol">
-              {#snippet start()}<Checkbox aria-label="Sélectionner" /><span class="avatar">G</span>{/snippet}
-              <div class="l1"><span class="de">Google</span><span class="heure">hier</span></div>
-              <div class="l2"><b>Alerte de sécurité</b> · Nouvelle connexion sur Windows</div>
-              {#snippet actions()}
-                <IconButton icon={icons.Archive} label="Archiver" shortcut="E" size="petit" />
-                <IconButton icon={icons.Folder} label="Ranger" shortcut="R" size="petit" />
-                <IconButton icon={icons.Trash} label="Mettre à la corbeille" shortcut="#" size="petit" />
-                <IconButton icon={icons.Clock} label="Plus tard" size="petit" />
-              {/snippet}
-            </ListRow>
-          </DayGroup>
+          <h3 class="flush-titre">Lignes de liste</h3>
+          <ListRow onopen={act('Ouvrir : Free Mobile')}>
+            {#snippet start()}<Checkbox aria-label="Sélectionner" /><span class="avatar">FM</span>{/snippet}
+            <div class="l1">
+              <span class="de">Free Mobile</span>
+              <span class="heure">09:12</span>
+            </div>
+            <div class="l2">
+              <b>Votre facture d’octobre est disponible</b> · Montant 19,99 €, prélevé le 5 novembre
+            </div>
+          </ListRow>
+          <ListRow selected>
+            {#snippet start()}<Checkbox aria-label="Sélectionner" checked /><span class="avatar">CT</span
+              >{/snippet}
+            <div class="l1"><span class="de">Compte test</span><span class="heure">00:28</span></div>
+            <div class="l2"><b>Essai de clé</b> · Message de test envoyé depuis un téléphone</div>
+          </ListRow>
+          <ListRow read data-etat="survol">
+            {#snippet start()}<Checkbox aria-label="Sélectionner" /><span class="avatar">G</span>{/snippet}
+            <div class="l1"><span class="de">Google</span><span class="heure">hier</span></div>
+            <div class="l2"><b>Alerte de sécurité</b> · Nouvelle connexion sur Windows</div>
+            {#snippet actions()}
+              <IconButton icon={icons.Archive} label="Archiver" shortcut="E" size="petit" />
+              <IconButton icon={icons.Folder} label="Ranger" shortcut="R" size="petit" />
+              <IconButton icon={icons.Trash} label="Mettre à la corbeille" shortcut="#" size="petit" />
+              <IconButton icon={icons.Clock} label="Plus tard" size="petit" />
+            {/snippet}
+          </ListRow>
           <p class="regle flush-regle">
             <b>Règle :</b> objet et début du message sur une ligne entière ; actions au survol et au clavier (survol
             forcé sur la dernière ligne).
@@ -838,16 +630,13 @@
       </div>
     </section>
 
-    <!-- 09 Navigation -->
+    <!-- 08 Navigation -->
     <section class="bloc" aria-labelledby="s-navigation">
       <header>
-        <span class="num">09</span>
-        <h2 id="s-navigation">Navigation : rail, onglets, palette de commandes</h2>
+        <span class="num">08</span>
+        <h2 id="s-navigation">Navigation : rail et état du service</h2>
       </header>
-      <p class="pourquoi">
-        Un rail à gauche avec icônes, libellés et compteurs, l’état du service en bas ; des onglets soulignés
-        pour les sous-vues ; une palette Ctrl K pour tout faire au clavier.
-      </p>
+      <p class="pourquoi">Un rail à gauche avec icônes, libellés et compteurs, l’état du service en bas.</p>
       <div class="grille g3">
         <div class="planche rail-cadre">
           <Rail label="Navigation du catalogue">
@@ -859,16 +648,6 @@
             <NavLink href="#a-valider" label="À valider" icon={icons.Sparkles} count={3} countTone="ia" />
             <NavLink href="#agenda" label="Agenda" icon={icons.Calendar} data-etat="survol" />
             <NavLink href="#taches" label="Tâches" icon={icons.List} count={4} data-etat="focus" />
-            <NavGroup title="Boîtes">
-              {#snippet action()}<IconButton
-                  icon={icons.Plus}
-                  label="Nouvelle boîte"
-                  size="petit"
-                />{/snippet}
-              <NavLink href="#factures" label="Factures" color={boxColors.factures} count={2} />
-              <NavLink href="#administratif" label="Administratif" color={boxColors.administratif} />
-              <NavLink href="#newsletters" label="Newsletters" color={boxColors.newsletters} count={18} />
-            </NavGroup>
             {#snippet footer()}
               <NavLink href="#journal" label="Journal" icon={icons.Clock} />
               <NavLink href="#reglages" label="Réglages" icon={icons.Settings} />
@@ -883,73 +662,36 @@
           <ServiceCard state="cle-refusee" detail="Clé refusée" />
         </div>
         <div class="planche col">
-          <h3>Palette Ctrl K</h3>
-          <p class="legende">Ctrl K l’ouvre et la ferme, y compris depuis son champ de recherche.</p>
-          <div class="ligne">
-            <Button variant="secondaire" icon={icons.Search} onclick={() => (paletteOpen = true)}>
-              Ouvrir la palette
-            </Button>
-            <Kbd>Ctrl K</Kbd>
-          </div>
           <h3>Colonne de thèmes</h3>
           <Rail label="Thèmes des réglages" variant="themes" title="Réglages">
-            <NavGroup title="Compte">
-              <NavLink href="#compte" label="Compte Google" icon={icons.Mail} />
-              <NavLink href="#appareils" label="Appareils et applications" icon={icons.Eye} />
-            </NavGroup>
-            <NavGroup title="Tri">
-              <NavLink href="#tri" label="Tri par l’IA" icon={icons.Sparkles} current />
-              <NavLink href="#boites" label="Boîtes et règles" icon={icons.Folder} />
-            </NavGroup>
+            <NavLink href="#compte" label="Compte Google" icon={icons.Mail} />
+            <NavLink href="#appareils" label="Appareils et applications" icon={icons.Eye} />
+            <NavLink href="#tri" label="Tri par l’IA" icon={icons.Sparkles} current />
+            <NavLink href="#boites" label="Boîtes et règles" icon={icons.Folder} />
           </Rail>
         </div>
       </div>
-      <div class="planche col onglets-demo">
-        <h3>Onglets</h3>
-        <Tabs items={tabs} bind:value={tab} label="Filtre de la liste" etat={['non-lus', 'survol']} />
-        <p class="legende">Onglet courant : {tabs.find((t) => t.value === tab)?.label}</p>
-        <p class="regle">
-          <b>Règle :</b> l’onglet actif est souligné en accent, jamais seulement « un peu plus clair ».
-        </p>
-      </div>
     </section>
 
-    <!-- 10 Mobile et pages seules -->
+    <!-- 09 Mobile et pages seules -->
     <section class="bloc" aria-labelledby="s-mobile">
       <header>
-        <span class="num">10</span>
+        <span class="num">09</span>
         <h2 id="s-mobile">Mobile et pages seules</h2>
       </header>
       <p class="pourquoi">
-        Sous 768 px : navigation en bas, bouton flottant pour l’action principale. Avant d’être dans l’app :
-        une carte centrée sur fond encre, la saisie du code en six cases, les étapes.
+        Sous 760 px : navigation en bas. Avant d’être dans l’app : une carte centrée sur fond encre, la saisie
+        du code en six cases, les étapes.
       </p>
       <div class="grille mobile-grille">
         <div class="telephone">
           <div class="tel-liste">
-            <DayGroup label="Aujourd’hui">
-              <ListRow>
-                {#snippet start()}<span class="avatar">FM</span>{/snippet}
-                <div class="l1"><span class="de">Free Mobile</span><span class="heure">09:12</span></div>
-                <div class="l2"><b>Votre facture d’octobre est disponible</b></div>
-                <div class="l3">
-                  <ProposalChip
-                    proposal={proposal('factures', 92)}
-                    boxName="Factures"
-                    onvalidate={act('Valider : Factures')}
-                    oncorrect={act('Corriger : Factures')}
-                  />
-                </div>
-              </ListRow>
-              <ListRow>
-                {#snippet start()}<span class="avatar">IM</span>{/snippet}
-                <div class="l1"><span class="de">Impots.gouv</span><span class="heure">08:47</span></div>
-                <div class="l2"><b>Votre avis de taxe foncière est disponible</b></div>
-                <div class="l3"><AutoMark boxName="Administratif" /></div>
-              </ListRow>
-            </DayGroup>
+            <ListRow>
+              {#snippet start()}<span class="avatar">FM</span>{/snippet}
+              <div class="l1"><span class="de">Free Mobile</span><span class="heure">09:12</span></div>
+              <div class="l2"><b>Votre facture d’octobre est disponible</b></div>
+            </ListRow>
           </div>
-          <Fab label="Nouveau" icon={icons.Plus} />
           <BottomNav items={mobileNav} current="#mail" />
         </div>
         <div class="cadre-seul">
@@ -978,38 +720,6 @@
     </section>
   </div>
 
-  {#snippet corriger(close: () => void)}
-    <div class="corriger">
-      <p class="titre-menu">Ranger dans</p>
-      <Segmented
-        options={[
-          { value: 'administratif', label: 'Administratif' },
-          { value: 'factures', label: 'Factures' },
-          { value: 'reception', label: 'Réception' },
-        ]}
-        bind:value={correctBox}
-        label="Boîte"
-        size="petit"
-      />
-      <Checkbox bind:checked={remember} label="Retenir pour cet expéditeur" />
-      <div class="ligne fin">
-        <Button variant="fantome" size="petit" onclick={close}>Annuler</Button>
-        <Button
-          variant="principal"
-          size="petit"
-          onclick={() => {
-            lastAction = `Corrigé : ${correctBox}${remember ? ', règle créée' : ''}`;
-            close();
-          }}>Appliquer</Button
-        >
-      </div>
-    </div>
-  {/snippet}
-
-  <Popover bind:open={correctOpen} anchor={correctAnchor} label="Corriger la proposition" width={290}>
-    {#snippet children({ close })}{@render corriger(close)}{/snippet}
-  </Popover>
-
   <Dialog
     bind:open={dialogOpen}
     title="Nouvel événement"
@@ -1033,7 +743,6 @@
     }}
   />
 
-  <CommandPalette bind:open={paletteOpen} {commands} />
   <Toaster />
 </div>
 
@@ -1312,36 +1021,6 @@
   }
 
   /* 06 to 10 */
-  .scene {
-    position: relative;
-    height: 260px;
-    overflow: hidden;
-    background: var(--fond);
-    border: 1px solid var(--bordure);
-    border-radius: var(--r-3);
-  }
-  .scene-gauche {
-    position: absolute;
-    inset: 0 55% 0 0;
-    padding: 14px;
-    border-right: 1px solid var(--bordure);
-  }
-  .scene-gauche :global(.rangee) {
-    border-radius: var(--r-2);
-    border-bottom: 0;
-    min-height: 52px;
-  }
-  .scene-actions {
-    margin-top: 12px;
-  }
-  .scene-droite {
-    position: absolute;
-    inset: 0 0 0 45%;
-    display: grid;
-    place-items: center;
-    font-size: 13px;
-    color: var(--texte-3);
-  }
   .l1 {
     display: flex;
     align-items: center;
@@ -1359,9 +1038,6 @@
   .l2 b {
     font-weight: 400;
     color: var(--texte);
-  }
-  .l3 {
-    margin-top: 6px;
   }
   /* A read row: lighter sender and subject. */
   :global(.lu) .de,
@@ -1457,23 +1133,6 @@
     border-right: 0;
     background: none;
   }
-  .corriger {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 6px 8px;
-  }
-  .titre-menu {
-    margin: 0;
-    font: 500 10.5px var(--sans);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--texte-3);
-  }
-  .fin {
-    justify-content: flex-end;
-    gap: 6px;
-  }
   .mobile-grille {
     grid-template-columns: 390px repeat(2, minmax(0, 1fr));
     align-items: start;
@@ -1497,9 +1156,6 @@
   }
   .telephone :global(.barre) {
     padding-bottom: 0;
-  }
-  .onglets-demo {
-    margin-top: 16px;
   }
   .cadre-seul {
     display: flex;

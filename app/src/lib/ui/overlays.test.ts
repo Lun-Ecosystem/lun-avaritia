@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import MenuFixture from '../../testing/MenuFixture.svelte';
 import CodeInput from './CodeInput.svelte';
 import ConfirmDialog from './ConfirmDialog.svelte';
 import { Archive } from './Icon.ts';
@@ -136,46 +135,6 @@ describe('CodeInput', () => {
 
 /** Lets Bits finish opening a layer (focus scope, escape layer) before a key is pressed. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
-
-// jsdom measures nothing, so Floating UI leaves the menu layer `visibility: hidden`, and hidden
-// elements have no accessible name: the entries are read by their text.
-const entries = () =>
-  screen
-    .queryAllByRole('menuitem', { hidden: true })
-    .map((item) => (item.textContent ?? '').replace(/\s+/g, ' ').trim());
-
-describe('Menu', () => {
-  it('filters its items as one types, and Enter chooses the first one left', async () => {
-    const user = userEvent.setup();
-    const onselect = vi.fn();
-    render(MenuFixture, { props: { onselect } });
-    await user.click(screen.getByRole('button', { name: 'Ranger dans' }));
-    const filter = await screen.findByLabelText('Filtrer les boîtes');
-    await settle();
-    expect(filter).toHaveFocus();
-    expect(entries()).toEqual(['Factures ↵', 'Administratif 2', 'Newsletters 3', 'Nouvelle boîte…']);
-
-    await user.keyboard('news');
-    // Newsletters is left, and the entry always offered whatever the filter.
-    expect(entries()).toEqual(['Newsletters ↵', 'Nouvelle boîte…']);
-    expect(filter).toHaveValue('news');
-
-    await user.keyboard('{Enter}');
-    expect(onselect).toHaveBeenCalledExactlyOnceWith('newsletters');
-    await settle();
-    expect(screen.queryByRole('menu', { hidden: true })).toBeNull();
-  });
-
-  it('ignores accents and case', async () => {
-    const user = userEvent.setup();
-    render(MenuFixture, { props: { onselect: vi.fn() } });
-    await user.click(screen.getByRole('button', { name: 'Ranger dans' }));
-    await screen.findByLabelText('Filtrer les boîtes');
-    await settle();
-    await user.keyboard('BOITE');
-    expect(entries()).toEqual(['Nouvelle boîte… ↵']);
-  });
-});
 
 describe('ConfirmDialog', () => {
   const props = {

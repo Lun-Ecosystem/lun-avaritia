@@ -24,10 +24,9 @@ describe('catalogue page', () => {
       'Bascules et cases',
       'Pastilles et filtres',
       'Clavier',
-      'L’IA visible et contrôlable',
-      'Ce qui flotte : menus, info-bulles, dialogues, toasts',
+      'Ce qui flotte : info-bulles, dialogues, toasts',
       'Structures : listes, cartes de réglages, états vides, chargement',
-      'Navigation : rail, onglets, palette de commandes',
+      'Navigation : rail et état du service',
       'Mobile et pages seules',
     ]) {
       expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();

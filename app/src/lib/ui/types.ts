@@ -33,40 +33,6 @@ export type DemoState = 'survol' | 'focus';
 /** State of the sorting service, shown at the bottom of the rail. */
 export type ServiceState = 'actif' | 'pause' | 'cle-refusee';
 
-/** One entry of a menu. */
-export interface MenuItem {
-  id: string;
-  label: string;
-  icon?: IconComponent | undefined;
-  /** Color of a box, shown as a small square before the label (a data value, not a token). */
-  color?: string | undefined;
-  /** Key shown at the end of the entry; typed while the menu has the focus, it chooses the entry. */
-  shortcut?: string | undefined;
-  /** `ia`: the entry the AI proposes; `danger`: an entry that removes or cuts. */
-  tone?: 'ia' | 'danger' | undefined;
-  /** Short note after the label (« proposé »). */
-  note?: string | undefined;
-  disabled?: boolean | undefined;
-  onselect?: (() => void) | undefined;
-}
-
-/** A group of entries, with an optional title. A `fixed` group stays whatever the filter. */
-export interface MenuSection {
-  title?: string | undefined;
-  fixed?: boolean | undefined;
-  items: MenuItem[];
-}
-
-/** One command of the palette (Ctrl K). */
-export interface PaletteCommand {
-  id: string;
-  label: string;
-  /** Kind of command, shown at the end of the line (« Action », « Aller à »). */
-  group: string;
-  icon?: IconComponent | undefined;
-  run: () => void;
-}
-
 /** One destination of a navigation (rail, bottom bar). */
 export interface NavItem {
   href: string;
@@ -75,11 +41,4 @@ export interface NavItem {
   count?: number | string | undefined;
   /** `ia`: counts what waits for a validation. */
   countTone?: 'neutre' | 'ia' | undefined;
-}
-
-/** One tab of a sub-view. */
-export interface TabItem {
-  value: string;
-  label: string;
-  count?: number | undefined;
 }
