@@ -41,6 +41,7 @@ describe('settings', () => {
     const db = openDb(':memory:');
     for (const bad of [
       { 'agent.name': '' },
+      { 'agent.name': '   ' },
       { 'agent.name': 'x'.repeat(41) },
       { 'agent.icon': 'rocket' },
       { 'agent.tone': 'grossier' },

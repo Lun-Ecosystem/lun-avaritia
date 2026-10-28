@@ -8,7 +8,7 @@ const SCHEMAS = {
   'core.lots': z.boolean(),
   'drafts.cap': z.number().int().min(1).max(100),
   'cost.monthlyCap': z.number().min(0).max(50),
-  'agent.name': z.string().min(1).max(40),
+  'agent.name': z.string().trim().min(1).max(40),
   'agent.icon': z.enum(['sparkles', 'brain', 'book-open', 'library', 'feather', 'moon', 'gem', 'scroll']),
   'agent.tone': z.enum(['neutre', 'chaleureux', 'concis']),
   'agent.persona': z.string().max(500),
