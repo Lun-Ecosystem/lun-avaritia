@@ -8,11 +8,19 @@ const SCHEMAS = {
   'core.lots': z.boolean(),
   'drafts.cap': z.number().int().min(1).max(100),
   'cost.monthlyCap': z.number().min(0).max(50),
+  'agent.name': z.string().min(1).max(40),
+  'agent.icon': z.enum(['sparkles', 'brain', 'book-open', 'library', 'feather', 'moon', 'gem', 'scroll']),
+  'agent.tone': z.enum(['neutre', 'chaleureux', 'concis']),
+  'agent.persona': z.string().max(500),
 };
 const DEFAULTS: { [K in keyof typeof SCHEMAS]: z.infer<(typeof SCHEMAS)[K]> } = {
   'core.lots': true,
   'drafts.cap': 15,
   'cost.monthlyCap': 5,
+  'agent.name': 'Agent',
+  'agent.icon': 'sparkles',
+  'agent.tone': 'neutre',
+  'agent.persona': '',
 };
 export type Settings = typeof DEFAULTS;
 
@@ -21,11 +29,9 @@ export function setting<K extends keyof Settings>(db: DatabaseSync, key: K): Set
 }
 
 export function readSettings(db: DatabaseSync): Settings {
-  return {
-    'core.lots': setting(db, 'core.lots'),
-    'drafts.cap': setting(db, 'drafts.cap'),
-    'cost.monthlyCap': setting(db, 'cost.monthlyCap'),
-  };
+  return Object.fromEntries(
+    (Object.keys(DEFAULTS) as (keyof Settings)[]).map((k) => [k, setting(db, k)]),
+  ) as Settings;
 }
 
 /** Validates the whole patch first, then saves it: a bad value saves nothing. */
