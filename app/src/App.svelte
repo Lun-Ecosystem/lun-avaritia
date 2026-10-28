@@ -6,7 +6,7 @@
   import { Button, EmptyState, icons, StandaloneCard } from './lib/ui/index.ts';
   import Pair from './Pair.svelte';
   import { clearToken, loadToken, saveToken } from './session.ts';
-  import { pathOf, routeFromPath, type Route } from './shell/routes.ts';
+  import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
 
   // The app is served by Lun'Avaritia itself (or proxied to it in development).
@@ -26,15 +26,18 @@
     history.replaceState(null, '', window.location.pathname);
   }
 
-  // Ignored once the token is gone: a late 401 does not reset the pairing screen.
-  function forget() {
-    if (!token) return;
+  // Only for the token still in use: a late 401 of an older one resets neither pairing nor a new token.
+  function forget(t: string) {
+    if (token !== t) return;
     clearToken(localStorage);
     token = null;
     notice = 'Cet appareil n’est plus reconnu. Saisir un nouveau code pour le relier.';
   }
 
-  const api = $derived(token ? createApi(baseUrl, token, { onUnauthorized: forget }) : null);
+  const api = $derived.by(() => {
+    const t = token;
+    return t ? createApi(baseUrl, t, { onUnauthorized: () => forget(t) }) : null;
+  });
   // Each screen reads the client with `getContext('api')`; a getter follows a new pairing.
   setContext('api', {
     get: <T,>(path: string) => api!.get<T>(path),
@@ -66,10 +69,13 @@
       return;
     const link = (event.target as Element | null)?.closest?.('a');
     const href = link?.getAttribute('href');
-    if (!link || !href?.startsWith('/') || href.startsWith('//') || link.target) return;
+    // Only the screens of the app: /api/, /lun/ and downloads stay with the browser.
+    const path = href?.split(/[?#]/)[0];
+    if (!link || !href || link.target || link.hasAttribute('download')) return;
+    if (!ROUTES.some((r) => pathOf(r) === path)) return;
     event.preventDefault();
-    if (href !== window.location.pathname) history.pushState(null, '', href);
-    route = routeFromPath(href);
+    if (href !== window.location.pathname + window.location.search) history.pushState(null, '', href);
+    route = routeFromPath(path!);
   }
 
   const TITLES: Record<Route, string> = {

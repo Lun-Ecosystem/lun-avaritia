@@ -149,3 +149,91 @@ describe('App', () => {
     expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
   });
 });
+
+describe('App, edge cases', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a late 401 from the old token does not clear the token paired since', async () => {
+    const calls: string[] = [];
+    let lateHealth: (r: Response) => void = () => {};
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const auth = new Headers(init?.headers).get('authorization');
+        const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname} ${auth ?? ''}`.trim();
+        calls.push(key);
+        if (key === 'GET /lun/v1/health Bearer tok-1') return new Promise((r) => (lateHealth = r));
+        if (key === 'POST /lun/v1/pair') return json({ token: 'tok-2', satellite: {} });
+        if (key === 'POST /api/authorizations Bearer tok-1') return json({ error: 'révoqué' }, 401);
+        if (key === 'GET /lun/v1/health Bearer tok-2') return json({ status: 'ok' });
+        return json({ error: 'Introuvable' }, 404);
+      }),
+    );
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', authorizeQuery());
+    const user = userEvent.setup();
+    render(App);
+
+    // tok-1 is refused on the authorization: back to pairing, its health read still on the way.
+    await user.click(screen.getByRole('button', { name: 'Autoriser' }));
+    await user.type(await screen.findByLabelText('Code à 6 chiffres'), '042517');
+    await screen.findByRole('button', { name: 'Autoriser' });
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('tok-2');
+
+    lateHealth(json({ error: 'révoqué' }, 401));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('tok-2');
+    expect(screen.getByRole('button', { name: 'Autoriser' })).toBeInTheDocument();
+    expect(calls).toContain('GET /lun/v1/health Bearer tok-1');
+  });
+
+  it('only the links to a screen of the app stay in the page', async () => {
+    fakeServer();
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    const user = userEvent.setup();
+    render(App);
+    await screen.findByRole('navigation', { name: 'Sections' });
+
+    const kept: string[] = [];
+    // Registered after the app's: sees its decision, then stops jsdom from navigating.
+    const record = (e: MouseEvent) => {
+      const a = (e.target as Element).closest('a')!;
+      if (e.defaultPrevented) kept.push(a.getAttribute('href')!);
+      e.preventDefault();
+    };
+    window.addEventListener('click', record);
+    const links = ['/memoire?type=personne', '/api/export', '/lun/v1/health', '/ailleurs'].map((href) => {
+      const a = document.body.appendChild(document.createElement('a'));
+      a.href = href;
+      a.textContent = href;
+      return a;
+    });
+    const download = document.body.appendChild(document.createElement('a'));
+    download.href = '/depots';
+    download.download = 'depots.md';
+    download.textContent = 'download';
+    try {
+      for (const a of [...links, download]) await user.click(a);
+    } finally {
+      window.removeEventListener('click', record);
+      for (const a of [...links, download]) a.remove();
+    }
+    expect(kept).toEqual(['/memoire?type=personne']);
+    expect(window.location.pathname + window.location.search).toBe('/memoire?type=personne');
+    expect(screen.getByRole('heading', { level: 2, name: 'Mémoire' })).toBeInTheDocument();
+  });
+
+  it('pairs with storage blocked: the token lives in memory', async () => {
+    fakeServer();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const user = userEvent.setup();
+    render(App);
+    await user.type(screen.getByLabelText('Code à 6 chiffres'), '042517');
+    expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+  });
+});

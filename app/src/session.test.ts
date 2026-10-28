@@ -71,4 +71,13 @@ describe('session', () => {
     } as unknown as Storage;
     expect(loadToken(broken)).toBeNull();
   });
+
+  it('saving into blocked storage does not throw', () => {
+    const blocked = {
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    } as unknown as Storage;
+    expect(() => saveToken(blocked, 'tok-9')).not.toThrow();
+  });
 });

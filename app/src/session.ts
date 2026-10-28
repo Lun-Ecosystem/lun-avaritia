@@ -10,8 +10,13 @@ export function loadToken(storage: Storage): string | null {
   }
 }
 
+/** Keeps the token across launches; with storage blocked it lives in memory for this visit only. */
 export function saveToken(storage: Storage, token: string): void {
-  storage.setItem(KEY, token);
+  try {
+    storage.setItem(KEY, token);
+  } catch {
+    // Paired anyway: the app keeps the token in memory.
+  }
 }
 
 export function clearToken(storage: Storage): void {

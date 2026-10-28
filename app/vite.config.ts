@@ -22,7 +22,7 @@ export default defineConfig({
       manifest: {
         name: "Lun'Avaritia",
         short_name: 'Avaritia',
-        description: 'Base de savoir de l’écosystème Lun’.',
+        description: "Base de savoir de l’écosystème Lun'.",
         lang: 'fr',
         start_url: '/',
         display: 'standalone',
