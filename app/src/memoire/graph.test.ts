@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeSet, buildGraph, focus, nodeSize, type GraphData, type Palette } from './graph.ts';
+import { activeSet, buildGraph, flatten, focus, nodeSize, type GraphData, type Palette } from './graph.ts';
 
 const palette: Palette = { node: 'n', edge: 'e', flagged: 'f', accent: 'a', label: 'l' };
 const data: GraphData = {
@@ -30,12 +30,19 @@ describe('graph', () => {
     expect(g.getNodeAttribute('2', 'borderColor')).toBe('f');
     expect(g.getNodeAttribute('1', 'borderColor')).toBe('n');
     expect(g.getNodeAttribute('1', 'size')).toBe(nodeSize(2));
-    expect(g.getNodeAttribute('4', 'size')).toBe(3);
+    expect(g.getNodeAttribute('4', 'size')).toBe(2);
   });
 
-  it('nodeSize grows as a root between 3 and 14', () => {
-    expect(nodeSize(0)).toBe(3);
-    expect(nodeSize(10000)).toBe(14);
+  it('flattens a translucent token on the stage color: WebGL would draw it at full strength', () => {
+    expect(flatten('rgba(200,192,176,.12)', '#100D0A')).toBe('rgb(38,34,30)');
+    expect(flatten('rgba(200, 192, 176, 0.5)', 'rgb(0, 0, 0)')).toBe('rgb(100,96,88)');
+    expect(flatten('#8A9BAE', '#100D0A')).toBe('#8A9BAE');
+    expect(flatten('rgb(1,2,3)', '#100D0A')).toBe('rgb(1,2,3)');
+  });
+
+  it('nodeSize grows as a root between 2 and 10 (small dots at overview)', () => {
+    expect(nodeSize(0)).toBe(2);
+    expect(nodeSize(10000)).toBe(10);
     expect(nodeSize(4)).toBeGreaterThan(nodeSize(1));
     expect(nodeSize(4) - nodeSize(1)).toBeGreaterThan(nodeSize(9) - nodeSize(6));
   });

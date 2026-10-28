@@ -20,8 +20,24 @@ export type NodeAttrs = {
   borderColor: string;
 };
 
-/** Between 3 and 14, growing as the square root of the number of links. */
-export const nodeSize = (degree: number): number => Math.min(14, 3 + 1.1 * Math.sqrt(degree));
+/** Between 2 and 10, growing as the square root of the number of links: small dots at overview. */
+export const nodeSize = (degree: number): number => Math.min(10, 2 + 0.8 * Math.sqrt(degree));
+
+/**
+ * A translucent token (`rgba(…, .12)`) made opaque on the stage color (`#rrggbb`): Sigma blends as if
+ * colors were premultiplied, so a light color at 12 % would be drawn nearly at full strength. The stage
+ * is `#rrggbb` or the `rgb(r, g, b)` of a computed background.
+ */
+export function flatten(color: string, stage: string): string {
+  const m = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(color.trim());
+  if (!m) return color;
+  const s = stage.trim();
+  const bg = s.startsWith('#')
+    ? [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16))
+    : (s.match(/\d+/g) ?? []).map(Number);
+  const a = Number(m[4]);
+  return `rgb(${[1, 2, 3].map((i) => Math.round(Number(m[i]) * a + bg[i - 1]! * (1 - a))).join(',')})`;
+}
 
 /** One node per fiche, one edge per linked pair; an edge towards an absent fiche is dropped. */
 export function buildGraph(data: GraphData, palette: Palette): UndirectedGraph<NodeAttrs> {

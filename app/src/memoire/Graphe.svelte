@@ -9,7 +9,7 @@
   import { Banner, Chip, EmptyState, icons, Skeleton } from '../lib/ui/index.ts';
   import { bindShortcuts } from '../lib/ui/shortcuts.ts';
   import FichePanel from './FichePanel.svelte';
-  import { activeSet, buildGraph, type GraphData, type Palette } from './graph.ts';
+  import { activeSet, buildGraph, flatten, type GraphData, type Palette } from './graph.ts';
 
   /*
    * The fiche graph (ADR 0006): Sigma draws, ForceAtlas2 lays out in a worker. Loaded on demand by the
@@ -34,7 +34,6 @@
   let centred = $state<number | null>(null);
   let missing = $state(false);
   let container = $state<HTMLDivElement>();
-  let wrapper = $state<HTMLDivElement>();
   let sigma = $state.raw<Sigma | null>(null);
   let graph = $state.raw<ReturnType<typeof buildGraph> | null>(null);
 
@@ -64,7 +63,8 @@
   $effect(() => {
     if (!container || !data || data.nodes.length === 0) return;
     const css = getComputedStyle(container);
-    const token = (name: string) => css.getPropertyValue(name).trim();
+    // WebGL takes opaque colors: a translucent token is flattened on the stage.
+    const token = (name: string) => flatten(css.getPropertyValue(name).trim(), css.backgroundColor);
     const palette: Palette = {
       node: token('--lavis'),
       edge: token('--bordure-forte'),
@@ -107,6 +107,9 @@
       labelSize: 12,
       // Labels only once zoomed in enough: thousands of titles at once would be unreadable.
       labelRenderedSizeThreshold: 9,
+      // Fewer labels per screen cell: titles do not run into each other.
+      labelDensity: 0.5,
+      labelGridCellSize: 150,
       hideEdgesOnMove: g.size > 5000,
       zIndex: true,
       minCameraRatio: 0.05,
@@ -168,12 +171,13 @@
     const near = activeSet(g, focused);
     const keep = shown.length ? new Set(shown) : null;
     const css = getComputedStyle(container!);
-    const token = (name: string) => css.getPropertyValue(name).trim();
-    const [accent, ring, strong, faint, lavis] = [
+    const token = (name: string) => flatten(css.getPropertyValue(name).trim(), css.backgroundColor);
+    const [accent, ring, strong, faint, dim, lavis] = [
       '--accent',
       '--accent-survol',
       '--ivoire',
-      '--bordure',
+      '--bordure-forte',
+      '--surface-1',
       '--lavis',
     ].map(token);
     s.setSetting('nodeReducer', (key, a) => {
@@ -190,7 +194,8 @@
           zIndex: 2,
         };
       if (near.has(id)) return { ...a, forceLabel: true, zIndex: 1 };
-      return { ...a, borderColor: faint, label: '', zIndex: 0 };
+      // The others fade: darker fill, faint outline, no label.
+      return { ...a, fillColor: dim, borderColor: faint, label: '', zIndex: 0 };
     });
     s.setSetting('edgeReducer', (key, a) => {
       // An edge to a hidden node is hidden by Sigma itself.
@@ -225,18 +230,17 @@
     if (selected !== null && sigma) untrack(() => fly(selected));
   });
 
-  // Escape closes the panel (from the panel or the graph, not from a field) and gives the graph the focus.
+  // Escape closes the panel from anywhere but a field or a dialog (the agent's panel included), and gives
+  // the graph the focus.
   $effect(() => {
-    if (!wrapper || selected === null) return;
-    return bindShortcuts(
-      {
-        Escape: () => {
-          onOpen(null);
-          container?.focus();
-        },
+    if (selected === null) return;
+    return bindShortcuts({
+      Escape: () => {
+        if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+        onOpen(null);
+        container?.focus();
       },
-      wrapper,
-    );
+    });
   });
 
   function fly(id: number) {
@@ -255,7 +259,7 @@
 {:else if data.nodes.length === 0}
   <EmptyState size="grand" tone="neutre" icon={icons.FileText} title="Aucune fiche." />
 {:else}
-  <div class="graphe" bind:this={wrapper}>
+  <div class="graphe">
     {#if types.length}
       <div class="filtres" role="group" aria-label="Filtrer par type">
         {#each types.filter((t) => counts.has(t.id)) as t (t.id)}
