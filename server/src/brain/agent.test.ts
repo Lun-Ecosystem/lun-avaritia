@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { makeHarness } from '../testing/harness.ts';
 import { ask } from './agent.ts';
+import { ProviderError } from '../llm/types.ts';
+import { recordCost } from '../contract/costs.ts';
+import { eventsSince } from '../contract/events.ts';
+import { putSetting } from '../db.ts';
 import { addFact, createFiche, link, listTypes, strikeFact, editFiche } from './store.ts';
 
 const NOW = '2026-11-02T08:00:00.000Z';
@@ -34,6 +38,71 @@ const run = async (h: ReturnType<typeof makeHarness>, name: string, body: unknow
     body: JSON.stringify(body),
   });
 };
+
+describe('ask: provider failures and cap', () => {
+  const health = async (h: ReturnType<typeof makeHarness>) => {
+    const token = await h.pairClient();
+    return (await (await h.app.request('/lun/v1/health', { headers: h.auth(token) })).json()) as {
+      status: string;
+      reason?: string;
+    };
+  };
+
+  it('a credit error degrades the health with its reason; a later success clears it', async () => {
+    const t = setup([{ text: 'Bonjour.', toolCalls: [] }]);
+    const failing = {
+      ...t.deps,
+      provider: () => ({
+        provider: {
+          ...t.fake.provider,
+          chat: async () => {
+            throw new ProviderError('credit', 'x');
+          },
+        },
+        model: 'claude-sonnet-5-5',
+      }),
+    };
+    await ask(failing, 'salut');
+    expect(await health(t.h)).toMatchObject({ status: 'degraded', reason: 'credit' });
+    await ask(t.deps, 'salut');
+    expect((await health(t.h)).status).toBe('ok');
+  });
+
+  it('a key error emits the key event', async () => {
+    const t = setup();
+    const failing = {
+      ...t.deps,
+      provider: () => ({
+        provider: {
+          ...t.fake.provider,
+          chat: async () => {
+            throw new ProviderError('key', 'x');
+          },
+        },
+        model: 'claude-sonnet-5-5',
+      }),
+    };
+    await ask(failing, 'salut');
+    expect(eventsSince(t.h.db).map((e) => e.type)).toContain('key.invalid');
+  });
+
+  it('stops calling the provider once the cap is crossed mid-loop', async () => {
+    const t = setup([
+      { text: 'Je cherche.', toolCalls: [call('c1', 'brain_search', { query: 'Client' })] },
+      { text: 'Ne devrait pas servir.', toolCalls: [] },
+    ]);
+    putSetting(t.h.db, 'cost.monthlyCap', 0.0001);
+    const spy = t.fake.provider.chat;
+    t.fake.provider.chat = async (req) => {
+      const r = await spy(req);
+      recordCost(t.h.db, { provider: 'anthropic', amount: 1, calls: 1 }, t.h.clock(), 'agent');
+      return r;
+    };
+    const r = await ask(t.deps, 'cherche');
+    expect(t.fake.chatCalls).toHaveLength(1);
+    expect(r.summary).toContain('Plafond');
+  });
+});
 
 describe('read actions', () => {
   it('brain.read leaves struck facts out and lists the actions as read', async () => {

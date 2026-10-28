@@ -1,9 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { recordCost } from '../contract/costs.ts';
+import { addDegraded, clearDegraded } from '../contract/state.ts';
+import { keyRefused, keyWorks } from '../llm/keys.ts';
 import { setting } from './settings.ts';
 import { costOf, priceOf } from '../llm/models.ts';
-import { ProviderError, type LlmProvider } from '../llm/types.ts';
+import { ProviderError, type LlmProvider, type ProviderId } from '../llm/types.ts';
 import type { Fiche, Source } from '../types.ts';
 import { parisMonthStart } from '../util.ts';
 import { addDraft, type DraftPayload } from './drafts.ts';
@@ -47,6 +49,23 @@ export function monthSpend(db: DatabaseSync, now: Date): number {
 }
 
 export const overCap = (db: DatabaseSync, now: Date) => monthSpend(db, now) >= setting(db, 'cost.monthlyCap');
+
+/** A provider call failed: a refused key or an exhausted credit reaches the health and the events. */
+export function providerFailed(
+  db: DatabaseSync,
+  providerId: ProviderId,
+  err: ProviderError,
+  now: Date,
+): void {
+  if (err.kind === 'key') keyRefused(db, providerId, now);
+  else if (err.kind === 'credit') addDegraded(db, 'credit');
+}
+
+/** A provider call went through: the refusal and the credit alert, if any, are over. */
+export function providerWorked(db: DatabaseSync, providerId: ProviderId, now: Date): void {
+  keyWorks(db, providerId, now);
+  clearDegraded(db, 'credit');
+}
 
 const norm = (t: string) =>
   t
@@ -204,8 +223,10 @@ async function ask<T>(
         use,
       );
       paid.cost += amount;
+      providerWorked(deps.db, choice.provider.id, deps.clock());
       value = res.value;
     } catch (err) {
+      if (err instanceof ProviderError) providerFailed(deps.db, choice.provider.id, err, deps.clock());
       if (err instanceof ProviderError && err.kind === 'format') {
         reason = err.message;
         continue;
@@ -260,7 +281,7 @@ export async function processLot(
       paid,
     );
 
-    // shortcut: the cap is checked before each call, so one pass may still exceed it by its own tri call.
+    // shortcut: the cap is checked between the two calls only, so one pass with a large depot may overrun it by its own calls; add a per-chunk check if depots get big.
     if (overCap(db, deps.clock())) return { status: 'pending', reason: 'cost-cap', cost: paid.cost };
     const groups = groupsOf(db, triOut);
     const pairs = duplicatePairs(db, groups);

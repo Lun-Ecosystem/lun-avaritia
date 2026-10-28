@@ -5,7 +5,7 @@ import { costOf, priceOf } from '../llm/models.ts';
 import { ProviderError, type ChatMessage, type ToolCall } from '../llm/types.ts';
 import { cardOf, getDraft, type Card } from './drafts.ts';
 import { addNote, InputError } from './inputs.ts';
-import { monthSpend, overCap, type BrainDeps } from './process.ts';
+import { monthSpend, overCap, providerFailed, providerWorked, type BrainDeps } from './process.ts';
 import { ASK_SYSTEM, block } from './prompt.ts';
 import { getFiche, listTypes, neighbors, searchFiches } from './store.ts';
 
@@ -124,6 +124,7 @@ export async function ask(
   const { db } = deps;
   const choice = deps.provider('agent');
   const refs = new Map<number, string>();
+  // shortcut: cards and cost are deltas since the start, so a concurrent ingest can add its own; tag them by origin if that matters.
   const spent0 = monthSpend(db, deps.clock());
   const lastDraft = (db.prepare('SELECT COALESCE(MAX(id), 0) AS n FROM drafts').get() as { n: number }).n;
   const reply = (summary: string): AgentReply => ({
@@ -182,13 +183,24 @@ export async function ask(
 
   let last = '';
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    // The cap is checked before every call, not only the first.
+    if (overCap(db, deps.clock()))
+      return reply(
+        last
+          ? `${last}
+
+${CAP}`
+          : CAP,
+      );
     let res;
     try {
       res = await provider.chat({ model, system: ASK_SYSTEM, messages, tools: TOOLS, maxTokens: MAX_TOKENS });
     } catch (err) {
       if (!(err instanceof ProviderError)) throw err;
+      providerFailed(db, provider.id, err, deps.clock());
       return reply(FAILED[err.kind]);
     }
+    providerWorked(db, provider.id, deps.clock());
     const price = priceOf(db, provider.id, model);
     recordCost(
       db,

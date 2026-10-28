@@ -3,6 +3,8 @@ import type { DatabaseSync } from 'node:sqlite';
 import { openDb, putSetting } from '../db.ts';
 import { recordCost } from '../contract/costs.ts';
 import { ProviderError } from '../llm/types.ts';
+import { getState } from '../contract/state.ts';
+import { eventsSince } from '../contract/events.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { addFact, createFiche, getFiche, listTypes } from './store.ts';
 import { applyDraft, cardOf, draftsByStatus, getDraft, queue } from './drafts.ts';
@@ -290,6 +292,21 @@ describe('processLot', () => {
       reason: 'provider-key',
       cost: 0,
     });
+  });
+
+  it('degrades on an exhausted credit, then clears it on the next success; a refused key emits its event', async () => {
+    const { deps: d } = deps([new ProviderError('credit', 'plus de crédit')]);
+    await processLot(d, clientX, origin);
+    expect(getState(db).degraded).toEqual(['credit']);
+    const ok = deps([
+      { groups: [{ observations: [0, 1, 2], ficheId: null, typeId, title: 'Client X' }] },
+      { fiches: [{ group: 0, synthesis: 'S', facts: facts([0]), links: [] }], questions: [] },
+    ]);
+    await processLot(ok.deps, clientX, origin);
+    expect(getState(db).degraded).toEqual([]);
+    await processLot(deps([new ProviderError('key', 'refusée')]).deps, clientX, origin);
+    expect(getState(db).degraded).toEqual(['anthropic-key']);
+    expect(eventsSince(db).map((e) => e.type)).toContain('key.invalid');
   });
 
   it('never puts observation or fiche text in the system prompt, and records a cost per call', async () => {
