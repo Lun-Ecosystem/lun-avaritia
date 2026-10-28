@@ -21,6 +21,15 @@ cp .env.example .env && npm install && npm run dev
 
 Prérequis : Node `^22.13.0 || >=24`. `npm run demo` tourne sans clé.
 
+## Le front
+
+- Tout le front vit dans `app/` (Svelte 5, Vite, PWA) ; le serveur sert `app/dist` à la racine une fois construit.
+- Le kit `app/src/lib/ui` est copié d'Acedia, jamais importé ; un composant manquant s'y ajoute dans le même style.
+  Dialog, Select et Switch s'importent de leur fichier, hors du barrel, pour rester hors du premier chargement.
+- Écrans Dépôts et Réglages, et le graphe, chargés à la demande : chaque morceau du build reste sous 500 kB.
+- Jamais de `{@html}` : synthèses et réponses de l'agent passent par `Prose.svelte`.
+- L'agent est une bulle flottante (`app/src/agent`), son échange vit dans la page seulement.
+
 ## Spécificités
 
 - Rien n'entre dans une fiche sans validation : l'agent propose des brouillons (cartes du contrat).
