@@ -1,8 +1,11 @@
 /** Shared types of the base ui components (values of plate 10). */
 import type { IconComponent } from './Icon.ts';
 
-/** Tones of a badge: color, soft background, border. `ia` marks what the AI proposed or did alone. */
-export type Tone = 'ok' | 'attention' | 'danger' | 'info' | 'ia' | 'neutre';
+/**
+ * Tones of a badge: color, soft background, border. `ia` marks what the AI proposed or did alone;
+ * `accent` takes the color of the world.
+ */
+export type Tone = 'ok' | 'attention' | 'danger' | 'info' | 'ia' | 'accent' | 'neutre';
 
 /** Five button levels, plus the filled danger of a confirmation. */
 export type ButtonVariant = 'principal' | 'doux' | 'secondaire' | 'fantome' | 'danger' | 'danger-plein';

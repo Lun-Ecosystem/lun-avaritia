@@ -9,6 +9,7 @@
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
   import Tableau from './screens/Tableau.svelte';
+  import Valider from './screens/Valider.svelte';
 
   // The app is served by Lun'Avaritia itself (or proxied to it in development).
   const baseUrl = window.location.origin;
@@ -17,6 +18,12 @@
   let notice = $state<string | null>(null);
 
   let route = $state(routeFromPath(window.location.pathname));
+  // `?filtre=` of the queue: a link to the same screen changes it without a new screen.
+  let filtre = $state(new URLSearchParams(window.location.search).get('filtre'));
+  function follow() {
+    route = routeFromPath(window.location.pathname);
+    filtre = new URLSearchParams(window.location.search).get('filtre');
+  }
 
   // An app asks for access (`GET /lun/v1/authorize`): the request waits here, through pairing if needed.
   let authorization = $state(readAuthorization(window.location.search));
@@ -89,7 +96,7 @@
     if (!ROUTES.some((r) => pathOf(r) === path)) return;
     event.preventDefault();
     if (href !== window.location.pathname + window.location.search) history.pushState(null, '', href);
-    route = routeFromPath(path!);
+    follow();
   }
 
   const TITLES: Record<Route, string> = {
@@ -107,7 +114,7 @@
   }
 </script>
 
-<svelte:window onclick={navigate} onpopstate={() => (route = routeFromPath(window.location.pathname))} />
+<svelte:window onclick={navigate} onpopstate={follow} />
 
 {#if authorization && 'error' in authorization}
   <div class="refused lun-avaritia" data-monde="avaritia">
@@ -123,6 +130,8 @@
     {#key route}
       {#if route === 'tableau'}
         <Tableau />
+      {:else if route === 'valider'}
+        <Valider {filtre} />
       {:else}
         <EmptyState
           size="grand"

@@ -64,6 +64,7 @@
     { tone: 'danger', label: 'Clé refusée' },
     { tone: 'info', label: 'Synchronisé' },
     { tone: 'ia', label: 'Proposition' },
+    { tone: 'accent', label: 'Doublon' },
     { tone: 'neutre', label: 'Brouillon' },
   ];
 

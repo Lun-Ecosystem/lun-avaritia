@@ -108,8 +108,13 @@ describe('App', () => {
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Cet appareil n’est plus reconnu.');
     await new Promise((r) => setTimeout(r, 100));
-    // Health and the rail counters fail once each; nothing retries.
-    expect(calls.toSorted()).toEqual(['GET /api/dashboard', 'GET /api/fiches', 'GET /lun/v1/health']);
+    // Health, the rail counters and the queue fail once each; nothing retries.
+    expect(calls.toSorted()).toEqual([
+      'GET /api/dashboard',
+      'GET /api/drafts',
+      'GET /api/fiches',
+      'GET /lun/v1/health',
+    ]);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 

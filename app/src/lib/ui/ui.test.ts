@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import FieldFixture from '../../testing/FieldFixture.svelte';
+import TextAreaFixture from '../../testing/TextAreaFixture.svelte';
 import Badge from './Badge.svelte';
 import Button from './Button.svelte';
 import { Archive } from './Icon.ts';
@@ -116,5 +117,21 @@ describe('Badge', () => {
   it('carries its tone', () => {
     render(Badge, { props: { tone: 'ok', dot: true, children: text('Connecté') } });
     expect(screen.getByText('Connecté').parentElement).toHaveClass('ok');
+  });
+
+  it('takes the accent of the world', () => {
+    render(Badge, { props: { tone: 'accent', children: text('doublon') } });
+    expect(screen.getByText('doublon').parentElement).toHaveClass('accent');
+  });
+});
+
+describe('TextArea', () => {
+  it('is labelled by its Field and binds its value', async () => {
+    const user = userEvent.setup();
+    render(TextAreaFixture);
+    const area = screen.getByLabelText('Synthèse');
+    expect(area.tagName).toBe('TEXTAREA');
+    await user.type(area, ' suite');
+    expect(screen.getByText('Valeur : Texte suite')).toBeInTheDocument();
   });
 });

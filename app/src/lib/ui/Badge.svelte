@@ -71,6 +71,11 @@
     background: var(--ia-doux);
     border-color: var(--ia-bord);
   }
+  .accent {
+    color: var(--accent-texte);
+    background: var(--accent-doux);
+    border-color: var(--accent-bord);
+  }
   .neutre {
     color: var(--texte-2);
     background: var(--surface-2);

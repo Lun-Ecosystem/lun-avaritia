@@ -36,6 +36,7 @@ export { default as StandaloneCard } from './StandaloneCard.svelte';
 export { default as Steps } from './Steps.svelte';
 export { default as Switch } from './Switch.svelte';
 export { default as Tabs } from './Tabs.svelte';
+export { default as TextArea } from './TextArea.svelte';
 export { default as TextInput } from './TextInput.svelte';
 export { default as Toaster } from './Toaster.svelte';
 export { default as Tooltip } from './Tooltip.svelte';
