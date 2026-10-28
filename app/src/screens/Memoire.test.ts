@@ -1,8 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '../memoire/fixtures.ts';
 import Memoire from './Memoire.svelte';
+
+// Counts the loads of the graph module: it must come only with the graph mode.
+const graphe = vi.hoisted(() => ({ loads: 0 }));
+vi.mock('../memoire/Graphe.svelte', async () => {
+  graphe.loads++;
+  return { default: (await import('../testing/GrapheStub.svelte')).default };
+});
 
 function show(props: { fiche?: string | null; mode?: string | null } = {}, results: unknown[] = []) {
   const f = fakeApi(undefined, results);
@@ -10,7 +17,15 @@ function show(props: { fiche?: string | null; mode?: string | null } = {}, resul
   return f;
 }
 
-afterEach(() => history.replaceState(null, '', '/'));
+// jsdom has no WebGL: getContext answers null unless a test says otherwise.
+let webgl: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  webgl = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+});
+afterEach(() => {
+  history.replaceState(null, '', '/');
+  vi.restoreAllMocks();
+});
 
 describe('Memoire', () => {
   it('groups fiches by type with their count, groups fold', async () => {
@@ -55,6 +70,23 @@ describe('Memoire', () => {
     await userEvent.click(await screen.findByRole('radio', { name: 'Graphe' }));
     expect(location.search).toContain('mode=graphe');
     expect(screen.queryByText('Jeanne D.')).toBeNull();
+  });
+
+  it('loads the graph module only in the graph mode', async () => {
+    webgl.mockReturnValue({} as RenderingContext);
+    show({ fiche: '1' });
+    await screen.findByText('Jeanne D.');
+    expect(graphe.loads).toBe(0);
+    await userEvent.click(screen.getByRole('radio', { name: 'Graphe' }));
+    expect(await screen.findByText('Graphe chargé 1')).toBeInTheDocument();
+    expect(graphe.loads).toBe(1);
+    expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Centrer le graphe sur…');
+  });
+
+  it('says the graph needs WebGL when there is none', async () => {
+    show({ mode: 'graphe' });
+    expect(await screen.findByText('Le graphe demande WebGL.')).toBeInTheDocument();
+    expect(screen.queryByText(/Graphe chargé/)).toBeNull();
   });
 
   it('guides an empty base', async () => {

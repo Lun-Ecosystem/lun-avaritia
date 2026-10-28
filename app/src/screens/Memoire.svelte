@@ -26,6 +26,19 @@
   let selected = $state<number | null>(untrack(() => asId(fiche)));
   let view = $state(untrack(() => (mode === 'graphe' ? 'graphe' : 'arbre')));
   let query = $state('');
+  let centre = $state('');
+  // The graph comes with its mode only (Sigma is a chunk apart); no WebGL, no graph.
+  const webgl = () => {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') ?? c.getContext('webgl'));
+  };
+  let graphe = $state<Promise<typeof import('../memoire/Graphe.svelte')> | null>(null);
+  let noWebgl = $state(false);
+  $effect(() => {
+    if (view !== 'graphe' || graphe || noWebgl) return;
+    if (webgl()) graphe = import('../memoire/Graphe.svelte');
+    else noWebgl = true;
+  });
   let hits = $state<Hit[] | null>(null);
   let searchError = $state<string | null>(null);
 
@@ -82,13 +95,23 @@
 <div class="ecran">
   <div class="entete">
     <div class="recherche">
-      <TextInput
-        type="search"
-        icon={icons.Search}
-        placeholder="Rechercher une fiche, une personne, un projet…"
-        aria-label="Rechercher une fiche"
-        bind:value={query}
-      />
+      {#if view === 'graphe'}
+        <TextInput
+          type="search"
+          icon={icons.Search}
+          placeholder="Centrer le graphe sur…"
+          aria-label="Centrer le graphe sur une fiche"
+          bind:value={centre}
+        />
+      {:else}
+        <TextInput
+          type="search"
+          icon={icons.Search}
+          placeholder="Rechercher une fiche, une personne, un projet…"
+          aria-label="Rechercher une fiche"
+          bind:value={query}
+        />
+      {/if}
     </div>
     <Segmented
       label="Mode d’affichage"
@@ -106,7 +129,23 @@
   {:else if !fiches}
     <Skeleton height={220} />
   {:else if view === 'graphe'}
-    <EmptyState size="grand" tone="neutre" icon={icons.Clock} title="Graphe" message="Bientôt ici." />
+    {#if noWebgl}
+      <EmptyState
+        size="grand"
+        tone="neutre"
+        icon={icons.Ban}
+        title="Le graphe demande WebGL."
+        message="Le navigateur ne le propose pas ici. L’arborescence reste disponible."
+      />
+    {:else if graphe}
+      {#await graphe}
+        <Skeleton height={420} />
+      {:then { default: Graphe }}
+        <Graphe {selected} {centre} onOpen={open} />
+      {:catch e}
+        <Banner title="Graphe indisponible">{e.message}</Banner>
+      {/await}
+    {/if}
   {:else if fiches.length === 0}
     <EmptyState
       size="grand"
