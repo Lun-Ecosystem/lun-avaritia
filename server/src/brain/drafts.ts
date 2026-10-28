@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { InvalidInputError } from '../contract/actions.ts';
 import type { Source } from '../types.ts';
+import { ImportedNoteSchema } from './obsidian.ts';
 import { addFact, createFiche, editFiche, getFiche, link, listTypes, reindex, strikeFact } from './store.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped SQLite rows, mapped to typed values below
@@ -30,14 +31,6 @@ const SourceSchema = z.object({
   at: z.string(),
 });
 const id = z.number().int().positive();
-
-const ImportedNoteSchema = z.object({
-  title: z.string(),
-  body: z.string(),
-  links: z.array(z.string()),
-  frontmatter: z.record(z.string(), z.string()),
-});
-export type ImportedNote = z.infer<typeof ImportedNoteSchema>;
 
 export const DraftPayloadSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -214,7 +207,7 @@ function applyImport(
     for (const t of n.links) {
       const target = byTitle.get(t.toLowerCase()) ?? resolve(db, t);
       if (target === undefined) warn(`« ${n.title} » : lien vers « ${t} » introuvable.`);
-      else if (target !== ids[i]) link(db, ids[i]!, target, 'lié');
+      else if (target !== ids[i]) link(db, ids[i]!, target, 'mentionne');
     }
   });
 }

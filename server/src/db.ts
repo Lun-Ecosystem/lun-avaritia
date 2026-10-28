@@ -113,6 +113,13 @@ const MIGRATIONS: string[] = [
      drafts INTEGER NOT NULL,
      questions INTEGER NOT NULL
    );`,
+  `CREATE TABLE depots (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     type TEXT NOT NULL,
+     bytes BLOB NOT NULL,
+     created_at TEXT NOT NULL
+   );`,
 ];
 
 export function openDb(path: string): DatabaseSync {

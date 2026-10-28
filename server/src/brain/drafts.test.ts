@@ -177,7 +177,7 @@ describe('drafts', () => {
       't1',
     );
     const d = applyDraft(db, id, undefined, 't2');
-    expect(getFiche(db, 1)!.links).toEqual([{ from: 1, to: 2, relation: 'lié' }]);
+    expect(getFiche(db, 1)!.links).toEqual([{ from: 1, to: 2, relation: 'mentionne' }]);
     expect(d.warnings).toEqual(['w', expect.stringContaining('Z')]);
   });
 
