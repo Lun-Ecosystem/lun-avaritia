@@ -5,6 +5,15 @@ import { parseVault } from './obsidian.ts';
 describe('parseVault', () => {
   const { notes, warnings } = parseVault(vault);
 
+  it('skips a note with an empty title, with a warning', () => {
+    const r = parseVault([
+      { path: 'dossier/.md', text: 'x' },
+      { path: 'A.md', text: 'y' },
+    ]);
+    expect(r.notes.map((n) => n.title)).toEqual(['A']);
+    expect(r.warnings).toEqual([expect.stringContaining('titre vide')]);
+  });
+
   it('keeps notes, frontmatter and links (aliases and headings stripped)', () => {
     expect(notes).toHaveLength(6);
     const atelier = notes.find((n) => n.title === 'Atelier')!;

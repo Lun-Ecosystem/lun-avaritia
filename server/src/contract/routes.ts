@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
 import type { AppDeps } from '../app.ts';
 import { SATELLITE } from '../identity.ts';
@@ -25,6 +26,10 @@ import { eventsSince, subscribe, type LunEvent } from './events.ts';
 import { getState, setPaused, statusOf } from './state.ts';
 
 const HEARTBEAT_MS = 25_000;
+const tooBig = bodyLimit({
+  maxSize: 25_000_000,
+  onError: (c) => c.json({ error: 'Envoi trop volumineux' }, 413),
+});
 const STATUSES = ['pending', 'done', 'refused', 'failed', 'expired'];
 const Accept = z.object({ input: z.unknown().optional() });
 
@@ -176,7 +181,7 @@ export function contractRoutes(deps: AppDeps): Hono {
     }
   };
 
-  r.post('/cards/:id/accept', (c) =>
+  r.post('/cards/:id/accept', tooBig, (c) =>
     decide(c, (id, input) => applyDraft(db, id, input, clock().toISOString())),
   );
   r.post('/cards/:id/refuse', (c) => decide(c, (id) => refuseDraft(db, id, clock().toISOString())));
@@ -196,7 +201,7 @@ export function contractRoutes(deps: AppDeps): Hono {
 
   r.get('/actions', (c) => c.json({ actions: actions.list() }));
 
-  r.post('/actions/:name', async (c) => {
+  r.post('/actions/:name', tooBig, async (c) => {
     const entry = actions.get(c.req.param('name'));
     if (!entry) return c.json({ error: `Action inconnue : ${c.req.param('name')}` }, 404);
     let raw: unknown;

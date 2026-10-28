@@ -220,6 +220,11 @@ function applyContradiction(
   const owned = (fact: number) =>
     !!db.prepare('SELECT 1 FROM facts WHERE id = ? AND fiche_id = ?').get(fact, p.ficheId);
   if (!owned(p.keep) || !owned(p.strike)) throw new InvalidInputError('Fait absent de cette fiche.');
+  if (p.keep === p.strike) throw new InvalidInputError('Un fait ne se barre pas lui-même.');
+  const active = (fact: number) =>
+    !!db.prepare('SELECT 1 FROM facts WHERE id = ? AND struck_at IS NULL').get(fact);
+  if (!active(p.strike)) throw new InvalidInputError('Le fait à barrer l’est déjà.');
+  if (!active(p.keep)) throw new InvalidInputError('Le fait à garder n’est plus actif.');
   strikeFact(db, p.strike, p.keep, now);
 }
 

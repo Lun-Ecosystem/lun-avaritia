@@ -40,6 +40,10 @@ export function parseVault(files: { path: string; text: string }[]): {
   for (const f of files) {
     if (!/\.md$/i.test(f.path)) continue;
     const title = baseName(f.path);
+    if (!title.trim()) {
+      warnings.push(`« ${f.path} » : titre vide, note ignorée.`);
+      continue;
+    }
     const fm = frontmatterOf(f.text);
     if (fm.broken) warnings.push(`« ${title} » : en-tête (frontmatter) illisible, ignoré.`);
     const links = new Set<string>();

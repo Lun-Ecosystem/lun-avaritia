@@ -21,3 +21,15 @@ describe('POST /lun/v1/pair lock', () => {
     expect(h.db.prepare('SELECT name, kind FROM clients').all()).toEqual([{ name: 'phone', kind: 'device' }]);
   });
 });
+
+describe('body limit', () => {
+  it('answers 413 to an oversize body on actions and card acceptance', async () => {
+    const h = makeHarness();
+    const token = await h.pairClient();
+    const body = JSON.stringify({ x: 'x'.repeat(26_000_000) });
+    for (const path of ['actions/brain.search', 'cards/1/accept']) {
+      const res = await h.app.request(`/lun/v1/${path}`, { method: 'POST', headers: h.auth(token), body });
+      expect(res.status).toBe(413);
+    }
+  });
+});

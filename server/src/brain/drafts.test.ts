@@ -81,6 +81,25 @@ describe('drafts', () => {
     expect(getFiche(db, f)!.facts[0]).toMatchObject({ struckAt: 't2', struckBy: b });
   });
 
+  it('refuses a contradiction that is self-referent, already struck or whose keep is struck', () => {
+    const f = fiche('C');
+    const a = addFact(db, f, 'vieux', src, 't0');
+    const b = addFact(db, f, 'neuf', src, 't0');
+    const c = addFact(db, f, 'autre', src, 't0');
+    const add = (keep: number, strike: number) =>
+      addDraft(db, { kind: 'contradiction', ficheId: f, keep, strike, reason: 'r' }, origin, 't1');
+    const same = add(b, b);
+    expect(() => applyDraft(db, same, undefined, 't2')).toThrow(InvalidInputError);
+    expect(getDraft(db, same)!.status).toBe('pending');
+    applyDraft(db, add(b, a), undefined, 't2');
+    const again = add(c, a);
+    expect(() => applyDraft(db, again, undefined, 't3')).toThrow(InvalidInputError);
+    const dead = add(a, c);
+    expect(() => applyDraft(db, dead, undefined, 't3')).toThrow(InvalidInputError);
+    expect(getDraft(db, dead)!.status).toBe('pending');
+    expect(getFiche(db, f)!.facts.find((x) => x.id === c)!.struckAt).toBeUndefined();
+  });
+
   it('merges a duplicate into the kept fiche', () => {
     const keep = fiche('Keep');
     const gone = fiche('Gone');
