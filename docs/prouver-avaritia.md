@@ -42,10 +42,10 @@ appareil). Sous 760 px, le rail laisse place à la barre du bas.
 4. **Mémoire, arborescence** : les fiches par type, la recherche, la fiche ouverte à droite (`?fiche=<id>` dans
    l’adresse) avec sa synthèse, ses faits sourcés, ses liens et son historique ; l’édition crée une version.
 5. **Mémoire, graphe** : le mode graphe charge la base de démo (plus de 3000 fiches) ; un nœud ouvre son panneau,
-   les fiches signalées (contradiction, doublon) se distinguent. Sans WebGL, le mode graphe n’est pas proposé.
+   les fiches signalées (contradiction, doublon) se distinguent. Sans WebGL, le mode reste proposé et affiche « Le graphe demande WebGL. ».
 6. **Dépôts** : déposer un fichier texte inventé, il apparaît dans la liste ; plusieurs fichiers déposés ensemble
-   sont tous signalés.
-7. **Réglages** : fournisseurs et modèles, types de fiches, lots, appareils, données (export, import Obsidian),
+   sont tous signalés. L’import Obsidian se fait ici aussi.
+7. **Réglages** : fournisseurs et modèles, types de fiches, lots, appareils, données (export ; l’import Obsidian renvoie vers Dépôts),
    pause et reprise. Dans « Agent », changer le nom (« Archiviste ») et l’icône (Plume) : la bulle et le titre du
    panneau les reprennent aussitôt.
 8. **Agent** : la bulle en bas à droite, sur chaque écran (au-dessus de la barre du bas sur un téléphone). Elle
