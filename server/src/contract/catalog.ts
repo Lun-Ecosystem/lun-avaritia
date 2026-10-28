@@ -1,4 +1,5 @@
 import { IdSchema, neighborsAction, readAction, SearchSchema, searchAction } from '../brain/agent.ts';
+import { DigestSchema, digestAction } from '../brain/digest.ts';
 import { IngestSchema, ingestLot, runPending } from '../brain/ingest.ts';
 import type { BrainDeps } from '../brain/process.ts';
 import type { ActionRegistry } from './actions.ts';
@@ -36,6 +37,13 @@ export function registerCatalog(actions: ActionRegistry, deps: BrainDeps, log: (
     'Les fiches liées à une fiche, avec la relation et le sens.',
     IdSchema,
     async (input) => neighborsAction(input, deps),
+    'read',
+  );
+  actions.register(
+    'day.digest',
+    'Le bilan d’une période : ce qui est arrivé, ce qui a été décidé, ce qui attend.',
+    DigestSchema,
+    async (input) => digestAction(input, deps.db),
     'read',
   );
 }
