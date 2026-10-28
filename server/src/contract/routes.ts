@@ -14,6 +14,8 @@ import {
   type DraftStatus,
 } from '../brain/drafts.ts';
 import { getSetting } from '../db.ts';
+import { ask, DelegationSchema } from '../brain/agent.ts';
+import { brainDeps } from '../app.ts';
 import { DegradedError, InvalidInputError } from './actions.ts';
 import { pair, recordPairingFailure, requireToken } from './auth.ts';
 import { authorizationPage, exchangeAuthorizationCode, readAuthorizationRequest } from './authorize.ts';
@@ -176,6 +178,19 @@ export function contractRoutes(deps: AppDeps): Hono {
     decide(c, (id, input) => applyDraft(db, id, input, clock().toISOString())),
   );
   r.post('/cards/:id/refuse', (c) => decide(c, (id) => refuseDraft(db, id, clock().toISOString())));
+
+  r.post('/agent', async (c) => {
+    const parsed = DelegationSchema.safeParse(await readJson(c.req.raw).catch(() => undefined));
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
+    if (getState(db).paused)
+      return c.json({
+        summary: 'Avaritia est en pause : je ne fais rien tant qu’elle n’est pas reprise.',
+        cards: [],
+        refs: [],
+        cost: { currency: 'USD', amount: 0 },
+      });
+    return c.json(await ask(brainDeps(deps), parsed.data.request, parsed.data.context));
+  });
 
   r.get('/actions', (c) => c.json({ actions: actions.list() }));
 

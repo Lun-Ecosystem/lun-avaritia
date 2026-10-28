@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { brainDeps, type AppDeps } from '../app.ts';
+import { ask, ChatSchema } from './agent.ts';
 import { addDraft } from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { parseVault } from './obsidian.ts';
@@ -33,6 +34,13 @@ export function brainRoutes(deps: AppDeps): Hono {
     const body = await jsonBody(c);
     if (typeof body?.text !== 'string') return c.json({ error: 'text attendu' }, 400);
     return c.json(await addNote(brainDeps(deps), body.text));
+  });
+
+  r.post('/agent', limit(100_000), async (c) => {
+    const parsed = ChatSchema.safeParse(await jsonBody(c));
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
+    const { request, context, history } = parsed.data;
+    return c.json(await ask(brainDeps(deps), request, context, history));
   });
 
   r.get('/depots', (c) => c.json({ depots: listDepots(deps.db) }));

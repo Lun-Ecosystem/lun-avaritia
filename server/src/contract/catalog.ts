@@ -1,3 +1,4 @@
+import { IdSchema, neighborsAction, readAction, SearchSchema, searchAction } from '../brain/agent.ts';
 import { IngestSchema, ingestLot, runPending } from '../brain/ingest.ts';
 import type { BrainDeps } from '../brain/process.ts';
 import type { ActionRegistry } from './actions.ts';
@@ -15,5 +16,26 @@ export function registerCatalog(actions: ActionRegistry, deps: BrainDeps, log: (
       return result;
     },
     'write',
+  );
+  actions.register(
+    'brain.search',
+    'Cherche des fiches par mots-clés (20 au plus) ; extraits de 300 caractères.',
+    SearchSchema,
+    async (input) => searchAction(input, deps),
+    'read',
+  );
+  actions.register(
+    'brain.read',
+    'Lit une fiche : synthèse (4 000 caractères au plus), faits actifs sourcés, liens. Une fiche fusionnée renvoie la fiche gardée.',
+    IdSchema,
+    async (input) => readAction(input, deps),
+    'read',
+  );
+  actions.register(
+    'brain.neighbors',
+    'Les fiches liées à une fiche, avec la relation et le sens.',
+    IdSchema,
+    async (input) => neighborsAction(input, deps),
+    'read',
   );
 }
