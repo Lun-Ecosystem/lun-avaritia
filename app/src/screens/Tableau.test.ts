@@ -34,6 +34,7 @@ const drafts = {
     draft(2, 'fiche', 'Projet Test', inRun(), { ficheId: 4, facts: [] }),
     draft(3, 'contradiction', 'Date de recette', inRun()),
     draft(4, 'doublon', 'Société A / Société B', inRun()),
+    draft(6, 'import', 'Coffre Obsidian', inRun(), { fiches: [], warnings: [] }),
     draft(5, 'fiche', 'Ancien brouillon', ago(30), { ficheId: 9, facts: [] }),
   ],
 };
@@ -62,14 +63,15 @@ describe('Tableau', () => {
       'href',
       '/valider?filtre=doublons',
     );
-    expect(screen.getByText('dont 4 de cette nuit')).toBeInTheDocument();
+    expect(screen.getByText('dont 5 de cette nuit')).toBeInTheDocument();
 
     const summary = screen.getByRole('region', { name: 'Résumé de la nuit' });
     expect(within(summary).getByText(/14 observations reçues, 5 brouillons créés/)).toBeInTheDocument();
     expect(within(summary).getByText('Client Exemple').parentElement).toHaveTextContent('nouvelle');
-    expect(within(summary).getByText('Projet Test').parentElement).toHaveTextContent('enrichit');
+    expect(within(summary).getByText('Projet Test').parentElement).toHaveTextContent('enrichissement');
     expect(within(summary).getByText('Date de recette').parentElement).toHaveTextContent('contradiction');
-    expect(within(summary).getByText('Société A / Société B').parentElement).toHaveTextContent('doublon ?');
+    expect(within(summary).getByText('Société A / Société B').parentElement).toHaveTextContent('doublon');
+    expect(within(summary).getByText('Coffre Obsidian').parentElement).toHaveTextContent('import');
     expect(within(summary).queryByText('Ancien brouillon')).toBeNull();
 
     expect(screen.getByText('Dépôt ajouté : exemple')).toBeInTheDocument();

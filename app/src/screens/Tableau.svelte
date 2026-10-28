@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Api } from '../api.ts';
+  import { kindOf, type DraftPayload } from '../valider/drafts.ts';
   import { formatCost, formatDuration, formatWhen } from '../format.ts';
   import {
     Badge,
@@ -21,9 +22,8 @@
   }
   interface QueueDraft {
     id: number;
-    kind: 'fiche' | 'contradiction' | 'doublon';
     card: { title: string };
-    payload: { ficheId?: number; facts?: { replaces?: number }[] };
+    payload: DraftPayload;
     createdAt: string;
   }
 
@@ -50,15 +50,6 @@
     const end = new Date(at);
     const start = new Date(end.getTime() - 24 * 3600_000);
     return `Nuit du ${paris(start, { day: 'numeric' })} au ${paris(end, { day: 'numeric', month: 'long' })}`;
-  }
-
-  function tag(d: QueueDraft): { label: string; tone: 'danger' | 'info' | 'ok' | 'neutre' } {
-    if (d.kind === 'contradiction' || d.payload.facts?.some((f) => f.replaces !== undefined))
-      return { label: 'contradiction', tone: 'danger' };
-    if (d.kind === 'doublon') return { label: 'doublon ?', tone: 'neutre' };
-    return d.payload.ficheId === undefined
-      ? { label: 'nouvelle', tone: 'ok' }
-      : { label: 'enrichit', tone: 'info' };
   }
 </script>
 
@@ -127,7 +118,7 @@
             )}.
           </p>
           {#each night.slice(0, 5) as d (d.id)}
-            {@const t = tag(d)}
+            {@const t = kindOf(d.payload)}
             <ListRow
               ><div class="ligne">
                 <span>{d.card.title}</span>
