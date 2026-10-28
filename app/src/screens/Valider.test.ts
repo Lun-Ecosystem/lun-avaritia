@@ -144,7 +144,17 @@ describe('Valider', () => {
   it('V and R act on the active item', async () => {
     const user = userEvent.setup();
     const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }]);
-    await screen.findAllByRole('region');
+    const cards = await screen.findAllByRole('region');
+    expect(within(cards[0]!).getByRole('button', { name: 'Valider' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'V',
+    );
+    expect(within(cards[1]!).getByRole('button', { name: 'Valider' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+    expect(within(cards[1]!).getByRole('button', { name: 'Refuser' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
     await user.keyboard('v');
     expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/1/accept', {});
     await waitFor(() => expect(screen.getAllByRole('region')).toHaveLength(1));

@@ -22,4 +22,18 @@ describe('tokens', () => {
       { kind: 'text', text: '# titre' },
     ]);
   });
+
+  it('reads an unclosed [[ in linear time, as text', () => {
+    const line = '[['.repeat(25_000);
+    const start = performance.now();
+    const out = tokens(line);
+    expect(performance.now() - start).toBeLessThan(100);
+    expect(out).toEqual([{ kind: 'text', text: line }]);
+  });
+
+  it('leaves a lone star between spaces as text', () => {
+    expect(tokens('2 * 3 * 4')).toEqual([{ kind: 'text', text: '2 * 3 * 4' }]);
+    expect(tokens('a ** b ** c')).toEqual([{ kind: 'text', text: 'a ** b ** c' }]);
+    expect(tokens('*a *')).toEqual([{ kind: 'text', text: '*a *' }]);
+  });
 });

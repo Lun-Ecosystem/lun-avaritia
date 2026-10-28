@@ -6,7 +6,10 @@
 export type Token =
   { kind: 'text' | 'strong' | 'em' | 'link'; text: string } | { kind: 'break' } | { kind: 'para' };
 
-const INLINE = /\*\*(.+?)\*\*|\*(.+?)\*|\[\[(.+?)\]\]/g;
+// Bodies are capped (200 characters, one line) so an unclosed marker costs a bounded scan; emphasis
+// needs a non-space, non-star right inside each marker, so `2 * 3 * 4` stays text.
+const INLINE =
+  /\*\*([^\s*](?:[^\n]{0,198}?[^\s*])?)\*\*|\*([^\s*](?:[^\n]{0,198}?[^\s*])?)\*|\[\[([^\]\n]{1,200})\]\]/g;
 
 function inline(line: string, out: Token[]) {
   let last = 0;

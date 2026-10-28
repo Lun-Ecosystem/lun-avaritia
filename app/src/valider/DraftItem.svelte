@@ -100,7 +100,7 @@
             size="petit"
             icon={icons.Check}
             loading={busy}
-            aria-keyshortcuts="V"
+            aria-keyshortcuts={active ? 'V' : undefined}
             onclick={() => onaccept()}>Valider</Button
           >
           {#if other}
@@ -116,8 +116,12 @@
               onclick={() => onedit(true)}>Modifier</Button
             >
           {/if}
-          <Button variant="fantome" size="petit" disabled={busy} aria-keyshortcuts="R" onclick={onrefuse}
-            >Refuser</Button
+          <Button
+            variant="fantome"
+            size="petit"
+            disabled={busy}
+            aria-keyshortcuts={active ? 'R' : undefined}
+            onclick={onrefuse}>Refuser</Button
           >
           {#if active}<span class="touches" aria-hidden="true"><Kbd>V</Kbd><Kbd>R</Kbd></span>{/if}
         </div>
