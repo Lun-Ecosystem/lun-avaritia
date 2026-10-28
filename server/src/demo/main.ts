@@ -55,10 +55,10 @@ link(db, jean, studio, 'dirige');
 link(db, refonte, studio, 'pour');
 addFact(db, doublon, 'Facture de novembre en attente.', src(1, 'm11'), ago(1));
 
-// A lot already processed into drafts, with one contradiction and one doublon.
+// A lot already processed into drafts, with one contradiction and one doublon: its run counts these 3 drafts.
 db.prepare("INSERT INTO lots (status, created_at) VALUES ('done', ?)").run(ago(1));
 db.prepare(
-  'INSERT INTO runs (lot, at, duration_ms, cost, observations, drafts, questions) VALUES (1, ?, 4200, 0.0042, 3, 1, 2)',
+  'INSERT INTO runs (lot, at, duration_ms, cost, observations, drafts, questions) VALUES (1, ?, 4200, 0.0042, 3, 3, 2)',
 ).run(ago(1));
 recordCost(db, { provider: 'anthropic', amount: 0.0042, calls: 2 }, now, 'tri');
 addDraft(
