@@ -350,3 +350,50 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     ...(d.error && { error: d.error }),
   };
 }
+
+export interface DraftView {
+  id: number;
+  kind: DraftPayload['kind'];
+  card: Card;
+  payload: DraftPayload;
+  /** Title of each fiche the payload cites, by id. */
+  names: Record<string, string>;
+  /** Text of each fact the payload cites (keep, strike, replaces), by id. */
+  facts: Record<string, { text: string; struck: boolean }>;
+  createdAt: string;
+  origin: Draft['origin'];
+}
+
+export function draftView(db: DatabaseSync, d: Draft): DraftView {
+  const p = d.payload;
+  const ficheIds: number[] = [];
+  const factIds: number[] = [];
+  if (p.kind === 'fiche') {
+    if (p.ficheId !== undefined) ficheIds.push(p.ficheId);
+    for (const l of p.links) if (typeof l.to === 'number') ficheIds.push(l.to);
+    for (const f of p.facts) if (f.replaces !== undefined) factIds.push(f.replaces);
+  } else if (p.kind === 'contradiction') {
+    ficheIds.push(p.ficheId);
+    factIds.push(p.keep, p.strike);
+  } else if (p.kind === 'doublon') ficheIds.push(p.keep, p.merge);
+  const names: DraftView['names'] = {};
+  for (const n of ficheIds) {
+    const r = db.prepare('SELECT title FROM fiches WHERE id = ?').get(n) as Row | undefined;
+    if (r) names[n] = r.title;
+  }
+  const facts: DraftView['facts'] = {};
+  for (const n of factIds) {
+    const r = db.prepare('SELECT text, struck_at FROM facts WHERE id = ?').get(n) as Row | undefined;
+    if (r) facts[n] = { text: r.text, struck: r.struck_at !== null };
+  }
+  return {
+    id: d.id,
+    kind: p.kind,
+    card: cardOf(db, d),
+    payload: p,
+    names,
+    facts,
+    createdAt: d.createdAt,
+    origin: d.origin,
+  };
+}

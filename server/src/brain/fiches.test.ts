@@ -7,7 +7,8 @@ import { fakeProvider } from '../testing/fake-provider.ts';
 import { makeHarness } from '../testing/harness.ts';
 import { setPaused } from '../contract/state.ts';
 import { runPending } from './ingest.ts';
-import { createFiche, getFiche, listTypes, versions } from './store.ts';
+import { addDraft } from './drafts.ts';
+import { addFact, createFiche, getFiche, link, listTypes, versions } from './store.ts';
 
 function setup(extra: Parameters<typeof makeHarness>[0] = {}) {
   const h = makeHarness(extra);
@@ -173,5 +174,100 @@ describe('fiches, settings, dashboard and export API', () => {
     await h.app.request('/lun/v1/resume', { method: 'POST', headers: h.auth(token) });
     for (let i = 0; i < 200 && lot() !== 'done'; i++) await new Promise((r) => setTimeout(r, 10));
     expect(lot()).toBe('done');
+  });
+});
+
+describe('reads for the app: drafts, graph, neighbors', () => {
+  const src = { kind: 'depot' as const, ref: '7', at: '2026-11-02T08:00:00.000Z' };
+  const fill = () => {
+    const { h, typeId, req } = setup();
+    const now = h.clock().toISOString();
+    const a = createFiche(h.db, { typeId, title: 'Client A', synthesis: '' }, now);
+    const b = createFiche(h.db, { typeId, title: 'Projet B', synthesis: '' }, now);
+    const f1 = addFact(h.db, a, 'Contact : a@example.org', src, now);
+    const f2 = addFact(h.db, a, 'Contact : b@example.org', src, now);
+    link(h.db, a, b, 'concerne');
+    return { h, typeId, req, a, b, f1, f2, now };
+  };
+
+  it('GET /api/drafts: queue order, names, facts, held beyond the cap', async () => {
+    const t = fill();
+    const fiche = {
+      kind: 'fiche' as const,
+      typeId: t.typeId,
+      title: 'Nouvelle',
+      synthesis: '',
+      facts: [],
+      links: [],
+    };
+    addDraft(t.h.db, fiche, { source: 'note' }, t.now);
+    addDraft(t.h.db, { kind: 'doublon', keep: t.a, merge: t.b, reason: 'r' }, { source: 'core' }, t.now);
+    addDraft(
+      t.h.db,
+      { kind: 'contradiction', ficheId: t.a, keep: t.f2, strike: t.f1, reason: 'r' },
+      { source: 'core' },
+      t.now,
+    );
+    type R = {
+      drafts: {
+        kind: string;
+        names: Record<string, string>;
+        facts: Record<string, { text: string; struck: boolean }>;
+      }[];
+      held: number;
+    };
+    const res = (await (await t.req('/api/drafts')).json()) as R;
+    expect(res.drafts.map((d) => d.kind)).toEqual(['contradiction', 'doublon', 'fiche']);
+    expect(res.drafts[0]!.names[String(t.a)]).toBe('Client A');
+    expect(res.drafts[0]!.facts[String(t.f1)]).toEqual({ text: 'Contact : a@example.org', struck: false });
+    expect(res.held).toBe(0);
+    await t.req('/api/settings', 'PUT', { 'drafts.cap': 1 });
+    const capped = (await (await t.req('/api/drafts')).json()) as R;
+    expect(capped.drafts).toHaveLength(1);
+    expect(capped.held).toBe(2);
+  });
+
+  it('GET /api/graph: nodes, degree, edges, merged excluded, flagged by a pending contradiction', async () => {
+    const t = fill();
+    const ghost = createFiche(t.h.db, { typeId: t.typeId, title: 'Fantôme', synthesis: '' }, t.now);
+    t.h.db.prepare('UPDATE fiches SET merged_into = ? WHERE id = ?').run(t.b, ghost);
+    link(t.h.db, ghost, t.a, 'vers');
+    type G = {
+      nodes: { id: number; degree: number; flagged: boolean }[];
+      edges: { from: number; to: number; relation: string }[];
+    };
+    let g = (await (await t.req('/api/graph')).json()) as G;
+    expect(g.nodes.map((n) => n.id).sort()).toEqual([t.a, t.b]);
+    expect(g.nodes.find((n) => n.id === t.a)!.degree).toBe(2);
+    expect(g.edges).toContainEqual({ from: t.a, to: t.b, relation: 'concerne' });
+    expect(g.edges).toContainEqual({ from: t.b, to: t.a, relation: 'vers' });
+    expect(g.nodes.every((n) => !n.flagged)).toBe(true);
+    addDraft(
+      t.h.db,
+      { kind: 'contradiction', ficheId: t.a, keep: t.f2, strike: t.f1, reason: 'r' },
+      { source: 'core' },
+      t.now,
+    );
+    g = (await (await t.req('/api/graph')).json()) as G;
+    expect(g.nodes.find((n) => n.id === t.a)!.flagged).toBe(true);
+    expect(g.nodes.find((n) => n.id === t.b)!.flagged).toBe(false);
+  });
+
+  it('GET /api/fiches/:id: neighbors both ways, depots; 401 without a token', async () => {
+    const t = fill();
+    t.h.db
+      .prepare(
+        "INSERT INTO depots (id, name, type, bytes, created_at) VALUES (7, 'Notes.pdf', 'application/pdf', x'00', ?)",
+      )
+      .run(t.now);
+    const one = (await (await t.req(`/api/fiches/${t.a}`)).json()) as {
+      neighbors: { id: number; title: string; relation: string; direction: string }[];
+      depots: { id: number; name: string }[];
+    };
+    expect(one.neighbors).toEqual([{ id: t.b, title: 'Projet B', relation: 'concerne', direction: 'out' }]);
+    expect(one.depots).toEqual([{ id: 7, name: 'Notes.pdf' }]);
+    const back = (await (await t.req(`/api/fiches/${t.b}`)).json()) as typeof one;
+    expect(back.neighbors).toEqual([{ id: t.a, title: 'Client A', relation: 'concerne', direction: 'in' }]);
+    expect((await t.h.app.request(`/api/fiches/${t.a}`)).status).toBe(401);
   });
 });
