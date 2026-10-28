@@ -1,0 +1,19 @@
+{
+  "name": "@lun-avaritia/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --watch --experimental-strip-types src/main.ts",
+    "start": "node dist/main.js",
+    "pair-code": "node --experimental-strip-types --no-warnings src/cli/pair-code.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.13",
+    "openai": "^7.39.0",
+    "zod": "^4.6.7"
+  }
+}

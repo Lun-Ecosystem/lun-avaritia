@@ -1,0 +1,82 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
+/**
+ * Ordered schema migrations. Adding one means appending to the list, never editing a past entry:
+ * `schema_version` records how many have run.
+ */
+const MIGRATIONS: string[] = [
+  `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+   CREATE TABLE clients (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     token_hash TEXT NOT NULL UNIQUE,
+     created_at TEXT NOT NULL,
+     revoked_at TEXT,
+     kind TEXT NOT NULL DEFAULT 'device' CHECK (kind IN ('device', 'app'))
+   );
+   CREATE TABLE pairing_codes (code TEXT PRIMARY KEY, expires_at TEXT NOT NULL, used_at TEXT);
+   CREATE TABLE pairing_failures (at TEXT NOT NULL);
+   CREATE TABLE authorization_codes (
+     code TEXT PRIMARY KEY,
+     client TEXT NOT NULL,
+     redirect_uri TEXT NOT NULL,
+     code_challenge TEXT NOT NULL,
+     expires_at TEXT NOT NULL,
+     used_at TEXT
+   );
+   CREATE TABLE events (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     type TEXT NOT NULL,
+     importance TEXT NOT NULL,
+     at TEXT NOT NULL,
+     title TEXT NOT NULL,
+     data TEXT
+   );
+   CREATE TABLE costs (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     at TEXT NOT NULL,
+     provider TEXT NOT NULL,
+     model TEXT,
+     amount REAL NOT NULL,
+     calls INTEGER NOT NULL,
+     purpose TEXT
+   );`,
+];
+
+export function openDb(path: string): DatabaseSync {
+  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+  const db = new DatabaseSync(path);
+  // busy_timeout: the `pair-code` command writes to the same file while the server runs.
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;');
+  db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
+  const row = db.prepare('SELECT version FROM schema_version').get() as { version: number } | undefined;
+  let version = row?.version ?? 0;
+  if (!row) db.prepare('INSERT INTO schema_version (version) VALUES (0)').run();
+  for (; version < MIGRATIONS.length; version++) {
+    db.exec('BEGIN');
+    try {
+      db.exec(MIGRATIONS[version]!);
+      db.prepare('UPDATE schema_version SET version = ?').run(version + 1);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+  return db;
+}
+
+/** Reads a JSON value from the settings table. */
+export function getSetting<T>(db: DatabaseSync, key: string, fallback: T): T {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+    { value: string } | undefined;
+  return row ? (JSON.parse(row.value) as T) : fallback;
+}
+
+export function putSetting(db: DatabaseSync, key: string, value: unknown): void {
+  db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run(key, JSON.stringify(value));
+}
