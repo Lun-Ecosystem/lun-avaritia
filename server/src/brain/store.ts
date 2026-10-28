@@ -7,10 +7,11 @@ type Row = Record<string, any>;
 
 // The FTS index is kept in step here, not by triggers: every write that changes
 // a fiche's title, synthesis or active facts calls reindex().
-function reindex(db: DatabaseSync, id: number): void {
-  const f = db.prepare('SELECT title, synthesis FROM fiches WHERE id = ?').get(id) as Row | undefined;
+export function reindex(db: DatabaseSync, id: number): void {
+  const f = db.prepare('SELECT title, synthesis, merged_into FROM fiches WHERE id = ?').get(id) as
+    Row | undefined;
   db.prepare('DELETE FROM fiche_search WHERE rowid = ?').run(id);
-  if (!f) return;
+  if (!f || f.merged_into !== null) return; // a merged fiche leaves the search
   const facts = (
     db.prepare('SELECT text FROM facts WHERE fiche_id = ? AND struck_at IS NULL').all(id) as Row[]
   )
@@ -72,6 +73,7 @@ export function getFiche(db: DatabaseSync, id: number): Fiche | undefined {
     updatedAt: r.updated_at,
     facts,
     links,
+    ...(r.merged_into !== null && { mergedInto: r.merged_into as number }),
   };
 }
 

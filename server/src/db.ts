@@ -76,6 +76,20 @@ const MIGRATIONS: string[] = [
      synthesis TEXT NOT NULL
    );
    CREATE VIRTUAL TABLE fiche_search USING fts5(title, synthesis, facts, tokenize = 'unicode61 remove_diacritics 2');`,
+  `ALTER TABLE fiches ADD COLUMN merged_into INTEGER REFERENCES fiches(id);
+   CREATE TABLE drafts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     kind TEXT NOT NULL,
+     payload TEXT NOT NULL,
+     lot INTEGER,
+     origin TEXT NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'applying', 'done', 'refused', 'failed')),
+     created_at TEXT NOT NULL,
+     decided_at TEXT,
+     error TEXT,
+     skipped_synthesis INTEGER NOT NULL DEFAULT 0,
+     warnings TEXT NOT NULL DEFAULT '[]'
+   );`,
 ];
 
 export function openDb(path: string): DatabaseSync {

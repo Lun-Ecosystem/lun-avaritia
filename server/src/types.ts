@@ -91,4 +91,6 @@ export interface Fiche {
   updatedAt: string;
   facts: Fact[];
   links: Link[];
+  /** Set when the fiche was merged into another: it is struck, its facts and links moved. */
+  mergedInto?: number;
 }

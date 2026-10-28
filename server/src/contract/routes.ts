@@ -1,7 +1,19 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppDeps } from '../app.ts';
 import { SATELLITE } from '../identity.ts';
+import { z } from 'zod';
+import {
+  applyDraft,
+  cardOf,
+  ConflictError,
+  draftsByStatus,
+  NotFoundError,
+  queue,
+  refuseDraft,
+  type DraftStatus,
+} from '../brain/drafts.ts';
+import { getSetting } from '../db.ts';
 import { DegradedError, InvalidInputError } from './actions.ts';
 import { pair, recordPairingFailure, requireToken } from './auth.ts';
 import { authorizationPage, exchangeAuthorizationCode, readAuthorizationRequest } from './authorize.ts';
@@ -10,6 +22,8 @@ import { eventsSince, subscribe, type LunEvent } from './events.ts';
 import { getState, setPaused, statusOf } from './state.ts';
 
 const HEARTBEAT_MS = 25_000;
+const STATUSES = ['pending', 'done', 'refused', 'failed', 'expired'];
+const Accept = z.object({ input: z.unknown().optional() });
 
 async function readJson(req: Request): Promise<unknown> {
   const text = await req.text();
@@ -126,6 +140,42 @@ export function contractRoutes(deps: AppDeps): Hono {
       }
     }),
   );
+
+  r.get('/cards', (c) => {
+    const status = c.req.query('status') ?? 'pending';
+    if (!STATUSES.includes(status)) return c.json({ error: `Statut inconnu : ${status}` }, 400);
+    const drafts =
+      status === 'pending'
+        ? queue(db, getSetting(db, 'drafts.cap', 15))
+        : status === 'expired'
+          ? []
+          : draftsByStatus(db, status as DraftStatus);
+    return c.json({ cards: drafts.map(cardOf) });
+  });
+
+  const decide = async (c: Context, run: (id: number, input: unknown) => ReturnType<typeof applyDraft>) => {
+    let raw: unknown;
+    try {
+      raw = await readJson(c.req.raw);
+    } catch {
+      return c.json({ error: 'Corps JSON invalide' }, 400);
+    }
+    const parsed = Accept.safeParse(raw);
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
+    try {
+      return c.json({ card: cardOf(run(Number(c.req.param('id')), parsed.data.input)) });
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+      if (err instanceof ConflictError) return c.json({ error: err.message }, 409);
+      if (err instanceof InvalidInputError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  };
+
+  r.post('/cards/:id/accept', (c) =>
+    decide(c, (id, input) => applyDraft(db, id, input, clock().toISOString())),
+  );
+  r.post('/cards/:id/refuse', (c) => decide(c, (id) => refuseDraft(db, id, clock().toISOString())));
 
   r.get('/actions', (c) => c.json({ actions: actions.list() }));
 
