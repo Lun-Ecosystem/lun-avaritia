@@ -1,0 +1,58 @@
+/*
+ * Base styles of the Lun'Avaritia front, written on the shared tokens (tokens.css). The host app
+ * loads the fonts (self-hosted Cormorant Garamond and Inter); the stacks fall back to Georgia and
+ * system-ui.
+ */
+/* On :root: the launcher is mounted by the host app, outside the views' roots. */
+:root {
+  /* The agent's bubble: its size and offset, and the room it takes under scrolling lists (none on a phone, where it is a top-bar button). */
+  --agent-lanceur-h: 44px;
+  --agent-lanceur-bas: 22px;
+  --agent-coin: calc(var(--agent-lanceur-h) + var(--agent-lanceur-bas) + 12px);
+}
+
+.lun-avaritia {
+  font-family: var(--sans);
+  font-weight: 300;
+  color: var(--texte);
+  background: var(--fond);
+}
+
+.lun-avaritia button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--bordure);
+  border-radius: var(--r-2);
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+}
+
+.lun-avaritia button:hover:not(:disabled) {
+  border-color: var(--accent-bord);
+}
+
+.lun-avaritia button:focus-visible,
+.lun-avaritia input:focus-visible,
+.lun-avaritia select:focus-visible,
+.lun-avaritia textarea:focus-visible {
+  outline: 2px solid var(--accent-bord);
+  outline-offset: 1px;
+}
+
+.lun-avaritia input,
+.lun-avaritia select,
+.lun-avaritia textarea {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface-2);
+  border: 1px solid var(--bordure);
+  border-radius: var(--r-2);
+  padding: 0.35rem 0.55rem;
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --agent-coin: 0px;
+  }
+}
