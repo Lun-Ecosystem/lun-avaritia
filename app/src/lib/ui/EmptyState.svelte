@@ -65,6 +65,7 @@
   .titre {
     margin: 0 0 4px;
     font: 500 22px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   p {
     max-width: 340px;

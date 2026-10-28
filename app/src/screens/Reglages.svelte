@@ -98,6 +98,7 @@
   h1 {
     margin: 0;
     font: 400 26px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .grille {
     display: grid;

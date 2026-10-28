@@ -145,6 +145,7 @@
   .titre {
     margin: 0 0 6px;
     font: 500 22px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .message {
     margin: 0 0 16px;

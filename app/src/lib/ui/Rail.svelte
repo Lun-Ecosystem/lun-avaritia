@@ -58,6 +58,7 @@
   .titre {
     margin: 0 20px 10px;
     font: 500 24px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .tete {
     display: flex;

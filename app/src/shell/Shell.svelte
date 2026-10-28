@@ -92,6 +92,7 @@
     gap: 9px;
     padding: 2px 8px 2px;
     font: 500 21px var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .marque i {
     width: 9px;

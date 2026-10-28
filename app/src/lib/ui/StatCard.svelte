@@ -53,6 +53,7 @@
   }
   .chiffre {
     font: 500 40px/1 var(--serif);
+    font-variant-numeric: lining-nums tabular-nums;
     margin: 6px 0;
   }
   .danger {

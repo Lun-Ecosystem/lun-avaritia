@@ -202,6 +202,7 @@
   h2 {
     margin: 0;
     font: 400 24px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   header :global(.btn) {
     margin-left: auto;

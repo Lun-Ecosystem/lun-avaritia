@@ -31,17 +31,13 @@
   border-color: var(--accent-bord);
 }
 
-.lun-avaritia button:focus-visible,
-.lun-avaritia input:focus-visible,
-.lun-avaritia select:focus-visible,
-.lun-avaritia textarea:focus-visible {
+/* No weight (:where): a kit control (TextInput, TextArea) styles its own field without a box inside the box. */
+:where(.lun-avaritia) :where(button, input, select, textarea):focus-visible {
   outline: 2px solid var(--accent-bord);
   outline-offset: 1px;
 }
 
-.lun-avaritia input,
-.lun-avaritia select,
-.lun-avaritia textarea {
+:where(.lun-avaritia) :where(input, select, textarea) {
   font: inherit;
   color: var(--texte);
   background: var(--surface-2);

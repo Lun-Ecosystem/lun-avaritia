@@ -79,6 +79,7 @@
     align-items: center;
     gap: 9px;
     font: 500 19px var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .marque i {
     width: 9px;
@@ -111,6 +112,7 @@
   h1 {
     margin: 0 0 8px;
     font: 500 28px/1.15 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .lead {
     margin: 0 0 20px;

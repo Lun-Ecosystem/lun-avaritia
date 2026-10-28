@@ -109,6 +109,7 @@
     background: var(--surface-3);
     color: var(--texte-2);
     font: 500 22px var(--serif);
+    font-variant-numeric: lining-nums;
   }
   .logo.avaritia {
     border-color: var(--accent-bord);

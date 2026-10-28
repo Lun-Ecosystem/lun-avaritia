@@ -230,6 +230,7 @@
     margin: 0;
     overflow: hidden;
     font: 500 18px var(--serif);
+    font-variant-numeric: lining-nums;
     white-space: nowrap;
     text-overflow: ellipsis;
   }

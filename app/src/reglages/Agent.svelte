@@ -140,6 +140,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font: 400 16px/1.2 var(--serif);
+    font-variant-numeric: lining-nums;
   }
   @media (max-width: 767.98px) {
     .bloc {
