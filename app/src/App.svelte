@@ -60,8 +60,10 @@
   // Each screen reads the client with `getContext('api')`; a getter follows a new pairing.
   setContext('api', {
     get: <T,>(path: string) => api!.get<T>(path),
-    send: <T,>(method: string, path: string, body?: unknown) => api!.send<T>(method, path, body),
-    upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form),
+    // Any change a screen makes can move the rail counters: they are read again after it.
+    send: <T,>(method: string, path: string, body?: unknown) =>
+      api!.send<T>(method, path, body).finally(() => void readCounts()),
+    upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form).finally(() => void readCounts()),
   } satisfies Api);
 
   let status = $state<{ paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } }>({
@@ -100,20 +102,32 @@
     }
   }
 
-  // Rail counters, read again at each change of screen.
-  $effect(() => {
+  /** Rail counters: at each change of screen, after each change made here, and every 30 s. */
+  async function readCounts() {
     const a = api;
-    void route;
     if (!a) return;
-    a.get<{ pending: { drafts: number }; fiches: number; monthSpend: number; monthlyCap: number }>(
-      '/api/dashboard',
-    )
+    await a
+      .get<{ pending: { drafts: number }; fiches: number; monthSpend: number; monthlyCap: number }>(
+        '/api/dashboard',
+      )
       .then((d) => {
         counts.valider = d.pending.drafts;
         counts.fiches = d.fiches;
         status.spend = { spent: d.monthSpend, cap: d.monthlyCap };
       })
       .catch(() => {});
+  }
+  $effect(() => {
+    void route;
+    void readCounts();
+  });
+  // What the core or the processing changes meanwhile reaches the rail without a click here.
+  $effect(() => {
+    if (!api) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void readCounts();
+    }, 30_000);
+    return () => clearInterval(timer);
   });
 
   // Links inside the app change the screen without reloading the page; the back button follows.

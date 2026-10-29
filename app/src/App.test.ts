@@ -41,6 +41,7 @@ beforeEach(() => {
   history.replaceState(null, '', '/');
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   // The panel's state lives in its module: one test leaves it closed for the next.
   agentPanel.open = false;
@@ -107,6 +108,50 @@ describe('App', () => {
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+  });
+
+  it('the rail counter follows a validation, and a change made elsewhere', async () => {
+    let pending = 2;
+    const json = (body: unknown) => new Response(JSON.stringify(body));
+    const draft = {
+      id: 1,
+      kind: 'fiche',
+      card: { title: 'Carte 1' },
+      payload: { kind: 'fiche', typeId: 1, title: 'Client Exemple', synthesis: '', facts: [], links: [] },
+      names: {},
+      facts: {},
+      createdAt: '2026-10-27T22:00:00Z',
+      origin: { source: 'core' },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`;
+        if (key === 'GET /api/dashboard')
+          return json({ pending: { drafts: pending }, fiches: 5, monthSpend: 0, monthlyCap: 1 });
+        if (key === 'GET /api/drafts') return json({ drafts: pending ? [draft] : [], held: 0 });
+        if (key === 'POST /lun/v1/cards/1/accept') {
+          pending -= 1;
+          return json({ status: 'done' });
+        }
+        if (key === 'GET /lun/v1/health') return json({ status: 'ok' });
+        return new Response('{"error":"Introuvable"}', { status: 404 });
+      }),
+    );
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', '/valider');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const link = () => within(rail).getByRole('link', { name: /À valider/ });
+    await waitFor(() => expect(link()).toHaveTextContent('2'));
+    await user.click(await screen.findByRole('button', { name: 'Valider' }));
+    await waitFor(() => expect(link()).toHaveTextContent('1'));
+    // Accepted from the core: nothing happens on this page, the counter still follows.
+    pending = 0;
+    await vi.advanceTimersByTimeAsync(30_000);
+    await waitFor(() => expect(link()).not.toHaveTextContent(/\d/));
   });
 
   it('a degraded service is not shown as active in the rail', async () => {
