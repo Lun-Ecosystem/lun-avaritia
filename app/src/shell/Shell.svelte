@@ -3,6 +3,7 @@
   import {
     bindShortcuts,
     BottomNav,
+    Button,
     IconButton,
     icons,
     Kbd,
@@ -122,6 +123,7 @@
   <Rail label="Sections" class="rail">
     {#snippet header()}
       <span class="marque"><i aria-hidden="true"></i>Lun'<em>Avaritia</em></span>
+      <Button variant="principal" icon={icons.Plus} class="nouveau" onclick={newNote}>Nouvelle note</Button>
     {/snippet}
     {#each items.slice(0, 4) as item (item.route)}
       {@render link(item)}
@@ -198,6 +200,10 @@
   }
   .marque em {
     color: var(--accent-texte);
+  }
+  .coque :global(.nouveau) {
+    width: 100%;
+    height: 38px;
   }
   .zone {
     display: flex;

@@ -388,4 +388,15 @@ describe('App, top bar and palette', () => {
     expect(field).toHaveValue('Note que ');
     await waitFor(() => expect(field).toHaveFocus());
   });
+
+  it('« Nouvelle note » at the head of the rail does the same', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    await user.click(within(rail).getByRole('button', { name: 'Nouvelle note' }));
+    const field = await screen.findByRole('textbox', { name: 'Demande à Agent' });
+    expect(field).toHaveValue('Note que ');
+    await waitFor(() => expect(field).toHaveFocus());
+  });
 });
