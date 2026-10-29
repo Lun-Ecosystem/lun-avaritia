@@ -21,6 +21,8 @@ export interface BrainDeps {
   db: DatabaseSync;
   clock: () => Date;
   provider: (use: 'tri' | 'agent') => { provider: LlmProvider; model: string } | undefined;
+  /** Where a provider failure is told in full (the result only carries its kind). */
+  log?: ((line: string) => void) | undefined;
 }
 
 /**
@@ -124,7 +126,8 @@ const AgentShape = z.strictObject({
     }),
   ),
   questions: z.array(
-    z.discriminatedUnion('kind', [
+    // A plain union (`anyOf`): Anthropic structured outputs refuse the `oneOf` of a discriminated one.
+    z.union([
       z.strictObject({
         kind: z.literal('contradiction'),
         ficheId: z.number(),
@@ -357,12 +360,14 @@ export async function processLot(
     return { status: 'done', drafts: drafts.length, questions: questions.length, cost: paid.cost };
   } catch (err) {
     if (err instanceof InvalidAnswer) return { status: 'failed', reason: err.message, cost: paid.cost };
-    if (err instanceof ProviderError)
+    if (err instanceof ProviderError) {
+      deps.log?.(`Traitement : fournisseur ${err.kind} : ${err.message}`.slice(0, 1000));
       return {
         status: 'pending',
         reason: `provider-${err.kind as Exclude<ProviderError['kind'], 'format'>}`,
         cost: paid.cost,
       };
+    }
     throw err;
   }
 }

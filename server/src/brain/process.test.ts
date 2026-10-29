@@ -162,6 +162,8 @@ describe('processLot', () => {
     // The schema the provider receives is plain: strict objects, no bounds it might refuse.
     const schema = JSON.stringify(calls[1]!.schema);
     expect(schema).not.toMatch(/minimum|maximum|minLength|maxLength/);
+    // Anthropic structured outputs refuse `oneOf` (400 « Schema type 'oneOf' is not supported »).
+    expect(schema).not.toContain('"oneOf"');
     expect(schema).toContain('"additionalProperties":false');
   });
 
@@ -283,6 +285,16 @@ describe('processLot', () => {
       reason: 'no-provider',
       cost: 0,
     });
+  });
+
+  it('logs what the provider said when it refuses a request', async () => {
+    const { deps: d } = deps([new ProviderError('unavailable', "400 Schema type 'oneOf' is not supported")]);
+    const logs: string[] = [];
+    const r = await processLot({ ...d, log: (line) => logs.push(line) }, clientX, origin);
+    expect(r).toMatchObject({ status: 'pending', reason: 'provider-unavailable' });
+    expect(logs).toEqual([
+      expect.stringMatching(/^Traitement : fournisseur unavailable .*oneOf' is not supported/),
+    ]);
   });
 
   it('keeps the lot pending on a refused key', async () => {
