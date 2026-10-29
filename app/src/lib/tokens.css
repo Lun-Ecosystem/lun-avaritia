@@ -25,8 +25,8 @@
    data-monde se pose sur la racine de chaque vue, pas sur la page.
    Chaque monde est encadré par @monde / @fin-monde : tools/sync-tokens.mjs --monde le filtre. */
 
-/* bleu nuit Avaritia jamais en texte : --accent-texte reprend le texte du socle */
+/* or Avaritia : l'accent reste assez sombre pour porter un libellé ivoire (contraste 5,7) */
 [data-monde='avaritia'] {
-  --accent:#1A3070; --accent-survol:#234090; --accent-texte:var(--texte);
-  --accent-doux:rgba(26,48,112,.30); --accent-bord:rgba(140,165,225,.36);
+  --accent:#745716; --accent-survol:#7F611A; --accent-texte:#D9BE7A;
+  --accent-doux:rgba(116,87,22,.28); --accent-bord:rgba(217,190,122,.40);
 }
