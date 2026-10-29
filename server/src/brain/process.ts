@@ -241,6 +241,8 @@ async function ask<T>(
   throw new InvalidAnswer(`Réponse invalide ${step}, deux fois : ${reason}`.slice(0, 500));
 }
 
+const SPOKEN = new Set<Source['kind']>(['note', 'core']);
+
 /** Two calls: the tri groups the observations, the agent drafts a fiche per group and a few questions. */
 export async function processLot(
   deps: BrainDeps,
@@ -312,7 +314,10 @@ export async function processLot(
               g.observations.map((o) => ({
                 group: i,
                 index: o,
-                date: parisDay(observations[o]!.source.at),
+                // A note or a message is dated when said; a deposit or an import only when it arrived.
+                ...(SPOKEN.has(observations[o]!.source.kind) && {
+                  date: parisDay(observations[o]!.source.at),
+                }),
                 text: observations[o]!.text,
               })),
             ),
