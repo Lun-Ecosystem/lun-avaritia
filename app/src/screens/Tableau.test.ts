@@ -9,6 +9,7 @@ const full = {
   pending: { drafts: 7, contradictions: 2, doublons: 3 },
   heldLots: 2,
   monthSpend: 1.5,
+  monthlyCap: 5,
   recent: [{ at: ago(2), what: 'Dépôt ajouté : exemple' }],
 };
 const empty = {
@@ -16,6 +17,7 @@ const empty = {
   pending: { drafts: 0, contradictions: 0, doublons: 0 },
   heldLots: 0,
   monthSpend: 0,
+  monthlyCap: 5,
   recent: [],
 };
 const inRun = () => new Date(Date.now() - 3600_000 - 10_000).toISOString();
@@ -47,9 +49,9 @@ function show(dash: unknown, queue: unknown = { drafts: [], held: 0 }) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('Tableau', () => {
-  it('shows the night header, the stat cards, the summary and the activity', async () => {
+  it('shows the last-run header, the stat cards, the summary and the activity', async () => {
     show(full, drafts);
-    expect(await screen.findByRole('heading', { name: /^Nuit du \d+ au \d+ \p{L}+/u })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dernier traitement' })).toBeInTheDocument();
     expect(screen.getByText(/traité à \d\d:\d\d, 41 s, 0,02 \$/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Brouillons à valider : Passer en revue' })).toHaveAttribute(
       'href',
@@ -63,9 +65,9 @@ describe('Tableau', () => {
       'href',
       '/valider?filtre=doublons',
     );
-    expect(screen.getByText('dont 5 de cette nuit')).toBeInTheDocument();
+    expect(screen.getByText('dont 5 du dernier traitement')).toBeInTheDocument();
 
-    const summary = screen.getByRole('region', { name: 'Résumé de la nuit' });
+    const summary = screen.getByRole('region', { name: 'Résumé' });
     expect(within(summary).getByText(/14 observations reçues, 5 brouillons créés/)).toBeInTheDocument();
     expect(within(summary).getByText('Client Exemple').parentElement).toHaveTextContent('nouvelle');
     expect(within(summary).getByText('Projet Test').parentElement).toHaveTextContent('enrichissement');
@@ -86,7 +88,7 @@ describe('Tableau', () => {
       await screen.findByRole('heading', { name: 'Aucun traitement pour l’instant' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Brouillons à valider : Passer en revue' })).toBeInTheDocument();
-    expect(screen.queryByText(/dont \d+ de cette nuit/)).toBeNull();
+    expect(screen.queryByText(/dont \d+ du dernier/)).toBeNull();
     expect(screen.queryByText(/Plafond de coût/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });

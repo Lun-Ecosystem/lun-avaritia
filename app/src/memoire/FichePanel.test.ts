@@ -39,7 +39,7 @@ describe('FichePanel', () => {
     show();
     await screen.findByRole('heading', { name: 'Client X' });
     const active = screen.getByText('Demande une visio').closest('li')!;
-    expect(active).toHaveTextContent('le core');
+    expect(active).toHaveTextContent('observation');
     expect(active).toHaveTextContent('27/10');
     const struck = screen.getByText('Recette le 3 juin');
     expect(struck.tagName).toBe('S');

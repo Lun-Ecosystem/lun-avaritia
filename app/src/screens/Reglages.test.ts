@@ -6,7 +6,6 @@ import AgentPanel from '../agent/AgentPanel.svelte';
 import Reglages from './Reglages.svelte';
 
 const SETTINGS = {
-  'core.lots': true,
   'drafts.cap': 15,
   'cost.monthlyCap': 5,
   'agent.name': 'Agent',
@@ -77,7 +76,7 @@ describe('Réglages', () => {
     const titles = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(titles).toEqual([
       'Modèle de langage',
-      'Lots du core',
+      'Lots',
       'Structure des fiches',
       'Données',
       'Agent',
@@ -106,18 +105,9 @@ describe('Réglages', () => {
     expect(await within(modele).findByText('1,20 $ sur 8,00 $')).toBeInTheDocument();
   });
 
-  it('the core lots switch posts core.lots; no time of passage here', async () => {
-    const { card, send, user } = show();
-    const lots = await card('Lots du core');
-    expect(await within(lots).findByText('Heure fixée par le core')).toBeInTheDocument();
-    expect(within(lots).queryByRole('textbox', { name: /Heure/ })).toBeNull();
-    await user.click(within(lots).getByRole('switch', { name: 'Accepter les lots du core' }));
-    expect(settingsPuts(send)).toEqual([{ 'core.lots': false }]);
-  });
-
   it('the drafts cap refuses 0 and accepts 1 to 100', async () => {
     const { card, send, user } = show();
-    const lots = await card('Lots du core');
+    const lots = await card('Lots');
     const cap = await within(lots).findByRole('spinbutton', { name: 'Brouillons maximum par lot' });
     await user.clear(cap);
     await user.type(cap, '0');
@@ -133,7 +123,7 @@ describe('Réglages', () => {
 
   it('shows a refusal of the server inline, next to the field', async () => {
     const { card, user } = show({ refuse: () => 'Réglage invalide : trop grand' });
-    const lots = await card('Lots du core');
+    const lots = await card('Lots');
     const cap = await within(lots).findByRole('spinbutton', { name: 'Brouillons maximum par lot' });
     await user.clear(cap);
     await user.type(cap, '42');
@@ -142,14 +132,17 @@ describe('Réglages', () => {
   });
 
   it('a refused value stays next to its error when another setting is saved', async () => {
-    const { card, send, user } = show();
-    const lots = await card('Lots du core');
+    const { card, modelCard, send, user } = show();
+    const lots = await card('Lots');
     const cap = await within(lots).findByRole('spinbutton', { name: 'Brouillons maximum par lot' });
     await user.clear(cap);
     await user.type(cap, '0');
     await user.tab();
-    await user.click(within(lots).getByRole('switch', { name: 'Accepter les lots du core' }));
-    await waitFor(() => expect(settingsPuts(send)).toEqual([{ 'core.lots': false }]));
+    const monthly = within(await modelCard()).getByRole('spinbutton', { name: 'Plafond de coût mensuel' });
+    await user.clear(monthly);
+    await user.type(monthly, '8');
+    await user.tab();
+    await waitFor(() => expect(settingsPuts(send)).toEqual([{ 'cost.monthlyCap': 8 }]));
     expect(within(lots).getByRole('alert')).toHaveTextContent('Entre 1 et 100');
     expect(cap).toHaveValue(0);
   });

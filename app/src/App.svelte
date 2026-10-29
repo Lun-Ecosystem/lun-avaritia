@@ -60,8 +60,10 @@
     upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form),
   } satisfies Api);
 
-  // v1: health carries no core flag, so `core` stays false (« Core non relié ») until pairing with the core.
-  let status = $state({ paused: false, degraded: false, core: false });
+  let status = $state<{ paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } }>({
+    paused: false,
+    degraded: false,
+  });
   let counts = $state({ valider: 0, fiches: 0 });
 
   /** Reads the service state again (at pairing, after a pause or a resume in the settings). */
@@ -85,10 +87,13 @@
     const a = api;
     void route;
     if (!a) return;
-    a.get<{ pending: { drafts: number }; fiches: number }>('/api/dashboard')
+    a.get<{ pending: { drafts: number }; fiches: number; monthSpend: number; monthlyCap: number }>(
+      '/api/dashboard',
+    )
       .then((d) => {
         counts.valider = d.pending.drafts;
         counts.fiches = d.fiches;
+        status.spend = { spent: d.monthSpend, cap: d.monthlyCap };
       })
       .catch(() => {});
   });

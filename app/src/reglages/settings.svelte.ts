@@ -5,7 +5,6 @@ import type { AgentIcon } from '../agent/icons.ts';
 
 /** The settings of `GET|PUT /api/settings`, bounds as the server checks them. */
 export interface Settings {
-  'core.lots': boolean;
   'drafts.cap': number;
   'cost.monthlyCap': number;
   'agent.name': string;

@@ -5,7 +5,6 @@ import { getSetting, putSetting } from '../db.ts';
 
 /** The single source of the brain's settings: key, default and validation. */
 const SCHEMAS = {
-  'core.lots': z.boolean(),
   'drafts.cap': z.number().int().min(1).max(100),
   'cost.monthlyCap': z.number().min(0).max(50),
   'agent.name': z.string().trim().min(1).max(40),
@@ -14,7 +13,6 @@ const SCHEMAS = {
   'agent.persona': z.string().max(500),
 };
 const DEFAULTS: { [K in keyof typeof SCHEMAS]: z.infer<(typeof SCHEMAS)[K]> } = {
-  'core.lots': true,
   'drafts.cap': 15,
   'cost.monthlyCap': 5,
   'agent.name': 'Agent',

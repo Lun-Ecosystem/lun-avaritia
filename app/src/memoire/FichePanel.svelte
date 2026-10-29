@@ -90,7 +90,7 @@
 
   const sourceOf = (s: Source) => {
     const depot = data?.depots.find((d) => String(d.id) === s.ref)?.name;
-    if (s.kind === 'core') return 'le core';
+    if (s.kind === 'core') return 'observation';
     if (depot) return depot;
     return s.kind === 'note' ? 'note' : s.kind === 'depot' ? 'dépôt' : (s.origin ?? 'import');
   };

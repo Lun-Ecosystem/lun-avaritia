@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { BottomNav, icons, NavLink, Rail, ServiceCard, Toaster, type NavItem } from '../lib/ui/index.ts';
+  import { formatCost } from '../format.ts';
   import { pathOf, type Route } from './routes.ts';
 
   /*
@@ -11,8 +12,8 @@
   type Props = {
     route: Route;
     counts: { valider: number; fiches: number };
-    /** The service paused by hand; the core linked to this satellite. */
-    status: { paused: boolean; degraded: boolean; core: boolean };
+    /** The service paused by hand or degraded, and the month's spend against its cap (unknown until read). */
+    status: { paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } | undefined };
     /** The agent's bubble, above the screens (it never resizes them). */
     agent?: Snippet | undefined;
     children: Snippet;
@@ -65,7 +66,7 @@
       {@render link(items[4]!)}
       <ServiceCard
         state={status.paused ? 'pause' : status.degraded ? 'cle-refusee' : 'actif'}
-        detail={status.core ? 'Core relié' : 'Core non relié'}
+        detail={status.spend ? `${formatCost(status.spend.spent)} sur ${formatCost(status.spend.cap)}` : ''}
       />
     {/snippet}
   </Rail>

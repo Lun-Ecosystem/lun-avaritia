@@ -11,7 +11,7 @@
   import Types from '../reglages/Types.svelte';
 
   /*
-   * The settings, in the cards of the mockup (language model, core lots, structure, data), then the
+   * The settings, in the cards of the mockup (language model, lots, structure, data), then the
    * agent, the devices and the service. The whole screen is loaded on demand by the app.
    */
 

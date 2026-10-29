@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { lastRun, type LastRun } from './ingest.ts';
 import { monthSpend } from './process.ts';
+import { setting } from './settings.ts';
 
 export interface Dashboard {
   lastRun: LastRun | undefined;
@@ -9,6 +10,8 @@ export interface Dashboard {
   fiches: number;
   heldLots: number;
   monthSpend: number;
+  /** The monthly cost cap, shown beside the spend. */
+  monthlyCap: number;
   recent: { at: string; what: string }[];
 }
 
@@ -31,6 +34,7 @@ export function dashboard(db: DatabaseSync, now: Date): Dashboard {
     fiches: count(db, 'SELECT COUNT(*) AS n FROM fiches WHERE merged_into IS NULL'),
     heldLots: count(db, "SELECT COUNT(*) AS n FROM lots WHERE status = 'held'"),
     monthSpend: monthSpend(db, now),
+    monthlyCap: setting(db, 'cost.monthlyCap'),
     recent: db
       .prepare(
         `SELECT at, what FROM (

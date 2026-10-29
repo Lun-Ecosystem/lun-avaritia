@@ -44,6 +44,7 @@ describe('dashboard', () => {
     expect(d.fiches).toBe(2);
     expect(d.heldLots).toBe(1);
     expect(d.monthSpend).toBeCloseTo(1.5);
+    expect(d.monthlyCap).toBe(5);
     expect(d.lastRun).toBeUndefined();
     expect(d.recent.map((e) => e.what)).toEqual(
       expect.arrayContaining([expect.stringContaining('d.txt'), expect.stringContaining('refusé')]),

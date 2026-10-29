@@ -45,12 +45,6 @@
   const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
   const paris = (d: Date, o: Intl.DateTimeFormatOptions) =>
     d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', ...o });
-
-  function title(at: string) {
-    const end = new Date(at);
-    const start = new Date(end.getTime() - 24 * 3600_000);
-    return `Nuit du ${paris(start, { day: 'numeric' })} au ${paris(end, { day: 'numeric', month: 'long' })}`;
-  }
 </script>
 
 <div class="ecran" aria-busy={!data && !failure}>
@@ -71,7 +65,7 @@
     {/if}
 
     <header class="entete">
-      <h1>{lastRun ? title(lastRun.at) : 'Aucun traitement pour l’instant'}</h1>
+      <h1>{lastRun ? 'Dernier traitement' : 'Aucun traitement pour l’instant'}</h1>
       {#if lastRun}
         <span class="muted">
           traité à {paris(new Date(lastRun.at), { hour: '2-digit', minute: '2-digit' })}, {formatDuration(
@@ -85,7 +79,7 @@
       <StatCard
         label="Brouillons à valider"
         value={pending.drafts}
-        sub={night.length > 0 ? `dont ${night.length} de cette nuit` : undefined}
+        sub={night.length > 0 ? `dont ${night.length} du dernier traitement` : undefined}
         href="/valider"
         action="Passer en revue"
         primary
@@ -108,7 +102,7 @@
     </div>
 
     <div class="deux">
-      <SettingsCard title="Résumé de la nuit">
+      <SettingsCard title="Résumé">
         {#if lastRun}
           <p class="phrase">
             {plural(lastRun.observations, 'observation reçue', 'observations reçues')}, {plural(
