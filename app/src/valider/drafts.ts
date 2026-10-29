@@ -14,7 +14,7 @@ export type FicheDraft = {
   typeId: number;
   title: string;
   synthesis: string;
-  facts: { text: string; source: Source; replaces?: number }[];
+  facts: { text: string; source: Source; replaces?: number; due?: string }[];
   links: { to: number | string; relation: string }[];
 };
 export type DraftPayload =

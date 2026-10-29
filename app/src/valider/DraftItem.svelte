@@ -2,6 +2,7 @@
   import { openFiche, titleKey } from '../memoire/titles.ts';
   import Prose from '../Prose.svelte';
   import { Badge, Button, icons, Kbd, SettingsCard } from '../lib/ui/index.ts';
+  import { formatDueDay } from '../format.ts';
   import { kindOf, swapped, type DraftPayload, type DraftView } from './drafts.ts';
   import FicheDraftEditor from './FicheDraftEditor.svelte';
 
@@ -74,6 +75,7 @@
                 <li>
                   {#if f.replaces !== undefined}<s class="barre">{fact(f.replaces)}</s>{/if}
                   <span>{f.text}</span>
+                  {#if f.due}<span class="muted">Échéance : {formatDueDay(f.due)}</span>{/if}
                 </li>
               {/each}
               {#each p.links as l, i (i)}
