@@ -309,7 +309,8 @@ describe('App, memory address', () => {
     history.replaceState(null, '', '/memoire');
     const user = userEvent.setup();
     render(App);
-    await user.click(await screen.findByRole('button', { name: 'Client X' }));
+    await user.click(await screen.findByRole('button', { name: /Personnes · 1/ }));
+    await user.click(screen.getByRole('button', { name: 'Client X' }));
     expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
     history.back();
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Client X' })).toBeNull());

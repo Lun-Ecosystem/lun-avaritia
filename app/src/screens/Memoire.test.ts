@@ -30,21 +30,35 @@ afterEach(() => {
 });
 
 describe('Memoire', () => {
-  it('groups fiches by type with their count, groups fold', async () => {
+  it('groups fiches by type with their count, all folded at first', async () => {
     show();
     const grp = await screen.findByRole('button', { name: /Personnes · 2/ });
-    expect(screen.getByRole('button', { name: /Organisations · 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Organisations · 1/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(grp).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Jeanne D.')).toBeNull();
+    await userEvent.click(grp);
     expect(screen.getByText('Jeanne D.')).toBeInTheDocument();
     await userEvent.click(grp);
     expect(screen.queryByText('Jeanne D.')).toBeNull();
-    expect(grp).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('opens only the group of the open fiche', async () => {
+    show({ fiche: '3' });
+    expect(await screen.findByRole('button', { name: /Organisations · 1/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /Personnes · 2/ })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('searches after 250 ms and swaps the tree for results, then back', async () => {
     const { send } = show({}, [
       { id: 3, title: 'Entreprise Z', type: 'Organisations', excerpt: 'Société du client' },
     ]);
-    await screen.findByText('Jeanne D.');
+    await userEvent.click(await screen.findByRole('button', { name: /Personnes · 2/ }));
     await userEvent.type(screen.getByRole('searchbox'), 'entre');
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith('POST', '/lun/v1/actions/brain.search', { query: 'entre' }),
@@ -52,12 +66,14 @@ describe('Memoire', () => {
     expect(await screen.findByText('Société du client')).toBeInTheDocument();
     expect(screen.queryByText('Jeanne D.')).toBeNull();
     await userEvent.clear(screen.getByRole('searchbox'));
-    expect(await screen.findByText('Jeanne D.')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Personnes · 2/ })).toBeInTheDocument();
+    expect(screen.queryByText('Société du client')).toBeNull();
   });
 
   it('opens a fiche into the URL and the panel', async () => {
     show();
-    await userEvent.click(await screen.findByRole('button', { name: 'Client X' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Personnes · 2/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Client X' }));
     expect(location.search).toContain('fiche=1');
     expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
   });
@@ -108,7 +124,7 @@ describe('Memoire', () => {
   it('keeps the tree and the fiche when the search fails', async () => {
     const f = show();
     f.send.mockRejectedValueOnce(new Error('Recherche indisponible'));
-    await screen.findByText('Jeanne D.');
+    await userEvent.click(await screen.findByRole('button', { name: /Personnes · 2/ }));
     await userEvent.type(screen.getByRole('searchbox'), 'x');
     expect(await screen.findByText('Recherche indisponible')).toBeInTheDocument();
     expect(screen.getByText('Jeanne D.')).toBeInTheDocument();

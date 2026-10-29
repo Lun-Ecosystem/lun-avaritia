@@ -2,7 +2,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { icons } from '../lib/ui/index.ts';
 
-  /* The fiches grouped by type, each group folding. The first group and the one holding the chosen fiche start open. */
+  /* The fiches grouped by type, each group folding. Every group starts folded, except the one holding the chosen fiche. */
 
   type Item = { id: number; title: string; typeId: number; type: string };
   type Props = { fiches: Item[]; selected: number | null; onOpen: (id: number) => void };
@@ -19,13 +19,13 @@
   });
 
   const folded = new SvelteMap<number, boolean>();
-  const isOpen = (g: { typeId: number; items: Item[] }, i: number) =>
-    !(folded.get(g.typeId) ?? !(i === 0 || g.items.some((f) => f.id === selected)));
+  const isOpen = (g: { typeId: number; items: Item[] }) =>
+    !(folded.get(g.typeId) ?? !g.items.some((f) => f.id === selected));
 </script>
 
 <nav class="arbo" aria-label="Fiches par type">
-  {#each groups as g, i (g.typeId)}
-    {@const open = isOpen(g, i)}
+  {#each groups as g (g.typeId)}
+    {@const open = isOpen(g)}
     <button type="button" class="grp" aria-expanded={open} onclick={() => folded.set(g.typeId, open)}>
       {#if open}<icons.ChevronDown size={14} />{:else}<icons.ChevronRight size={14} />{/if}
       {g.name} · {g.items.length}
