@@ -198,7 +198,7 @@
       {#if theme === 'appareils'}
         <Appareils />
       {:else if theme === 'service'}
-        <SettingsCard title="Service" description="La pause arrête tout ce qui est automatique.">
+        <SettingsCard title="Service">
           {#snippet aside()}
             <Badge tone={paused ? 'attention' : 'ok'} dot>{paused ? 'En pause' : 'Actif'}</Badge>
           {/snippet}
