@@ -1,12 +1,27 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { BottomNav, icons, NavLink, Rail, ServiceCard, Toaster, type NavItem } from '../lib/ui/index.ts';
+  import {
+    bindShortcuts,
+    BottomNav,
+    IconButton,
+    icons,
+    Kbd,
+    NavLink,
+    Rail,
+    ServiceCard,
+    Toaster,
+    type NavItem,
+    type PaletteCommand,
+  } from '../lib/ui/index.ts';
+  import { openAgent } from '../agent/conversation.svelte.ts';
+  import { go } from '../memoire/titles.ts';
   import { formatCost } from '../format.ts';
   import { pathOf, type Route } from './routes.ts';
 
   /*
-   * Shell of the standalone app: the rail with its counters and the service card on a desktop, the
-   * bottom navigation under 768 px, the agent's bubble in the bottom right corner, the toasts.
+   * Shell of the standalone app, as Lun'Acedia's (plate 03): the rail with its counters and the
+   * service card on a desktop, the top bar with the search (which opens the palette, Ctrl K) and the
+   * pause, the bottom navigation under 768 px, the agent's bubble in the bottom right corner, the toasts.
    */
 
   type Props = {
@@ -14,12 +29,14 @@
     counts: { valider: number; fiches: number };
     /** The service paused by hand or degraded, and the month's spend against its cap (unknown until read). */
     status: { paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } | undefined };
+    /** Pauses or resumes the processing. */
+    ontogglepause: () => void;
     /** The agent's bubble, above the screens (it never resizes them). */
     agent?: Snippet | undefined;
     children: Snippet;
   };
 
-  let { route, counts, status, agent, children }: Props = $props();
+  let { route, counts, status, ontogglepause, agent, children }: Props = $props();
 
   const items = $derived<(NavItem & { route: Route })[]>([
     { route: 'tableau', href: pathOf('tableau'), label: 'Tableau de bord', icon: icons.LayoutDashboard },
@@ -41,6 +58,53 @@
     { route: 'depots', href: pathOf('depots'), label: 'Dépôts', icon: icons.Folder },
     { route: 'reglages', href: pathOf('reglages'), label: 'Réglages', icon: icons.Settings },
   ]);
+
+  const pauseLabel = $derived(status.paused ? 'Reprendre le traitement' : 'Mettre le traitement en pause');
+
+  // The palette (bits-ui Command) comes with its first opening: it stays out of the first load.
+  let palette = $state(false);
+  let search = $state('');
+  let paletteModule = $state<Promise<typeof import('../lib/ui/CommandPalette.svelte')> | null>(null);
+  function togglePalette() {
+    paletteModule ??= import('../lib/ui/CommandPalette.svelte');
+    palette = !palette;
+  }
+  // From a field too, as Ctrl J: the palette is the way to everything.
+  $effect(() => bindShortcuts({ 'Ctrl+k': togglePalette }, window, { fromFields: ['Ctrl+k'] }));
+
+  const newNote = () => openAgent('Note que ');
+
+  const commands = $derived.by((): PaletteCommand[] => {
+    const q = search.trim();
+    return [
+      ...(q
+        ? [
+            {
+              id: 'rechercher',
+              label: `Rechercher « ${q} » dans la mémoire`,
+              group: 'Recherche',
+              icon: icons.Search,
+              run: () => go(`${pathOf('memoire')}?${new URLSearchParams({ q })}`),
+            },
+          ]
+        : []),
+      { id: 'note', label: 'Nouvelle note', group: 'Action', icon: icons.Plus, run: newNote },
+      {
+        id: 'pause',
+        label: pauseLabel,
+        group: 'Action',
+        icon: status.paused ? icons.Play : icons.Pause,
+        run: ontogglepause,
+      },
+      ...items.map((item) => ({
+        id: item.route,
+        label: item.label,
+        group: 'Aller à',
+        icon: item.icon,
+        run: () => go(item.href),
+      })),
+    ];
+  });
 </script>
 
 {#snippet link(item: (typeof items)[number])}
@@ -71,10 +135,40 @@
     {/snippet}
   </Rail>
 
-  <main>{@render children()}</main>
+  <div class="zone">
+    <header class="haut">
+      <button type="button" class="rech" aria-haspopup="dialog" onclick={togglePalette}>
+        <icons.Search size={16} strokeWidth={1.75} aria-hidden="true" />
+        <span class="large">Rechercher dans la mémoire, ou une commande</span>
+        <span class="court">Rechercher</span>
+        <span class="touche"><Kbd>Ctrl K</Kbd></span>
+      </button>
+      <div class="droite">
+        <span class="pause">
+          <IconButton
+            icon={status.paused ? icons.Play : icons.Pause}
+            label={pauseLabel}
+            onclick={ontogglepause}
+          />
+        </span>
+      </div>
+    </header>
+    <main>{@render children()}</main>
+  </div>
 
   <BottomNav {items} current={pathOf(route)} class="nav-mobile" />
   <div class="agent">{@render agent?.()}</div>
+  {#if paletteModule}
+    {#await paletteModule then m}
+      <m.default
+        {commands}
+        bind:open={palette}
+        bind:search
+        shortcut={false}
+        placeholder="Rechercher dans la mémoire, ou une commande"
+      />
+    {/await}
+  {/if}
   <Toaster />
 </div>
 
@@ -105,9 +199,60 @@
   .marque em {
     color: var(--accent-texte);
   }
+  .zone {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+  .haut {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    height: 58px;
+    padding: 0 18px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--bordure);
+  }
+  .rech {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    max-width: 620px;
+    height: 38px;
+    padding: 0 12px;
+    background: var(--surface-1);
+    border: 1px solid var(--bordure-forte);
+    border-radius: var(--r-2);
+    color: var(--texte-3);
+    font: 300 13.5px var(--sans);
+    text-align: left;
+    cursor: text;
+  }
+  .rech:hover {
+    border-color: var(--accent-bord);
+  }
+  .rech:focus-visible {
+    outline: 2px solid var(--accent-texte);
+    outline-offset: 2px;
+  }
+  .touche {
+    margin-left: auto;
+  }
+  .court {
+    display: none;
+  }
+  .droite {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
   main {
     flex: 1;
-    min-width: 0;
     min-height: 0;
     overflow: auto;
   }
@@ -126,6 +271,24 @@
     }
     .coque :global(.rail) {
       display: none;
+    }
+    .haut {
+      height: auto;
+      padding: max(6px, env(safe-area-inset-top)) 14px 10px;
+      border-bottom: 0;
+    }
+    .rech {
+      max-width: none;
+      height: 42px;
+      border-radius: 21px;
+    }
+    .large,
+    .touche,
+    .pause {
+      display: none;
+    }
+    .court {
+      display: inline;
     }
     .coque :global(.nav-mobile) {
       display: grid;

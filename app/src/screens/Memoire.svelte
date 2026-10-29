@@ -10,12 +10,17 @@
 
   /*
    * The memory: search and the tree / graph switch on one row, the tree (or the search results) on
-   * the left, the fiche on the right. The address (`?fiche=&mode=`) is the state; under 768 px the
+   * the left, the fiche on the right. The address (`?fiche=&mode=&q=`) is the state; under 768 px the
    * fiche covers the tree.
    */
 
-  type Props = { fiche?: string | null | undefined; mode?: string | null | undefined };
-  let { fiche = null, mode = null }: Props = $props();
+  type Props = {
+    fiche?: string | null | undefined;
+    mode?: string | null | undefined;
+    /** The search, from the address (the palette sends `/memoire?q=`). */
+    q?: string | null | undefined;
+  };
+  let { fiche = null, mode = null, q = null }: Props = $props();
 
   type Item = { id: number; title: string; typeId: number; type: string };
   type Hit = { id: number; title: string; type: string; excerpt: string };
@@ -27,7 +32,7 @@
   let failure = $state<string | null>(null);
   let selected = $state<number | null>(untrack(() => asId(fiche)));
   let view = $state(untrack(() => (mode === 'graphe' ? 'graphe' : 'arbre')));
-  let query = $state('');
+  let query = $state(untrack(() => q ?? ''));
   let centre = $state('');
   // The graph comes with its mode only (Sigma is a chunk apart); no WebGL, no graph.
   let graphe = $state<Promise<typeof import('../memoire/Graphe.svelte')> | null>(null);
@@ -45,6 +50,9 @@
     selected = asId(fiche);
     view = mode === 'graphe' ? 'graphe' : 'arbre';
   });
+  $effect(() => {
+    query = q ?? '';
+  });
 
   function load() {
     api
@@ -54,12 +62,22 @@
   }
   load();
 
+  function address() {
+    const p = new URLSearchParams();
+    if (selected !== null) p.set('fiche', String(selected));
+    if (view === 'graphe') p.set('mode', 'graphe');
+    if (query) p.set('q', query);
+    const s = p.toString();
+    return `/memoire${s ? `?${s}` : ''}`;
+  }
   function push() {
-    const q = new URLSearchParams();
-    if (selected !== null) q.set('fiche', String(selected));
-    if (view === 'graphe') q.set('mode', 'graphe');
-    const s = q.toString();
-    go(`/memoire${s ? `?${s}` : ''}`);
+    go(address());
+  }
+  /** Each key replaces the entry: back leaves the search, not one letter. The app follows the address. */
+  function typed(value: string) {
+    query = value;
+    history.replaceState(null, '', address());
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
   function open(id: number | null) {
     selected = id;
@@ -107,7 +125,7 @@
           icon={icons.Search}
           placeholder="Rechercher une fiche, une personne, un projet…"
           aria-label="Rechercher une fiche"
-          bind:value={query}
+          bind:value={() => query, typed}
         />
       {/if}
     </div>

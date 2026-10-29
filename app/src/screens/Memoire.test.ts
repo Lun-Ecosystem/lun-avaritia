@@ -13,7 +13,10 @@ vi.mock('../memoire/Graphe.svelte', async () => {
   return { default: (await import('../testing/GrapheStub.svelte')).default };
 });
 
-function show(props: { fiche?: string | null; mode?: string | null } = {}, results: unknown[] = []) {
+function show(
+  props: { fiche?: string | null; mode?: string | null; q?: string | null } = {},
+  results: unknown[] = [],
+) {
   const f = fakeApi(undefined, results);
   render(Memoire, { props, context: new Map([['api', f.api]]) });
   return f;
@@ -68,6 +71,20 @@ describe('Memoire', () => {
     await userEvent.clear(screen.getByRole('searchbox'));
     expect(await screen.findByRole('button', { name: /Personnes · 2/ })).toBeInTheDocument();
     expect(screen.queryByText('Société du client')).toBeNull();
+  });
+
+  it('searches the text of the address (`?q=`) and writes the typed one there, replacing the entry', async () => {
+    const { send } = show({ q: 'client' });
+    expect(screen.getByRole('searchbox')).toHaveValue('client');
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith('POST', '/lun/v1/actions/brain.search', { query: 'client' }),
+    );
+    const before = history.length;
+    await userEvent.type(screen.getByRole('searchbox'), ' x');
+    expect(location.search).toBe('?q=client+x');
+    expect(history.length).toBe(before);
+    await userEvent.clear(screen.getByRole('searchbox'));
+    expect(location.search).toBe('');
   });
 
   it('opens a fiche into the URL and the panel', async () => {

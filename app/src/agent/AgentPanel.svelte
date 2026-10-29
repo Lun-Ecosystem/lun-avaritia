@@ -33,6 +33,7 @@
   let text = $state('');
   let bubble = $state<HTMLButtonElement | null>(null);
   let fil = $state<HTMLElement | null>(null);
+  let field = $state<HTMLTextAreaElement | null>(null);
   let panel = $state<HTMLElement | null>(null);
   const size = new PanelSize();
 
@@ -82,11 +83,14 @@
     }
   }
 
-  // A request handed by another screen (« Écrire une note ») lands in the field.
+  // A request handed by another screen (« Nouvelle note ») lands in the field, the focus with it.
   $effect(() => {
     if (!agentPanel.open || !agentPanel.draft) return;
     text = agentPanel.draft;
     agentPanel.draft = '';
+    // After the current task: the palette that asked gives the focus back as it closes. (No cleanup:
+    // emptying the draft above runs this effect again.)
+    setTimeout(() => field?.focus());
   });
 
   // The latest message in view.
@@ -310,6 +314,7 @@
 
     <div class="saisie">
       <textarea
+        bind:this={field}
         bind:value={text}
         rows="1"
         aria-label="Demande à {name}"

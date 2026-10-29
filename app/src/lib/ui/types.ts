@@ -33,6 +33,16 @@ export type DemoState = 'survol' | 'focus';
 /** State of the sorting service, shown at the bottom of the rail. */
 export type ServiceState = 'actif' | 'pause' | 'cle-refusee';
 
+/** One command of the palette (Ctrl K). */
+export interface PaletteCommand {
+  id: string;
+  label: string;
+  /** Kind of command, shown at the end of the line (« Action », « Aller à »). */
+  group: string;
+  icon?: IconComponent | undefined;
+  run: () => void;
+}
+
 /** One destination of a navigation (rail, bottom bar). */
 export interface NavItem {
   href: string;

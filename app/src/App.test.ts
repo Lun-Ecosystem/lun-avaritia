@@ -319,3 +319,73 @@ describe('App, memory address', () => {
     expect(await screen.findByRole('heading', { name: 'Client X' })).toBeInTheDocument();
   });
 });
+
+describe('App, top bar and palette', () => {
+  beforeEach(() => {
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+  });
+
+  it('Ctrl K opens the palette from anywhere, the search button too', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    await screen.findByRole('navigation', { name: 'Sections' });
+    await user.keyboard('{Control>}k{/Control}');
+    expect(await screen.findByRole('dialog', { name: 'Palette de commandes' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(screen.getByRole('button', { name: /Rechercher dans la mémoire, ou une commande/ }));
+    expect(await screen.findByRole('dialog', { name: 'Palette de commandes' })).toBeInTheDocument();
+  });
+
+  it('a typed text searches the memory: /memoire?q=, the field of the memory shows it', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    await screen.findByRole('navigation', { name: 'Sections' });
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(
+      await screen.findByPlaceholderText('Rechercher dans la mémoire, ou une commande'),
+      'Client X',
+    );
+    await user.click(await screen.findByText('Rechercher « Client X » dans la mémoire'));
+    await waitFor(() => expect(window.location.pathname).toBe('/memoire'));
+    expect(window.location.search).toBe('?q=Client+X');
+    expect(await screen.findByRole('searchbox', { name: 'Rechercher une fiche' })).toHaveValue('Client X');
+  });
+
+  it('« Aller à » goes to a screen', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    await screen.findByRole('navigation', { name: 'Sections' });
+    await user.keyboard('{Control>}k{/Control}');
+    await user.click(await screen.findByText('Dépôts', { selector: '.item .texte' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/depots'));
+  });
+
+  it('the pause of the palette and of the top bar posts /lun/v1/pause, the rail reads the state again', async () => {
+    const { calls } = fakeServer({ paused: false });
+    const user = userEvent.setup();
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.click(await screen.findByText('Mettre le traitement en pause'));
+    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(calls).toContain('POST /lun/v1/pause');
+    expect(screen.getByRole('button', { name: 'Reprendre le traitement' })).toBeInTheDocument();
+  });
+
+  it('« Nouvelle note » of the palette opens the agent with « Note que » and the focus in the field', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    await screen.findByRole('navigation', { name: 'Sections' });
+    await user.keyboard('{Control>}k{/Control}');
+    await user.click(await screen.findByText('Nouvelle note', { selector: '.item .texte' }));
+    const field = await screen.findByRole('textbox', { name: 'Demande à Agent' });
+    expect(field).toHaveValue('Note que ');
+    await waitFor(() => expect(field).toHaveFocus());
+  });
+});

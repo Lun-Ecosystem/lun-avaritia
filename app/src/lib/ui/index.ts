@@ -1,7 +1,8 @@
 /**
  * Base ui components of the Lun' views (plate 10), styled only by the shared tokens.
- * Dialog, Select and Switch are imported from their own files: whatever this barrel names joins the
- * first load, and only the screens loaded on demand use them (with bits-ui and floating-ui, about 75 kB).
+ * CommandPalette, Dialog, Select and Switch are imported from their own files: whatever this barrel
+ * names joins the first load, and only what is loaded on demand uses them (with bits-ui and
+ * floating-ui, about 75 kB).
  */
 export { default as Badge } from './Badge.svelte';
 export { default as Banner } from './Banner.svelte';
@@ -38,4 +39,13 @@ export { ICON_STROKE, type IconComponent } from './Icon.ts';
 export { mondeOf } from './monde.ts';
 export { bindShortcuts } from './shortcuts.ts';
 export { dismiss, dismissAll, toast, TOAST_DURATION, type ToastOptions } from './toasts.svelte.ts';
-export type { ButtonVariant, DemoState, NavItem, Option, ServiceState, Size, Tone } from './types.ts';
+export type {
+  ButtonVariant,
+  DemoState,
+  NavItem,
+  Option,
+  PaletteCommand,
+  ServiceState,
+  Size,
+  Tone,
+} from './types.ts';

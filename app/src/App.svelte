@@ -3,7 +3,7 @@
   import { createApi, type Api } from './api.ts';
   import { readAuthorization } from './authorization.ts';
   import Authorize from './Authorize.svelte';
-  import { Banner, Button, Skeleton, StandaloneCard } from './lib/ui/index.ts';
+  import { Banner, Button, Skeleton, StandaloneCard, toast } from './lib/ui/index.ts';
   import Pair from './Pair.svelte';
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
@@ -25,6 +25,7 @@
   let fiche = $state(new URLSearchParams(window.location.search).get('fiche'));
   let mode = $state(new URLSearchParams(window.location.search).get('mode'));
   let theme = $state(new URLSearchParams(window.location.search).get('theme'));
+  let search = $state(new URLSearchParams(window.location.search).get('q'));
   function follow() {
     route = routeFromPath(window.location.pathname);
     const q = new URLSearchParams(window.location.search);
@@ -32,6 +33,7 @@
     fiche = q.get('fiche');
     mode = q.get('mode');
     theme = q.get('theme');
+    search = q.get('q');
   }
 
   // An app asks for access (`GET /lun/v1/authorize`): the request waits here, through pairing if needed.
@@ -83,6 +85,20 @@
   $effect(() => {
     void readHealth();
   });
+
+  /** The pause of the top bar and the palette: the same calls as Réglages › Service. */
+  async function togglePause() {
+    const a = api;
+    if (!a) return;
+    try {
+      await a.send('POST', status.paused ? '/lun/v1/resume' : '/lun/v1/pause');
+    } catch (e) {
+      toast(e instanceof Error && e.message ? e.message : 'L’action a échoué.', { tone: 'danger' });
+    } finally {
+      // Even refused (409: already in that state), the rail must show the state of the server.
+      await readHealth();
+    }
+  }
 
   // Rail counters, read again at each change of screen.
   $effect(() => {
@@ -153,7 +169,7 @@
 {:else if api && authorization}
   <Authorize {api} request={authorization.request} />
 {:else if api}
-  <Shell {route} {counts} {status}>
+  <Shell {route} {counts} {status} ontogglepause={togglePause}>
     {#snippet agent()}
       <AgentPanel fiche={route === 'memoire' ? fiche : null} />
     {/snippet}
@@ -163,7 +179,7 @@
       {:else if route === 'valider'}
         <Valider {filtre} />
       {:else if route === 'memoire'}
-        <Memoire {fiche} {mode} />
+        <Memoire {fiche} {mode} q={search} />
       {:else if route === 'depots'}
         {#await import('./screens/Depots.svelte')}
           {@render loading()}
