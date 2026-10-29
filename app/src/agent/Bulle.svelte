@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ICON_STROKE, type IconComponent } from '../lib/ui/index.ts';
+  import { ICON_STROKE, Kbd, type IconComponent } from '../lib/ui/index.ts';
 
-  /** The agent's bubble, the only fixed element of the bottom right corner: its icon and its name. */
+  /** The agent's bubble, the only fixed element of the bottom right corner: its icon, its name, its key. */
 
   type Props = {
     name: string;
@@ -13,9 +13,18 @@
   let { name, icon: Icon, onclick, element = $bindable(null) }: Props = $props();
 </script>
 
-<button bind:this={element} type="button" class="bulle" aria-haspopup="dialog" {onclick}>
+<button
+  bind:this={element}
+  type="button"
+  class="bulle"
+  aria-haspopup="dialog"
+  aria-keyshortcuts="Control+J"
+  {onclick}
+>
   <Icon size={16} strokeWidth={ICON_STROKE} aria-hidden="true" />
   <span class="nom">{name}</span>
+  <!-- Said by aria-keyshortcuts: the name of the button stays the agent's. -->
+  <span class="touche" aria-hidden="true"><Kbd>Ctrl J</Kbd></span>
 </button>
 
 <style>
@@ -49,11 +58,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .touche {
+    display: flex;
+    margin-left: 4px;
+  }
   .bulle:hover {
     background: var(--surface-3);
   }
   .bulle:focus-visible {
     outline: 2px solid var(--ia);
     outline-offset: 2px;
+  }
+  /* No keyboard on a phone. */
+  @media (max-width: 767.98px) {
+    .touche {
+      display: none;
+    }
   }
 </style>
