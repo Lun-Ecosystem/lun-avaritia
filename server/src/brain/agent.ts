@@ -7,7 +7,8 @@ import { ProviderError, type ChatMessage, type ToolCall } from '../llm/types.ts'
 import { cardOf, getDraft, type Card } from './drafts.ts';
 import { addNote, InputError } from './inputs.ts';
 import { monthSpend, overCap, providerFailed, providerWorked, type BrainDeps } from './process.ts';
-import { ASK_SYSTEM, block } from './prompt.ts';
+import { askSystem, block } from './prompt.ts';
+import { readSettings } from './settings.ts';
 import { getFiche, listTypes, neighbors, searchFiches } from './store.ts';
 
 const MAX_ROUNDS = 6;
@@ -200,7 +201,13 @@ ${CAP}`
       );
     let res;
     try {
-      res = await provider.chat({ model, system: ASK_SYSTEM, messages, tools: TOOLS, maxTokens: MAX_TOKENS });
+      res = await provider.chat({
+        model,
+        system: askSystem(readSettings(db)),
+        messages,
+        tools: TOOLS,
+        maxTokens: MAX_TOKENS,
+      });
     } catch (err) {
       if (!(err instanceof ProviderError)) throw err;
       providerFailed(db, provider.id, err, deps.clock());

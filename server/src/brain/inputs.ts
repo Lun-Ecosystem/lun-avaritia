@@ -38,9 +38,29 @@ function store(db: DatabaseSync, name: string, type: string, bytes: Uint8Array, 
 }
 
 async function ingest(deps: BrainDeps, kind: 'note' | 'depot', depot: number, text: string) {
-  const at = deps.clock().toISOString();
-  const r = await processLot(deps, [{ text, source: { kind, ref: String(depot), at } }], { source: kind });
-  return outcome(r);
+  const start = deps.clock();
+  const r = await processLot(
+    deps,
+    [{ text, source: { kind, ref: String(depot), at: start.toISOString() } }],
+    {
+      source: kind,
+    },
+  );
+  const drafts = outcome(r);
+  // « Dernier traitement » also shows what a note or a depot just did (no lot behind it).
+  const end = deps.clock();
+  deps.db
+    .prepare(
+      'INSERT INTO runs (lot, at, duration_ms, cost, observations, drafts, questions) VALUES (NULL, ?, ?, ?, 1, ?, ?)',
+    )
+    .run(
+      end.toISOString(),
+      end.getTime() - start.getTime(),
+      r.cost,
+      drafts,
+      r.status === 'done' ? r.questions : 0,
+    );
+  return drafts;
 }
 
 const checkText = (text: string) => {

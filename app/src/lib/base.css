@@ -1,0 +1,49 @@
+/*
+ * Base styles of the Lun'Avaritia front, written on the shared tokens (tokens.css). The host app
+ * loads the fonts (self-hosted Cormorant Garamond and Inter); the stacks fall back to Georgia and
+ * system-ui.
+ */
+/* On :root: the launcher is mounted by the host app, outside the views' roots. */
+:root {
+  /* The agent's bubble: its height and its offset from the corner (lifted above the bottom navigation on a phone, by the shell). */
+  --agent-lanceur-h: 44px;
+  --agent-lanceur-bas: 22px;
+}
+
+.lun-avaritia {
+  font-family: var(--sans);
+  font-weight: 300;
+  color: var(--texte);
+  background: var(--fond);
+  /* Inherited: the tree and fiche columns scroll on their own, with a bar in the base colors. */
+  scrollbar-color: var(--bordure-forte) transparent;
+}
+
+.lun-avaritia button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--bordure);
+  border-radius: var(--r-2);
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+}
+
+.lun-avaritia button:hover:not(:disabled) {
+  border-color: var(--accent-bord);
+}
+
+/* No weight (:where): a kit control (TextInput, TextArea) styles its own field without a box inside the box. */
+:where(.lun-avaritia) :where(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent-bord);
+  outline-offset: 1px;
+}
+
+:where(.lun-avaritia) :where(input, select, textarea) {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface-2);
+  border: 1px solid var(--bordure);
+  border-radius: var(--r-2);
+  padding: 0.35rem 0.55rem;
+}

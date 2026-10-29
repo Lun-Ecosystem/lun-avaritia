@@ -173,7 +173,7 @@ export function neighbors(
     .prepare(
       `SELECT f.id, f.title, l.relation, 'out' AS direction FROM links l JOIN fiches f ON f.id = l.to_id WHERE l.from_id = ? AND f.merged_into IS NULL
        UNION ALL
-       SELECT f.id, f.title, l.relation, 'in' AS direction FROM links l JOIN fiches f ON f.id = l.from_id WHERE l.to_id = ? AND f.merged_into IS NULL`,
+       SELECT f.id, f.title, l.relation, 'in' AS direction FROM links l JOIN fiches f ON f.id = l.from_id WHERE l.to_id = ? AND f.merged_into IS NULL ORDER BY 1`,
     )
     .all(id, id) as unknown as { id: number; title: string; relation: string; direction: 'out' | 'in' }[];
 }

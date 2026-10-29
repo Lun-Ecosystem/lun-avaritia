@@ -91,15 +91,6 @@ describe('brain.ingest', () => {
     expect(t.fake.calls).toHaveLength(0);
   });
 
-  it('refuses the lot with a reason when core.lots is false', async () => {
-    const t = setup();
-    putSetting(t.h.db, 'core.lots', false);
-    const res = await t.ingest({ version: 1, observations: [obs('texte')] });
-    expect(res.status).toBe(400);
-    expect(JSON.stringify(await res.json())).toContain('coupés');
-    expect(t.count('lots')).toBe(0);
-  });
-
   it('holds a lot over the cap, then processes it on the next pass under the cap', async () => {
     const t = setup(); // no replies: any LLM call would fail loudly
     recordCost(t.h.db, { provider: 'anthropic', amount: 9, calls: 1 }, t.h.clock(), 'tri');

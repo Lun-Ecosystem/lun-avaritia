@@ -5,13 +5,22 @@ import { join } from 'node:path';
 import { InvalidInputError } from '../contract/actions.ts';
 import { brainDeps, type AppDeps } from '../app.ts';
 import { ask, ChatSchema, keptFiche } from './agent.ts';
-import { addDraft } from './drafts.ts';
+import { addDraft, draftView, queue, type DraftPayload } from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { dashboard } from './dashboard.ts';
 import { exportMarkdown } from './export.ts';
 import { parseVault } from './obsidian.ts';
-import { readSettings, saveSettings } from './settings.ts';
-import { addType, editFiche, getFiche, listTypes, removeType, renameType, versions } from './store.ts';
+import { readSettings, saveSettings, setting } from './settings.ts';
+import {
+  addType,
+  editFiche,
+  getFiche,
+  listTypes,
+  neighbors,
+  removeType,
+  renameType,
+  versions,
+} from './store.ts';
 
 const MAX_FILES = 2000;
 const MAX_VAULT_CHARS = 20_000_000;
@@ -42,6 +51,46 @@ export function brainRoutes(deps: AppDeps): Hono {
   r.put('/settings', async (c) => c.json({ settings: saveSettings(deps.db, await jsonBody(c)) }));
   r.get('/dashboard', (c) => c.json(dashboard(deps.db, deps.clock())));
 
+  r.get('/drafts', (c) => {
+    const shown = queue(deps.db, setting(deps.db, 'drafts.cap'));
+    const { n } = deps.db
+      .prepare("SELECT COUNT(*) AS n FROM drafts WHERE status IN ('pending', 'applying')")
+      .get() as { n: number };
+    return c.json({ drafts: shown.map((d) => draftView(deps.db, d)), held: n - shown.length });
+  });
+
+  // A link of a merged fiche counts for the kept one (one hop, as merges are flattened on apply).
+  r.get('/graph', (c) => {
+    const kept = (col: string) => `(SELECT COALESCE(merged_into, id) FROM fiches WHERE id = l.${col})`;
+    let edges = deps.db
+      .prepare(
+        `SELECT DISTINCT ${kept('from_id')} AS "from", ${kept('to_id')} AS "to", l.relation
+           FROM links l WHERE "from" <> "to"`,
+      )
+      .all() as { from: number; to: number; relation: string }[];
+    const nodeRows = deps.db
+      .prepare('SELECT id, title, type_id AS typeId FROM fiches WHERE merged_into IS NULL ORDER BY id')
+      .all() as { id: number; title: string; typeId: number }[];
+    // An end that was itself merged away is no node: drop the edge rather than leave it dangling.
+    const ids = new Set(nodeRows.map((n) => n.id));
+    edges = edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+    const degree = new Map<number, number>();
+    for (const e of edges) for (const n of [e.from, e.to]) degree.set(n, (degree.get(n) ?? 0) + 1);
+    const flagged = new Set<number>();
+    const pending = deps.db
+      .prepare("SELECT payload FROM drafts WHERE status IN ('pending', 'applying')")
+      .all() as { payload: string }[];
+    for (const { payload } of pending) {
+      const p = JSON.parse(payload) as DraftPayload;
+      if (p.kind === 'contradiction') flagged.add(p.ficheId);
+      else if (p.kind === 'doublon') flagged.add(p.keep).add(p.merge);
+      else if (p.kind === 'fiche' && p.ficheId !== undefined && p.facts.some((f) => f.replaces !== undefined))
+        flagged.add(p.ficheId);
+    }
+    const nodes = nodeRows.map((n) => ({ ...n, degree: degree.get(n.id) ?? 0, flagged: flagged.has(n.id) }));
+    return c.json({ nodes, edges });
+  });
+
   r.get('/fiches', (c) =>
     c.json({
       fiches: deps.db
@@ -61,8 +110,19 @@ export function brainRoutes(deps: AppDeps): Hono {
     } catch {
       return c.json({ error: 'Fiche inconnue' }, 404);
     }
+    const around = neighbors(deps.db, fiche.id);
+    // A fact's source cites its depot (a note is a depot too) by id in `ref`.
+    const depots = deps.db
+      .prepare(
+        `SELECT id, name FROM depots WHERE CAST(id AS TEXT) IN (
+           SELECT json_extract(source, '$.ref') FROM facts
+            WHERE fiche_id = ? AND json_extract(source, '$.kind') IN ('depot', 'note')) ORDER BY id`,
+      )
+      .all(fiche.id);
     return c.json({
       fiche,
+      neighbors: around,
+      depots,
       versions: versions(deps.db, fiche.id),
       ...(fiche.id !== asked && { redirectedFrom: asked }),
     });

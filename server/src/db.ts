@@ -120,6 +120,20 @@ const MIGRATIONS: string[] = [
      bytes BLOB NOT NULL,
      created_at TEXT NOT NULL
    );`,
+  // A note or a depot also leaves a run, without a lot: `runs.lot` becomes nullable.
+  `CREATE TABLE runs_new (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     lot INTEGER REFERENCES lots(id),
+     at TEXT NOT NULL,
+     duration_ms INTEGER NOT NULL,
+     cost REAL NOT NULL,
+     observations INTEGER NOT NULL,
+     drafts INTEGER NOT NULL,
+     questions INTEGER NOT NULL
+   );
+   INSERT INTO runs_new SELECT * FROM runs;
+   DROP TABLE runs;
+   ALTER TABLE runs_new RENAME TO runs;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

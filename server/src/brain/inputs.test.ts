@@ -3,6 +3,7 @@ import { recordCost } from '../contract/costs.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { vault } from '../testing/load-vault.ts';
 import { makeHarness } from '../testing/harness.ts';
+import { dashboard } from './dashboard.ts';
 import { applyDraft } from './drafts.ts';
 import { getFiche, listTypes } from './store.ts';
 
@@ -48,6 +49,21 @@ function setup(withProvider = true) {
 }
 
 describe('notes and depots', () => {
+  it('a depot leaves a run that « Dernier traitement » shows; a refused one leaves none', async () => {
+    const t = setup();
+    t.queue.push(...t.good());
+    await t.upload('d.txt', 'text/plain', 'Le client X a signé.');
+    expect(dashboard(t.h.db, t.h.clock()).lastRun).toMatchObject({
+      observations: 1,
+      drafts: 1,
+      questions: 0,
+    });
+    const none = setup(false);
+    expect((await none.upload('d.txt', 'text/plain', 'Le client X a signé.')).status).toBe(503);
+    expect(none.count('runs')).toBe(0);
+    expect(dashboard(none.h.db, none.h.clock()).lastRun).toBeUndefined();
+  });
+
   it('a note becomes drafts at once, sourced to its stored text', async () => {
     const t = setup();
     t.queue.push(...t.good());
