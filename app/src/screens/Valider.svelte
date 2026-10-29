@@ -158,7 +158,7 @@
     font-size: 12.5px;
     text-align: center;
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .ecran {
       padding: 16px;
     }

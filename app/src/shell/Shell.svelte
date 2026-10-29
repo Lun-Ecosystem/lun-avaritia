@@ -6,7 +6,7 @@
 
   /*
    * Shell of the standalone app: the rail with its counters and the service card on a desktop, the
-   * bottom navigation under 760 px, the agent's bubble in the bottom right corner, the toasts.
+   * bottom navigation under 768 px, the agent's bubble in the bottom right corner, the toasts.
    */
 
   type Props = {
@@ -120,7 +120,7 @@
     display: none;
   }
 
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .coque {
       flex-direction: column;
     }

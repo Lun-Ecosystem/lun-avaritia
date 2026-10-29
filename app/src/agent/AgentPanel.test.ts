@@ -61,7 +61,7 @@ describe('AgentPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Agent' })).toHaveFocus());
   });
 
-  it('is modal under 760 px: the page is inert and Tab goes round inside the panel', async () => {
+  it('is modal under 768 px: the page is inert and Tab goes round inside the panel', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q }));
     const page = document.createElement('main');
     page.innerHTML = '<button>Ailleurs</button>';

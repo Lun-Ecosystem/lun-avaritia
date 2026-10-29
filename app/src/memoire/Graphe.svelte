@@ -343,7 +343,7 @@
     box-shadow: var(--ombre-2);
     overflow-y: auto;
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .panneau {
       position: fixed;
       inset: 0;

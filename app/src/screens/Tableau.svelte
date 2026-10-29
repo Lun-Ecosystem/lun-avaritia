@@ -184,7 +184,7 @@
     display: inline-block;
     min-width: 72px;
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .grille,
     .deux {
       grid-template-columns: 1fr;

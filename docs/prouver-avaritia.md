@@ -30,7 +30,7 @@ npm run build && DEMO_FICHES=3000 npm run demo
 ```
 
 Ouvrir `http://127.0.0.1:8798` en 1440 px, puis refaire le parcours en 390 px (outils de développement, mode
-appareil). Sous 760 px, le rail laisse place à la barre du bas.
+appareil). Sous 768 px, le rail laisse place à la barre du bas.
 
 1. **Appairer** : saisir le code à 6 chiffres affiché par la commande. Le tableau de bord s’ouvre ; un jeton refusé
    plus tard ramène à cet écran.
@@ -49,7 +49,7 @@ appareil). Sous 760 px, le rail laisse place à la barre du bas.
    pause et reprise. Dans « Agent », changer le nom (« Archiviste ») et l’icône (Plume) : la bulle et le titre du
    panneau les reprennent aussitôt.
 8. **Agent** : la bulle en bas à droite, sur chaque écran (au-dessus de la barre du bas sur un téléphone). Elle
-   ouvre un panneau de 400 px, plein écran sous 760 px, titré du nom réglé ; `Échap` le ferme et rend le focus à la
+   ouvre un panneau de 400 px, plein écran sous 768 px, titré du nom réglé ; `Échap` le ferme et rend le focus à la
    bulle. Sans modèle choisi, l’agent répond qu’il faut en choisir un dans Réglages. Avec un modèle (partie 3),
    « note que Client X préfère le mardi » donne une réponse et le lien « Voir dans À valider ». Sur une fiche
    ouverte, le panneau l’indique comme contexte. Une base vide propose « Écrire une note », qui ouvre le panneau sur

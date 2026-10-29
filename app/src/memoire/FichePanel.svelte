@@ -279,7 +279,7 @@
   .retour {
     display: none;
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .retour {
       display: block;
     }

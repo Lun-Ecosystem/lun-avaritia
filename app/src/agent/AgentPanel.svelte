@@ -10,7 +10,7 @@
 
   /*
    * The agent: a bubble in the bottom right corner of every screen, and a panel over the screen that
-   * never resizes it (400 px on a desktop, the full screen under 760 px). The thread lives in the page.
+   * never resizes it (400 px on a desktop, the full screen under 768 px). The thread lives in the page.
    */
 
   type Props = {
@@ -35,11 +35,11 @@
     .then(({ settings }) => takeIdentity(settings))
     .catch(() => {});
 
-  /** Under 760 px the panel takes the screen: it is modal, the rest of the page is inert. */
+  /** Under 768 px the panel takes the screen: it is modal, the rest of the page is inert. */
   let modal = $state(false);
   function holdPage(panel: HTMLElement) {
-    // shortcut: decided at opening, a resize across 760 px while open keeps that mode; reopen to switch.
-    if (!(window.matchMedia?.('(max-width: 759.98px)').matches ?? false)) return;
+    // shortcut: decided at opening, a resize across 768 px while open keeps that mode; reopen to switch.
+    if (!(window.matchMedia?.('(max-width: 767.98px)').matches ?? false)) return;
     modal = true;
     const held: HTMLElement[] = [];
     for (
@@ -381,7 +381,7 @@
     color: var(--texte-3);
   }
 
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .panneau {
       inset: 0;
       width: auto;

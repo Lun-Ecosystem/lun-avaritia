@@ -10,7 +10,7 @@
 
   /*
    * The memory: search and the tree / graph switch on one row, the tree (or the search results) on
-   * the left, the fiche on the right. The address (`?fiche=&mode=`) is the state; under 760 px the
+   * the left, the fiche on the right. The address (`?fiche=&mode=`) is the state; under 768 px the
    * fiche covers the tree.
    */
 
@@ -283,7 +283,7 @@
     color: var(--texte-3);
     font-size: 13px;
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .ecran {
       padding: 16px;
     }

@@ -680,7 +680,7 @@
         <h2 id="s-mobile">Mobile et pages seules</h2>
       </header>
       <p class="pourquoi">
-        Sous 760 px : navigation en bas. Avant d’être dans l’app : une carte centrée sur fond encre, la saisie
+        Sous 768 px : navigation en bas. Avant d’être dans l’app : une carte centrée sur fond encre, la saisie
         du code en six cases, les étapes.
       </p>
       <div class="grille mobile-grille">

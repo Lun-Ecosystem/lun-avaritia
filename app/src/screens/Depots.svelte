@@ -241,7 +241,7 @@
   a {
     color: var(--accent-texte);
   }
-  @media (max-width: 759.98px) {
+  @media (max-width: 767.98px) {
     .ecran {
       padding: 16px;
     }
