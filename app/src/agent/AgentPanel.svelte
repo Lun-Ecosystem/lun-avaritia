@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, tick } from 'svelte';
+  import { getContext, tick, untrack } from 'svelte';
   import type { Api } from '../api.ts';
   import { formatCost } from '../format.ts';
   import { bindShortcuts, ICON_STROKE, IconButton, icons } from '../lib/ui/index.ts';
@@ -14,8 +14,9 @@
    * The agent: a bubble in the bottom right corner of every screen, and a panel over the screen that
    * never resizes it, as Lun'Acedia's Pina. On a desktop it is resized by its left edge, its top edge
    * or its top-left corner (or the arrows on a focused edge), or set to the full height on the right;
-   * the size is kept. Ctrl J opens and closes it from anywhere, a field included. Under 768 px: a sheet
-   * rising from the bottom, pulled down to close. The thread lives in the page.
+   * the size is kept. Ctrl J opens and closes it from anywhere, a field included. Under 768 px: no
+   * bubble (the shell's top bar has the agent's button), a sheet rising from the bottom, pulled down to
+   * close. The thread lives in the page.
    */
 
   type Props = {
@@ -43,11 +44,21 @@
     .then(({ settings }) => takeIdentity(settings))
     .catch(() => {});
 
+  const isPhone = () => window.matchMedia?.('(max-width: 767.98px)').matches ?? false;
+  /** Under 768 px the top bar has the agent's button: no bubble. */
+  let phone = $state(isPhone());
+  /** Where the focus was at opening (the top bar's button on a phone), given back at closing. */
+  let opener: HTMLElement | null = null;
+  $effect.pre(() => {
+    if (agentPanel.open)
+      opener = untrack(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  });
+
   /** Under 768 px the panel takes the screen: it is modal, the rest of the page is inert. */
   let modal = $state(false);
   function holdPage(panel: HTMLElement) {
     // shortcut: decided at opening, a resize across 768 px while open keeps that mode; reopen to switch.
-    if (!(window.matchMedia?.('(max-width: 767.98px)').matches ?? false)) return;
+    if (!isPhone()) return;
     modal = true;
     const held: HTMLElement[] = [];
     for (
@@ -122,7 +133,7 @@
   async function close(refocus = true) {
     agentPanel.open = false;
     await tick();
-    if (refocus) bubble?.focus();
+    if (refocus) (bubble ?? opener)?.focus();
   }
 
   function ask() {
@@ -186,7 +197,12 @@
   }
 </script>
 
-<svelte:window onresize={() => size.fit()} />
+<svelte:window
+  onresize={() => {
+    size.fit();
+    phone = isPhone();
+  }}
+/>
 
 {#if agentPanel.open}
   {#if modal}
@@ -332,7 +348,7 @@
       />
     </div>
   </div>
-{:else}
+{:else if !phone}
   <Bulle bind:element={bubble} {name} icon={Icon} onclick={() => (agentPanel.open = true)} />
 {/if}
 

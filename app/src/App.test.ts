@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentPanel } from './agent/conversation.svelte.ts';
 import App from './App.svelte';
 
 const TOKEN_KEY = 'lunavaritia.token';
@@ -41,6 +42,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  // The panel's state lives in its module: one test leaves it closed for the next.
+  agentPanel.open = false;
 });
 
 describe('App', () => {
@@ -59,7 +62,7 @@ describe('App', () => {
     expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
     expect(localStorage.getItem(TOKEN_KEY)).toBe('tok-2');
     // The agent's bubble, on every screen (default name: the settings are unreadable here).
-    expect(screen.getByRole('button', { name: 'Agent' })).toBeInTheDocument();
+    expect(document.querySelector('.bulle')).toHaveAccessibleName('Agent');
   });
 
   it('with a token, shows the shell on the route of the address', async () => {
@@ -387,6 +390,24 @@ describe('App, top bar and palette', () => {
     const field = await screen.findByRole('textbox', { name: 'Demande à Agent' });
     expect(field).toHaveValue('Note que ');
     await waitFor(() => expect(field).toHaveFocus());
+  });
+
+  it('under 768 px: no bubble, the agent button of the top bar opens and closes the sheet', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q }));
+    fakeServer();
+    const user = userEvent.setup();
+    render(App);
+    const bar = (await screen.findByRole('button', { name: /^Rechercher/ })).closest('header')!;
+    const button = within(bar).getByRole('button', { name: 'Agent' });
+    expect(document.querySelector('.bulle')).toBeNull();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await user.click(button);
+    expect(screen.getByRole('dialog', { name: 'Agent' })).toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    await user.click(button);
+    expect(screen.queryByRole('dialog', { name: 'Agent' })).toBeNull();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.bulle')).toBeNull();
   });
 
   it('« Nouvelle note » at the head of the rail does the same', async () => {

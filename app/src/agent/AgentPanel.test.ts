@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api.ts';
@@ -65,11 +65,15 @@ describe('AgentPanel', () => {
   it('is modal under 768 px: the page is inert and Tab goes round inside the panel', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q }));
     const page = document.createElement('main');
+    // The top bar's button of the shell, which opens the panel on a phone.
     page.innerHTML = '<button>Ailleurs</button>';
     document.body.append(page);
     try {
       show();
-      await userEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+      await screen.findByRole('button', { name: 'Ailleurs' });
+      expect(document.querySelector('.bulle')).toBeNull();
+      screen.getByRole('button', { name: 'Ailleurs' }).focus();
+      await act(() => (agentPanel.open = true));
       const dialog = screen.getByRole('dialog', { name: 'Agent' });
       expect(dialog).toHaveAttribute('aria-modal', 'true');
       expect(page.inert).toBe(true);
@@ -83,7 +87,8 @@ describe('AgentPanel', () => {
       expect(screen.getByRole('button', { name: 'Envoyer' })).toHaveFocus();
       await userEvent.keyboard('{Escape}');
       expect(page.inert).toBe(false);
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Agent' })).toHaveFocus());
+      // No bubble on a phone: the focus goes back to where it was at opening.
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Ailleurs' })).toHaveFocus());
     } finally {
       page.remove();
       vi.unstubAllGlobals();
@@ -185,13 +190,14 @@ describe('AgentPanel', () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q }));
     try {
       show();
-      await userEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+      expect(document.querySelector('.bulle')).toBeNull();
+      await act(() => (agentPanel.open = true));
       expect(screen.queryByRole('separator')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Pleine hauteur' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Fermer Agent' }));
       expect(screen.queryByRole('dialog')).toBeNull();
 
-      await userEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+      await act(() => (agentPanel.open = true));
       const handle = screen.getByRole('dialog').querySelector('.poignee')!;
       await fireEvent.pointerDown(handle, { pointerId: 1, clientY: 100 });
       await fireEvent.pointerUp(handle, { pointerId: 1, clientY: 130 });

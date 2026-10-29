@@ -9,12 +9,14 @@
     Kbd,
     NavLink,
     Rail,
+    ICON_STROKE,
     ServiceCard,
     Toaster,
     type NavItem,
     type PaletteCommand,
   } from '../lib/ui/index.ts';
-  import { openAgent } from '../agent/conversation.svelte.ts';
+  import { agentIdentity, agentPanel, openAgent } from '../agent/conversation.svelte.ts';
+  import { agentIcon } from '../agent/icons.ts';
   import { go } from '../memoire/titles.ts';
   import { formatCost } from '../format.ts';
   import { pathOf, type Route } from './routes.ts';
@@ -22,7 +24,8 @@
   /*
    * Shell of the standalone app, as Lun'Acedia's (plate 03): the rail with its counters and the
    * service card on a desktop, the top bar with the search (which opens the palette, Ctrl K) and the
-   * pause, the bottom navigation under 768 px, the agent's bubble in the bottom right corner, the toasts.
+   * pause, the agent's bubble in the bottom right corner, the toasts. Under 768 px: the bottom
+   * navigation, and the agent's button in the top bar instead of the bubble.
    */
 
   type Props = {
@@ -74,6 +77,7 @@
   $effect(() => bindShortcuts({ 'Ctrl+k': togglePalette }, window, { fromFields: ['Ctrl+k'] }));
 
   const newNote = () => openAgent('Note que ');
+  const AgentIcon = $derived(agentIcon(agentIdentity.icon));
 
   const commands = $derived.by((): PaletteCommand[] => {
     const q = search.trim();
@@ -153,6 +157,15 @@
             onclick={ontogglepause}
           />
         </span>
+        <button
+          type="button"
+          class="agent-haut"
+          aria-label={agentIdentity.name}
+          aria-expanded={agentPanel.open}
+          onclick={() => (agentPanel.open = !agentPanel.open)}
+        >
+          <AgentIcon size={16} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </button>
       </div>
     </header>
     <main>{@render children()}</main>
@@ -265,7 +278,22 @@
   /* No box of its own: the bubble (20) and the open panel (45) each stack on their own. */
   .agent {
     display: contents;
-    --agent-bas: var(--agent-lanceur-bas);
+  }
+  .agent-haut {
+    display: none;
+    place-items: center;
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--ia-bord);
+    border-radius: 21px;
+    background: var(--ia-doux);
+    color: var(--ia);
+    cursor: pointer;
+  }
+  .agent-haut:focus-visible {
+    outline: 2px solid var(--ia);
+    outline-offset: 2px;
   }
   .coque :global(.nav-mobile) {
     display: none;
@@ -300,9 +328,8 @@
       display: grid;
       flex: none;
     }
-    /* Above the bottom navigation. */
-    .agent {
-      --agent-bas: calc(68px + env(safe-area-inset-bottom, 0px) + 14px);
+    .agent-haut {
+      display: grid;
     }
   }
 </style>

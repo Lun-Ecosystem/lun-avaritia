@@ -31,8 +31,7 @@
   .bulle {
     position: fixed;
     right: var(--agent-lanceur-bas);
-    /* Set by the shell: higher on a phone, above the bottom navigation. */
-    bottom: var(--agent-bas, var(--agent-lanceur-bas));
+    bottom: var(--agent-lanceur-bas);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -68,11 +67,5 @@
   .bulle:focus-visible {
     outline: 2px solid var(--ia);
     outline-offset: 2px;
-  }
-  /* No keyboard on a phone. */
-  @media (max-width: 767.98px) {
-    .touche {
-      display: none;
-    }
   }
 </style>
