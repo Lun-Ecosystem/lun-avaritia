@@ -34,6 +34,16 @@ export function startLoop(
 
 const PARIS = 'Europe/Paris';
 
+/** The day of an instant in Paris, in words: « jeudi 29 octobre 2026 ». */
+export const parisDay = (at: Date | string) =>
+  new Date(at).toLocaleDateString('fr-FR', {
+    timeZone: PARIS,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
 /** Offset of Paris from UTC at an instant, in ms (DST included). */
 function parisOffset(at: number): number {
   const p = Object.fromEntries(

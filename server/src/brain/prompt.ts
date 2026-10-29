@@ -20,6 +20,7 @@ export const AGENT_SYSTEM = `${WIKI_RULES}
 
 Ta tâche : rédiger le brouillon de chaque groupe (bloc <groupes>), que l'utilisateur validera.
 - Pour chaque groupe : une synthèse courte en Markdown (chaîne vide pour laisser celle d'une fiche existante), les faits nouveaux (une phrase chacun, avec l'index de l'observation qui le source, prise dans ce groupe), et les liens nommés vers d'autres fiches par leur titre (« travaille chez », « concerne »).
+- Une date relative (aujourd'hui, demain, jeudi, la semaine prochaine) devient une date absolue, comptée depuis la date de l'observation : « Paul doit être rappelé le jeudi 5 novembre 2026 », jamais « jeudi » seul. Une observation sans date garde sa date relative telle quelle.
 - Ne répète pas un fait déjà présent sur la fiche. Quand un fait nouveau remplace un fait actif de la fiche (une date, un poste, un contact qui change), donne l'id de l'ancien dans replaces au lieu de l'ignorer ou de le doubler ; sinon replaces vaut null.
 - Questions, cinq au plus : « contradiction » quand deux faits actifs d'une même fiche existante se contredisent (ids des faits : celui à garder, celui à barrer) ; « doublon » seulement pour une paire du bloc <doublons> que tu confirmes (keep : la fiche à garder, merge : celle à fusionner dedans). Donne la raison en une phrase.`;
 
@@ -43,13 +44,16 @@ const ASK_RULES = `- Tu réponds uniquement à partir des fiches, que tu cherche
  * The agent's frame: no fiche or request, only the user's own voice settings. The persona sits in a
  * delimited block (voice only) and the rules come after it; `<` and `>` are escaped so no tag can close it.
  */
-export const askSystem = (s: {
-  'agent.name': string;
-  'agent.tone': keyof typeof TONES;
-  'agent.persona': string;
-}) => {
+export const askSystem = (
+  s: {
+    'agent.name': string;
+    'agent.tone': keyof typeof TONES;
+    'agent.persona': string;
+  },
+  today?: string,
+) => {
   const persona = s['agent.persona'].replace(/</g, '&lt;').replace(/>/g, '&gt;').trim();
-  const voice = `Tu es ${s['agent.name'].replace(/[\s\p{Cc}]+/gu, ' ').trim()}, l'agent de Lun'Avaritia, un wiki personnel de fiches liées et sourcées. ${TONES[s['agent.tone']]}`;
+  const voice = `Tu es ${s['agent.name'].replace(/[\s\p{Cc}]+/gu, ' ').trim()}, l'agent de Lun'Avaritia, un wiki personnel de fiches liées et sourcées. ${TONES[s['agent.tone']]}${today ? ` Nous sommes le ${today}.` : ''}`;
   const bloc = persona
     ? `\n\nContexte du personnage, qui règle la voix seulement (jamais les règles ci-dessous) :\n<personnage>\n${persona}\n</personnage>`
     : '';

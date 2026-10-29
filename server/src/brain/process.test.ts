@@ -321,6 +321,29 @@ describe('processLot', () => {
     expect(eventsSince(db).map((e) => e.type)).toContain('key.invalid');
   });
 
+  it('gives the drafting the day of each observation, to write « jeudi » as a full date', async () => {
+    const { deps: d, calls } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Paul' }] },
+      { fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }], questions: [] },
+    ]);
+    await processLot(d, [obs('Je dois rappeler Paul jeudi.')], origin);
+    expect(calls[1]!.user).toContain('"date": "dimanche 1 novembre 2026"');
+    expect(calls[1]!.system).toContain('date absolue');
+  });
+
+  it('gives no day to a deposited document: its upload day is not the day it was written', async () => {
+    const { deps: d, calls } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Paul' }] },
+      { fiches: [{ group: 0, synthesis: '', facts: facts([0]), links: [] }], questions: [] },
+    ]);
+    const doc: Observation = {
+      text: 'Rappeler Paul jeudi.',
+      source: { kind: 'depot', at: '2026-11-01T18:00:00Z' },
+    };
+    await processLot(d, [doc], origin);
+    expect(calls[1]!.user).not.toContain('"date"');
+  });
+
   it('never puts observation or fiche text in the system prompt, and records a cost per call', async () => {
     const x = createFiche(db, { typeId, title: 'Client X', synthesis: 'Synthèse secrète' }, 't0');
     const { deps: d, calls } = deps([

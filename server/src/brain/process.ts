@@ -7,7 +7,7 @@ import { setting } from './settings.ts';
 import { costOf, priceOf } from '../llm/models.ts';
 import { ProviderError, type LlmProvider, type ProviderId } from '../llm/types.ts';
 import type { Fiche, Source } from '../types.ts';
-import { parisMonthStart } from '../util.ts';
+import { parisDay, parisMonthStart } from '../util.ts';
 import { addDraft, type DraftPayload } from './drafts.ts';
 import { AGENT_SYSTEM, block, TRI_SYSTEM } from './prompt.ts';
 import { getFiche, listTypes, searchFiches } from './store.ts';
@@ -244,6 +244,8 @@ async function ask<T>(
   throw new InvalidAnswer(`Réponse invalide ${step}, deux fois : ${reason}`.slice(0, 500));
 }
 
+const SPOKEN = new Set<Source['kind']>(['note', 'core']);
+
 /** Two calls: the tri groups the observations, the agent drafts a fiche per group and a few questions. */
 export async function processLot(
   deps: BrainDeps,
@@ -312,7 +314,15 @@ export async function processLot(
           block(
             'observations',
             groups.flatMap((g, i) =>
-              g.observations.map((o) => ({ group: i, index: o, text: observations[o]!.text })),
+              g.observations.map((o) => ({
+                group: i,
+                index: o,
+                // A note or a message is dated when said; a deposit or an import only when it arrived.
+                ...(SPOKEN.has(observations[o]!.source.kind) && {
+                  date: parisDay(observations[o]!.source.at),
+                }),
+                text: observations[o]!.text,
+              })),
             ),
           ),
           block(
