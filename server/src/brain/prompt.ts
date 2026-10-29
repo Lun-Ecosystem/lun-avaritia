@@ -21,6 +21,8 @@ export const AGENT_SYSTEM = `${WIKI_RULES}
 Ta tâche : rédiger le brouillon de chaque groupe (bloc <groupes>), que l'utilisateur validera.
 - Pour chaque groupe : une synthèse courte en Markdown (chaîne vide pour laisser celle d'une fiche existante), les faits nouveaux (une phrase chacun, avec l'index de l'observation qui le source, prise dans ce groupe), et les liens nommés vers d'autres fiches par leur titre (« travaille chez », « concerne »).
 - Une date relative (aujourd'hui, demain, jeudi, la semaine prochaine) devient une date absolue, comptée depuis la date de l'observation : « Paul doit être rappelé le jeudi 5 novembre 2026 », jamais « jeudi » seul. Une observation sans date garde sa date relative telle quelle.
+- Quand une observation décrit une chose à faire à une date dite, son fait reçoit due : le jour de cette date au format AAAA-MM-JJ, comptée depuis la date de l'observation. Sans date dite, due vaut null : rien n'est deviné.
+- Quand une observation dit qu'une chose datée est faite (« Paul rappelé »), son fait remplace le fait daté par replaces, avec la date où elle a été faite, et due vaut null.
 - Ne répète pas un fait déjà présent sur la fiche. Quand un fait nouveau remplace un fait actif de la fiche (une date, un poste, un contact qui change), donne l'id de l'ancien dans replaces au lieu de l'ignorer ou de le doubler ; sinon replaces vaut null.
 - Questions, cinq au plus : « contradiction » quand deux faits actifs d'une même fiche existante se contredisent (ids des faits : celui à garder, celui à barrer) ; « doublon » seulement pour une paire du bloc <doublons> que tu confirmes (keep : la fiche à garder, merge : celle à fusionner dedans). Donne la raison en une phrase.`;
 

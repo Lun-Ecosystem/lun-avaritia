@@ -8,7 +8,7 @@ import { costOf, priceOf } from '../llm/models.ts';
 import { ProviderError, type LlmProvider, type ProviderId } from '../llm/types.ts';
 import type { Fiche, Source } from '../types.ts';
 import { parisDay, parisMonthStart } from '../util.ts';
-import { addDraft, type DraftPayload } from './drafts.ts';
+import { addDraft, DaySchema, type DraftPayload } from './drafts.ts';
 import { AGENT_SYSTEM, block, TRI_SYSTEM } from './prompt.ts';
 import { getFiche, listTypes, searchFiches } from './store.ts';
 
@@ -120,7 +120,12 @@ const AgentShape = z.strictObject({
       group: z.number(),
       synthesis: z.string(),
       facts: z.array(
-        z.strictObject({ text: z.string(), observation: z.number(), replaces: z.number().nullable() }),
+        z.strictObject({
+          text: z.string(),
+          observation: z.number(),
+          replaces: z.number().nullable(),
+          due: z.string().nullable(),
+        }),
       ),
       links: z.array(z.strictObject({ to: z.string(), relation: z.string() })),
     }),
@@ -179,6 +184,8 @@ function agentSchema(groups: Group[], pairs: [number, number][]) {
         if (!g.observations.includes(x.observation)) ctx.addIssue(`source ${x.observation} hors du groupe`);
         if (x.replaces !== null && !active.delete(x.replaces))
           ctx.addIssue(`fait remplacé ${x.replaces} absent de la fiche ou déjà remplacé`);
+        if (x.due !== null && !DaySchema.safeParse(x.due).success)
+          ctx.addIssue(`échéance ${x.due} : un jour AAAA-MM-JJ qui existe, ou null`);
       }
       for (const l of f.links)
         if (!short(l.to, 120) || !short(l.relation, 60)) ctx.addIssue('lien vide ou trop long');
@@ -348,6 +355,7 @@ export async function processLot(
           text: x.text.trim(),
           source: observations[x.observation]!.source,
           ...(x.replaces !== null && { replaces: x.replaces }),
+          ...(x.due !== null && { due: x.due }),
         })),
         links: f.links.map((l) => ({ to: l.to.trim(), relation: l.relation.trim() })),
       };

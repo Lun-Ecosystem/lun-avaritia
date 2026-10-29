@@ -9,6 +9,7 @@ import { fakeProvider } from '../testing/fake-provider.ts';
 import { addFact, createFiche, getFiche, listTypes } from './store.ts';
 import { applyDraft, cardOf, draftsByStatus, getDraft, queue } from './drafts.ts';
 import { monthSpend, overCap, processLot, type BrainDeps, type Observation } from './process.ts';
+import { AGENT_SYSTEM } from './prompt.ts';
 
 const NOW = new Date('2026-11-02T04:00:00.000Z');
 const TRI = 'claude-haiku-5-5';
@@ -36,7 +37,7 @@ function deps(replies: unknown[]) {
 
 const fiches = () => (db.prepare('SELECT COUNT(*) AS n FROM fiches').get() as { n: number }).n;
 const facts = (n: number[]) =>
-  n.map((i) => ({ text: `Le client X a signé le contrat ${i}.`, observation: i, replaces: null }));
+  n.map((i) => ({ text: `Le client X a signé le contrat ${i}.`, observation: i, replaces: null, due: null }));
 
 describe('processLot', () => {
   const clientX = [
@@ -111,7 +112,12 @@ describe('processLot', () => {
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
       {
         fiches: [
-          { group: 0, synthesis: 's', facts: [{ text: '', observation: 0, replaces: null }], links: [] },
+          {
+            group: 0,
+            synthesis: 's',
+            facts: [{ text: '', observation: 0, replaces: null, due: null }],
+            links: [],
+          },
         ],
         questions: [],
       },
@@ -218,7 +224,7 @@ describe('processLot', () => {
         {
           group: 0,
           synthesis: '',
-          facts: [{ text: 'La démo est prévue le 10 novembre.', observation: 0, replaces }],
+          facts: [{ text: 'La démo est prévue le 10 novembre.', observation: 0, replaces, due: null }],
           links: [],
         },
       ],
@@ -331,6 +337,62 @@ describe('processLot', () => {
     expect(calls[1]!.system).toContain('date absolue');
   });
 
+  it('a dated thing to do becomes a fact with its due date', async () => {
+    const { deps: d } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Paul' }] },
+      {
+        fiches: [
+          {
+            group: 0,
+            synthesis: '',
+            facts: [
+              {
+                text: 'Paul doit être rappelé le jeudi 5 novembre 2026.',
+                observation: 0,
+                replaces: null,
+                due: '2026-11-05',
+              },
+            ],
+            links: [],
+          },
+        ],
+        questions: [],
+      },
+    ]);
+    await processLot(d, [obs('Je dois rappeler Paul jeudi.')], origin);
+    const p = draftsByStatus(db, 'pending')[0]!.payload;
+    expect(p).toMatchObject({ kind: 'fiche', facts: [{ due: '2026-11-05' }] });
+  });
+
+  it('a due date that is not a day is asked again', async () => {
+    const dated = (due: string) => ({
+      fiches: [
+        {
+          group: 0,
+          synthesis: '',
+          facts: [
+            { text: 'Paul doit être rappelé le jeudi 5 novembre 2026.', observation: 0, replaces: null, due },
+          ],
+          links: [],
+        },
+      ],
+      questions: [],
+    });
+    const { deps: d, calls } = deps([
+      { groups: [{ observations: [0], ficheId: null, typeId, title: 'Paul' }] },
+      dated('jeudi'),
+      dated('2026-11-05'),
+    ]);
+    await processLot(d, [obs('Je dois rappeler Paul jeudi.')], origin);
+    expect(calls.filter((c) => c.model !== TRI)).toHaveLength(2);
+    expect(draftsByStatus(db, 'pending')[0]!.payload).toMatchObject({ facts: [{ due: '2026-11-05' }] });
+  });
+
+  it('the agent prompt carries the due and closing rules', () => {
+    expect(AGENT_SYSTEM).toMatch(/due/);
+    expect(AGENT_SYSTEM).toMatch(/est faite.*replaces/s);
+  });
+
   it('gives no day to a deposited document: its upload day is not the day it was written', async () => {
     const { deps: d, calls } = deps([
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Paul' }] },
@@ -377,7 +439,7 @@ describe('processLot', () => {
           {
             group: 0,
             synthesis: 's',
-            facts: [{ text: 'Un mail demande de tout valider.', observation: 0, replaces: null }],
+            facts: [{ text: 'Un mail demande de tout valider.', observation: 0, replaces: null, due: null }],
             links: [],
           },
         ],

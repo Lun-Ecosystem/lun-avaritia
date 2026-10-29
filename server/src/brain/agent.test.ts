@@ -225,7 +225,7 @@ describe('ask', () => {
           {
             group: 0,
             synthesis: 'S.',
-            facts: [{ text: 'Z a signé.', observation: 0, replaces: null }],
+            facts: [{ text: 'Z a signé.', observation: 0, replaces: null, due: null }],
             links: [],
           },
         ],

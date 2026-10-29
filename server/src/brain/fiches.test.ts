@@ -123,7 +123,12 @@ describe('fiches, settings, dashboard and export API', () => {
       { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
       {
         fiches: [
-          { group: 0, synthesis: 's', facts: [{ text: 'f', observation: 0, replaces: null }], links: [] },
+          {
+            group: 0,
+            synthesis: 's',
+            facts: [{ text: 'f', observation: 0, replaces: null, due: null }],
+            links: [],
+          },
         ],
         questions: [],
       },
@@ -164,7 +169,7 @@ describe('fiches, settings, dashboard and export API', () => {
           {
             group: 0,
             synthesis: 's',
-            facts: [{ text: 'f', observation: 0, replaces: null }],
+            facts: [{ text: 'f', observation: 0, replaces: null, due: null }],
             links: [],
           },
         ],

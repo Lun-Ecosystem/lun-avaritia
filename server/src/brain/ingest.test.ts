@@ -54,7 +54,7 @@ function setup(replies: unknown[] = []) {
         {
           group: 0,
           synthesis: 'Client fictif.',
-          facts: [{ text: 'Le client X a signé.', observation: 0, replaces: null }],
+          facts: [{ text: 'Le client X a signé.', observation: 0, replaces: null, due: null }],
           links: [],
         },
       ],

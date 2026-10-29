@@ -33,9 +33,10 @@ const SourceSchema = z.object({
 });
 const id = z.number().int().positive();
 /** A real calendar day: `z.iso.date()` alone lets 30 February through. */
-export const DaySchema = z.iso
-  .date()
-  .refine((d) => new Date(`${d}T12:00:00Z`).toISOString().slice(0, 10) === d, 'Jour inexistant');
+export const DaySchema = z.iso.date().refine((d) => {
+  const t = new Date(`${d}T12:00:00Z`);
+  return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === d;
+}, 'Jour inexistant');
 
 export const DraftPayloadSchema = z.discriminatedUnion('kind', [
   z.object({
