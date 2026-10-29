@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { InvalidInputError } from '../contract/actions.ts';
 import type { Source } from '../types.ts';
+import { parisDay } from '../util.ts';
 import { ImportedNoteSchema } from './obsidian.ts';
 import { addFact, createFiche, editFiche, getFiche, link, listTypes, reindex, strikeFact } from './store.ts';
 
@@ -31,6 +32,10 @@ const SourceSchema = z.object({
   at: z.string(),
 });
 const id = z.number().int().positive();
+/** A real calendar day: `z.iso.date()` alone lets 30 February through. */
+export const DaySchema = z.iso
+  .date()
+  .refine((d) => new Date(`${d}T12:00:00Z`).toISOString().slice(0, 10) === d, 'Jour inexistant');
 
 export const DraftPayloadSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -40,7 +45,15 @@ export const DraftPayloadSchema = z.discriminatedUnion('kind', [
     title: z.string(),
     synthesis: z.string(),
     // `replaces`: an active fact of the same fiche that the new fact supersedes (struck on apply).
-    facts: z.array(z.object({ text: z.string().min(1), source: SourceSchema, replaces: id.optional() })),
+    // `due`: the day a thing to do is due, only when the note said a date.
+    facts: z.array(
+      z.object({
+        text: z.string().min(1),
+        source: SourceSchema,
+        replaces: id.optional(),
+        due: DaySchema.optional(),
+      }),
+    ),
     links: z.array(z.object({ to: z.union([id, z.string().min(1)]), relation: z.string().min(1) })),
   }),
   z.object({ kind: z.literal('contradiction'), ficheId: id, keep: id, strike: id, reason: z.string() }),
@@ -177,7 +190,7 @@ function applyFiche(
       if (!old || old.fiche_id !== ficheId || old.struck_at !== null)
         throw new InvalidInputError(`Le fait remplacé n° ${f.replaces} n'est plus actif sur cette fiche.`);
     }
-    const added = addFact(db, ficheId, f.text, f.source as Source, now);
+    const added = addFact(db, ficheId, f.text, f.source as Source, now, f.due);
     if (f.replaces !== undefined) strikeFact(db, f.replaces, added, now);
   }
   for (const l of p.links) {
@@ -316,10 +329,12 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
   if (p.kind === 'fiche') {
     title = p.ficheId === undefined ? `Nouvelle fiche : ${p.title}` : `Enrichir la fiche : ${p.title}`;
     if (p.synthesis) lines.push(`Synthèse : ${p.synthesis}`);
-    for (const f of p.facts)
+    for (const f of p.facts) {
       lines.push(
         f.replaces === undefined ? `Fait : ${f.text}` : `Remplace : ${factText(f.replaces)} → ${f.text}`,
       );
+      if (f.due !== undefined) lines.push(`Échéance : ${parisDay(`${f.due}T12:00:00Z`)}`);
+    }
     for (const l of p.links)
       lines.push(`Lien : ${l.relation} → ${typeof l.to === 'number' ? ficheTitle(l.to) : l.to}`);
     if (d.skippedSynthesis) lines.push('Synthèse non appliquée : la fiche a été modifiée depuis.');

@@ -207,6 +207,24 @@ describe('drafts', () => {
   });
 });
 
+describe('due dates', () => {
+  const dated = { text: 'rappeler Paul', source: src, due: '2026-11-05' };
+
+  it('a fiche draft with a due date writes it on the fact', () => {
+    applyDraft(db, draft({ facts: [dated] }), undefined, 't2');
+    expect(getFiche(db, 1)!.facts[0]!.due).toBe('2026-11-05');
+  });
+
+  it('the card shows the due date', () => {
+    const d = getDraft(db, draft({ facts: [dated] }))!;
+    expect(cardOf(db, d).lines).toContain('Échéance : jeudi 5 novembre 2026');
+  });
+
+  it('an impossible due date is refused', () => {
+    expect(() => draft({ facts: [{ ...dated, due: '2026-02-30' }] })).toThrow(InvalidInputError);
+  });
+});
+
 describe('drafts review fixes', () => {
   it('applies a second enrichment synthesis after the first was accepted', () => {
     const f = fiche('Bob');

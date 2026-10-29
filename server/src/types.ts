@@ -74,6 +74,8 @@ export interface Fact {
   at: string;
   struckAt?: string;
   struckBy?: number;
+  /** The day it is due (ISO date), for a thing to do at a date said. */
+  due?: string;
 }
 
 export interface Link {
