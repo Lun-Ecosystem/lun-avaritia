@@ -24,12 +24,14 @@
   let filtre = $state(new URLSearchParams(window.location.search).get('filtre'));
   let fiche = $state(new URLSearchParams(window.location.search).get('fiche'));
   let mode = $state(new URLSearchParams(window.location.search).get('mode'));
+  let theme = $state(new URLSearchParams(window.location.search).get('theme'));
   function follow() {
     route = routeFromPath(window.location.pathname);
     const q = new URLSearchParams(window.location.search);
     filtre = q.get('filtre');
     fiche = q.get('fiche');
     mode = q.get('mode');
+    theme = q.get('theme');
   }
 
   // An app asks for access (`GET /lun/v1/authorize`): the request waits here, through pairing if needed.
@@ -174,7 +176,7 @@
         {#await import('./screens/Reglages.svelte')}
           {@render loading()}
         {:then m}
-          <m.default paused={status.paused} onservice={readHealth} />
+          <m.default paused={status.paused} onservice={readHealth} {theme} />
         {:catch e}
           {@render failed(e)}
         {/await}

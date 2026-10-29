@@ -60,7 +60,7 @@
         tone="attention"
         title="Plafond de coût atteint : {plural(data.heldLots, 'lot en attente', 'lots en attente')}"
       >
-        {#snippet action()}<a href="/reglages">Réglages</a>{/snippet}
+        {#snippet action()}<a href="/reglages?theme=fournisseurs">Réglages</a>{/snippet}
       </Banner>
     {/if}
 

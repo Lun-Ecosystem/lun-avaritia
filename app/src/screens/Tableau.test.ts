@@ -78,7 +78,10 @@ describe('Tableau', () => {
 
     expect(screen.getByText('Dépôt ajouté : exemple')).toBeInTheDocument();
     expect(screen.getByText('Plafond de coût atteint : 2 lots en attente')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Réglages' })).toHaveAttribute('href', '/reglages');
+    expect(screen.getByRole('link', { name: 'Réglages' })).toHaveAttribute(
+      'href',
+      '/reglages?theme=fournisseurs',
+    );
     expect(screen.queryByText(/ce mois/)).toBeNull();
   });
 
