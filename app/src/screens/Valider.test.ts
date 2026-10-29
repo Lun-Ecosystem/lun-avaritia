@@ -81,6 +81,14 @@ afterEach(() => {
 });
 
 describe('Valider', () => {
+  it('shows the due date of a fact to validate', async () => {
+    const dated = fiche(1, 'Paul', {
+      facts: [{ text: 'Paul doit être rappelé le jeudi 5 novembre 2026.', source: src, due: '2026-11-05' }],
+    });
+    show([{ drafts: [dated], held: 0 }]);
+    expect(await screen.findByText('Échéance : jeudi 5 novembre 2026')).toBeInTheDocument();
+  });
+
   it('shows the queue in the order served, each draft with its kind', async () => {
     show([
       {

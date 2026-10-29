@@ -57,6 +57,7 @@ export function getFiche(db: DatabaseSync, id: number): Fiche | undefined {
       source: JSON.parse(x.source) as Source,
       at: x.at,
       ...(x.struck_at !== null && { struckAt: x.struck_at, struckBy: x.struck_by ?? undefined }),
+      ...(x.due !== null && { due: x.due as string }),
     }),
   );
   const links = (
@@ -83,12 +84,13 @@ export function addFact(
   text: string,
   source: Source,
   now: string,
+  due?: string,
 ): number {
   if (!exists(db, ficheId)) throw new InvalidInputError('Fiche absente.');
   const id = Number(
     db
-      .prepare('INSERT INTO facts (fiche_id, text, source, at) VALUES (?, ?, ?, ?)')
-      .run(ficheId, text, JSON.stringify(source), now).lastInsertRowid,
+      .prepare('INSERT INTO facts (fiche_id, text, source, at, due) VALUES (?, ?, ?, ?, ?)')
+      .run(ficheId, text, JSON.stringify(source), now, due ?? null).lastInsertRowid,
   );
   reindex(db, ficheId);
   return id;

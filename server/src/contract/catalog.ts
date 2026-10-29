@@ -1,4 +1,12 @@
-import { IdSchema, neighborsAction, readAction, SearchSchema, searchAction } from '../brain/agent.ts';
+import {
+  DueSchema,
+  dueAction,
+  IdSchema,
+  neighborsAction,
+  readAction,
+  SearchSchema,
+  searchAction,
+} from '../brain/agent.ts';
 import { DigestSchema, digestAction } from '../brain/digest.ts';
 import { IngestSchema, ingestLot, runPending } from '../brain/ingest.ts';
 import type { BrainDeps } from '../brain/process.ts';
@@ -30,6 +38,13 @@ export function registerCatalog(actions: ActionRegistry, deps: BrainDeps, log: (
     'Lit une fiche : synthèse (4 000 caractères au plus), faits actifs sourcés, liens. Une fiche fusionnée renvoie la fiche gardée.',
     IdSchema,
     async (input) => readAction(input, deps),
+    'read',
+  );
+  actions.register(
+    'brain.due',
+    'Les faits actifs dont l’échéance tombe au plus tard ce jour (AAAA-MM-JJ), la plus ancienne d’abord.',
+    DueSchema,
+    async (input) => dueAction(input, deps),
     'read',
   );
   actions.register(

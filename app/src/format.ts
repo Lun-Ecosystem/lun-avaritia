@@ -23,5 +23,15 @@ export function formatWhen(iso: string, now: Date): string {
   return part(d, { day: '2-digit', month: '2-digit' });
 }
 
+/** A day `AAAA-MM-JJ` in words, « jeudi 5 novembre 2026 », without going through the local time zone. */
+export const formatDueDay = (iso: string): string =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+
 /** `28/10` (Paris time). */
 export const formatDay = (iso: string): string => part(new Date(iso), { day: '2-digit', month: '2-digit' });

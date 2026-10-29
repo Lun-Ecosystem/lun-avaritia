@@ -121,6 +121,38 @@ describe('read actions', () => {
       expect(list.actions.find((a) => a.name === n)?.effect).toBe('read');
   });
 
+  it('brain.due gives the open facts due by that day, and brain.read shows the due date', async () => {
+    const t = setup();
+    addFact(t.h.db, t.y, 'Livrer la maquette le 10 novembre 2026.', src, NOW, '2026-11-10');
+    addFact(t.h.db, t.x, 'Rappeler Paul le 5 novembre 2026.', src, NOW, '2026-11-05');
+    addFact(t.h.db, t.x, 'Envoyer le devis le 1 novembre 2026.', src, NOW, '2026-11-01');
+    const res = await run(t.h, 'brain.due', { day: '2026-11-05' });
+    const { result } = (await res.json()) as { result: { fiche: string; text: string; due: string }[] };
+    expect(result.map((r) => [r.fiche, r.due])).toEqual([
+      ['Client X', '2026-11-01'],
+      ['Client X', '2026-11-05'],
+    ]);
+    const read = (await (await run(t.h, 'brain.read', { id: t.x })).json()) as {
+      result: { facts: { due?: string }[] };
+    };
+    expect(read.result.facts.map((f) => f.due)).toContain('2026-11-05');
+  });
+
+  it('a replaced fact is no longer due', async () => {
+    const t = setup();
+    const old = addFact(t.h.db, t.x, 'Rappeler Paul le 1 novembre 2026.', src, NOW, '2026-11-01');
+    strikeFact(t.h.db, old, addFact(t.h.db, t.x, 'Paul rappelé le 2 novembre 2026.', src, NOW), NOW);
+    const { result } = (await (await run(t.h, 'brain.due', { day: '2026-11-05' })).json()) as {
+      result: unknown[];
+    };
+    expect(result).toEqual([]);
+  });
+
+  it('brain.due answers 400 on a bad day', async () => {
+    const t = setup();
+    expect((await run(t.h, 'brain.due', { day: 'jeudi' })).status).toBe(400);
+  });
+
   it('brain.read truncates the synthesis to 4 000 characters', async () => {
     const t = setup();
     editFiche(t.h.db, t.x, { synthesis: 'a'.repeat(9000) }, NOW);
@@ -225,7 +257,7 @@ describe('ask', () => {
           {
             group: 0,
             synthesis: 'S.',
-            facts: [{ text: 'Z a signé.', observation: 0, replaces: null }],
+            facts: [{ text: 'Z a signé.', observation: 0, replaces: null, due: null }],
             links: [],
           },
         ],

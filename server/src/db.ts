@@ -134,6 +134,8 @@ const MIGRATIONS: string[] = [
    INSERT INTO runs_new SELECT * FROM runs;
    DROP TABLE runs;
    ALTER TABLE runs_new RENAME TO runs;`,
+  // The day a thing to do is due (ISO date), when the note said one.
+  `ALTER TABLE facts ADD COLUMN due TEXT;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

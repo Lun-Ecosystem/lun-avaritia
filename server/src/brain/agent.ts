@@ -4,7 +4,7 @@ import { InvalidInputError } from '../contract/actions.ts';
 import { recordCost } from '../contract/costs.ts';
 import { costOf, priceOf } from '../llm/models.ts';
 import { ProviderError, type ChatMessage, type ToolCall } from '../llm/types.ts';
-import { cardOf, getDraft, type Card } from './drafts.ts';
+import { cardOf, DaySchema, getDraft, type Card } from './drafts.ts';
 import { addNote, InputError } from './inputs.ts';
 import { monthSpend, overCap, providerFailed, providerWorked, type BrainDeps } from './process.ts';
 import { parisDay } from '../util.ts';
@@ -42,6 +42,7 @@ export const SearchSchema = z.object({
   limit: z.number().int().min(1).max(20).default(10),
 });
 export const IdSchema = z.object({ id: z.number().int().positive() });
+export const DueSchema = z.object({ day: DaySchema });
 
 export function searchAction({ query, limit }: z.infer<typeof SearchSchema>, deps: Pick<BrainDeps, 'db'>) {
   return searchFiches(deps.db, query, limit).map((r) => ({
@@ -59,6 +60,25 @@ export function keptFiche(db: DatabaseSync, id: number) {
   return fiche;
 }
 
+/** The active facts due by `day` (a struck fact is done or superseded), the earliest first. */
+export function dueAction({ day }: z.infer<typeof DueSchema>, deps: Pick<BrainDeps, 'db'>) {
+  return deps.db
+    .prepare(
+      `SELECT x.id AS factId, f.id AS ficheId, f.title AS fiche, x.text, x.due
+         FROM facts x JOIN fiches f ON f.id = x.fiche_id
+        WHERE x.struck_at IS NULL AND x.due IS NOT NULL AND x.due <= ? AND f.merged_into IS NULL
+        ORDER BY x.due, x.id`,
+    )
+    .all(day)
+    .map((r) => ({ ...r })) as {
+    factId: number;
+    ficheId: number;
+    fiche: string;
+    text: string;
+    due: string;
+  }[];
+}
+
 /**
  * The fiche with its active facts only. A fiche merged into another redirects to the kept one (the answer
  * says `redirectedFrom`), so a link to an old id still lands somewhere.
@@ -73,7 +93,7 @@ export function readAction({ id }: z.infer<typeof IdSchema>, deps: Pick<BrainDep
     synthesis: fiche.synthesis.slice(0, SYNTHESIS_CHARS),
     facts: fiche.facts
       .filter((f) => f.struckAt === undefined)
-      .map((f) => ({ id: f.id, text: f.text, source: f.source, at: f.at })),
+      .map((f) => ({ id: f.id, text: f.text, source: f.source, at: f.at, ...(f.due && { due: f.due }) })),
     links: fiche.links.filter((l) => live(l.from) && live(l.to)),
     updatedAt: fiche.updatedAt,
     ...(fiche.id !== id && { redirectedFrom: id }),

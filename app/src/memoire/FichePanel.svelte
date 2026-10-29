@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, untrack } from 'svelte';
   import type { Api } from '../api.ts';
-  import { formatDay } from '../format.ts';
+  import { formatDay, formatDueDay } from '../format.ts';
   import { Badge, Banner, Button, icons, Skeleton } from '../lib/ui/index.ts';
   import Prose from '../Prose.svelte';
   import FicheEdit from './FicheEdit.svelte';
@@ -10,7 +10,7 @@
   /* One fiche: synthesis, sourced facts (struck ones kept and dated), links, versions, edition. */
 
   type Source = { kind: string; origin?: string; ref?: string; at?: string };
-  type Fact = { id: number; text: string; source: Source; at: string; struckAt?: string };
+  type Fact = { id: number; text: string; source: Source; at: string; struckAt?: string; due?: string };
   type Fiche = {
     id: number;
     typeId: number;
@@ -147,7 +147,8 @@
             <li>
               {#if fact.struckAt}<s>{fact.text}</s>{:else}<span>{fact.text}</span>{/if}
               <span class="src">
-                {sourceOf(fact.source)} · {formatDay(fact.at)}{#if fact.struckAt}
+                {sourceOf(fact.source)} · {formatDay(fact.at)}{#if fact.due && !fact.struckAt}
+                  · échéance le {formatDueDay(fact.due)}{/if}{#if fact.struckAt}
                   · barré le {formatDay(fact.struckAt)}{/if}
               </span>
             </li>
