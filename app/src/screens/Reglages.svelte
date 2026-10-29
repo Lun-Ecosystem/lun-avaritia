@@ -372,7 +372,7 @@
       pointer-events: none;
     }
     .contenu {
-      padding: 8px 16px 32px;
+      padding: 8px 16px calc(24px + var(--agent-lanceur-h) + var(--agent-lanceur-bas));
     }
     .colonne {
       gap: 14px;
