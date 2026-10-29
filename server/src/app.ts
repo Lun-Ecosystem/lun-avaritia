@@ -48,6 +48,7 @@ export function brainDeps(deps: AppDeps): BrainDeps {
   return {
     db: deps.db,
     clock: deps.clock,
+    log: deps.log ?? console.warn,
     provider:
       deps.brainProvider ??
       ((use) => {
