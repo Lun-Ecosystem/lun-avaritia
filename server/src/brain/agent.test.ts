@@ -211,6 +211,12 @@ describe('ask', () => {
     expect(sent).toContain('Bibliothécaire fictif.');
   });
 
+  it('tells the agent the day it is, so a passed date reads as passed', async () => {
+    const t = setup([{ text: 'ok', toolCalls: [] }]);
+    await ask(t.deps, 'que dois-je faire cette semaine ?', {});
+    expect(t.fake.chatCalls[0]!.system).toContain('Nous sommes le lundi 2 novembre 2026.');
+  });
+
   it('note creates a draft, no fiche', async () => {
     const good = [
       { groups: [{ observations: [0], ficheId: null, typeId: 1, title: 'Client Z' }] },

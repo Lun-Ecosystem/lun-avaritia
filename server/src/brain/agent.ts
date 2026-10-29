@@ -7,6 +7,7 @@ import { ProviderError, type ChatMessage, type ToolCall } from '../llm/types.ts'
 import { cardOf, getDraft, type Card } from './drafts.ts';
 import { addNote, InputError } from './inputs.ts';
 import { monthSpend, overCap, providerFailed, providerWorked, type BrainDeps } from './process.ts';
+import { parisDay } from '../util.ts';
 import { askSystem, block } from './prompt.ts';
 import { readSettings } from './settings.ts';
 import { getFiche, listTypes, neighbors, searchFiches } from './store.ts';
@@ -203,7 +204,7 @@ ${CAP}`
     try {
       res = await provider.chat({
         model,
-        system: askSystem(readSettings(db)),
+        system: askSystem(readSettings(db), parisDay(deps.clock())),
         messages,
         tools: TOOLS,
         maxTokens: MAX_TOKENS,
