@@ -9,6 +9,8 @@ export interface LunEvent {
   at: string;
   title: string;
   data?: unknown;
+  /** Path in the satellite's own front (`/…` or `#/…`), never an address (contract v1.3). */
+  link?: string;
 }
 
 /** The AI providers the user can pick; `custom` is any OpenAI-compatible endpoint. */

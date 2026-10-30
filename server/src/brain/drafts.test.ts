@@ -287,6 +287,32 @@ describe('drafts review fixes', () => {
   });
 });
 
+describe('card links', () => {
+  const cardFor = (payload: Record<string, unknown>) =>
+    cardOf(db, getDraft(db, addDraft(db, payload as never, origin, 't1'))!);
+
+  it('an enrichment card links to its fiche', () => {
+    const f = fiche('Eve');
+    expect(cardOf(db, getDraft(db, draft({ ficheId: f }))!).link).toBe(`/memoire?fiche=${f}`);
+  });
+
+  it('a new fiche card has no link', () => {
+    expect(cardOf(db, getDraft(db, draft())!)).not.toHaveProperty('link');
+  });
+
+  it('contradiction and doublon cards link to the fiche they keep, an import to none', () => {
+    const f = fiche('Fay');
+    const g = fiche('Fayy');
+    const a = addFact(db, f, 'vieux', src, 't0');
+    const b = addFact(db, f, 'neuf', src, 't0');
+    expect(cardFor({ kind: 'contradiction', ficheId: f, keep: b, strike: a, reason: 'r' }).link).toBe(
+      `/memoire?fiche=${f}`,
+    );
+    expect(cardFor({ kind: 'doublon', keep: f, merge: g, reason: 'r' }).link).toBe(`/memoire?fiche=${f}`);
+    expect(cardFor({ kind: 'import', fiches: [], warnings: [] })).not.toHaveProperty('link');
+  });
+});
+
 describe('cards routes', () => {
   it('lists the queue, answers 400 on an invalid input, 409 on a settled card, 404 on an unknown one', async () => {
     const h = makeHarness();
