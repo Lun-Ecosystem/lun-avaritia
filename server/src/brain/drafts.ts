@@ -87,6 +87,8 @@ export interface Card {
   status: 'pending' | 'done' | 'refused' | 'failed' | 'expired';
   at: string;
   error?: string;
+  /** Path in this satellite's own front (contract v1.3), only when the card targets an existing fiche. */
+  link?: string;
 }
 
 const toDraft = (r: Row): Draft => ({
@@ -327,6 +329,14 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     `fait n° ${n}`;
   const lines: string[] = [];
   let title: string;
+  const target =
+    p.kind === 'fiche'
+      ? p.ficheId
+      : p.kind === 'doublon'
+        ? p.keep
+        : p.kind === 'contradiction'
+          ? p.ficheId
+          : undefined;
   if (p.kind === 'fiche') {
     title = p.ficheId === undefined ? `Nouvelle fiche : ${p.title}` : `Enrichir la fiche : ${p.title}`;
     if (p.synthesis) lines.push(`Synthèse : ${p.synthesis}`);
@@ -364,6 +374,7 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     status: CARD_STATUS[d.status],
     at: d.createdAt,
     ...(d.error && { error: d.error }),
+    ...(target !== undefined && { link: `/memoire?fiche=${target}` }),
   };
 }
 
