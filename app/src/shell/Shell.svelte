@@ -32,7 +32,12 @@
     route: Route;
     counts: { valider: number; fiches: number };
     /** The service paused by hand or degraded, and the month's spend against its cap (unknown until read). */
-    status: { paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } | undefined };
+    status: {
+      held: boolean;
+      paused: boolean;
+      degraded: boolean;
+      spend?: { spent: number; cap: number } | undefined;
+    };
     /** Pauses or resumes the processing. */
     ontogglepause: () => void;
     /** The agent's bubble, above the screens (it never resizes them). */
@@ -135,7 +140,7 @@
     {#snippet footer()}
       {@render link(items[4]!)}
       <ServiceCard
-        state={status.paused ? 'pause' : status.degraded ? 'cle-refusee' : 'actif'}
+        state={status.held ? 'pause' : status.degraded ? 'cle-refusee' : 'actif'}
         detail={status.spend ? `${formatCost(status.spend.spent)} sur ${formatCost(status.spend.cap)}` : ''}
       />
     {/snippet}
