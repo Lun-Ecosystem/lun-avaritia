@@ -352,3 +352,86 @@ describe('cards routes', () => {
     expect(((await done.json()) as { cards: unknown[] }).cards).toHaveLength(1);
   });
 });
+
+describe('questions and answers (v1.4)', () => {
+  const seedContradiction = () => {
+    const f = fiche('Lulu');
+    const old = addFact(db, f, 'vieux fait', src, 't0');
+    const neu = addFact(db, f, 'neuf fait', src, 't0');
+    const id = addDraft(
+      db,
+      { kind: 'contradiction', ficheId: f, keep: neu, strike: old, reason: 'Deux dates citées.' },
+      origin,
+      't1',
+    );
+    return { f, old, neu, id };
+  };
+  const seedDoublon = () => {
+    const a = fiche('Dora');
+    const b = fiche('Dorah');
+    return {
+      a,
+      b,
+      id: addDraft(db, { kind: 'doublon', keep: a, merge: b, reason: 'Même nom.' }, origin, 't1'),
+    };
+  };
+
+  it('gives kind, reason and options to its questions, kind alone to a fiche', () => {
+    const c = cardOf(db, getDraft(db, seedContradiction().id)!);
+    expect(c).toMatchObject({
+      kind: 'Question',
+      reason: 'Deux dates citées.',
+      options: ['neuf fait', 'vieux fait'],
+    });
+    expect(c.lines.some((l) => l.startsWith('Raison'))).toBe(false);
+    const d = cardOf(db, getDraft(db, seedDoublon().id)!);
+    expect(d).toMatchObject({ kind: 'Question', options: ['Dora', 'Dorah'] });
+    const n = cardOf(db, getDraft(db, draft())!);
+    expect(n.kind).toBe('Nouvelle fiche');
+    expect(n).not.toHaveProperty('reason');
+    expect(n).not.toHaveProperty('options');
+    expect(cardOf(db, getDraft(db, draft({ ficheId: fiche('Bob') }))!).kind).toBe('Fiche enrichie');
+    expect(
+      cardOf(db, getDraft(db, addDraft(db, { kind: 'import', fiches: [], warnings: [] }, origin, 't1'))!)
+        .kind,
+    ).toBe('Import');
+  });
+
+  it('an answer naming the proposed loser swaps the contradiction', () => {
+    const { f, old, neu, id } = seedContradiction();
+    applyDraft(db, id, { answer: 'vieux fait' }, 't2');
+    const facts = getFiche(db, f)!.facts;
+    expect(facts.find((x) => x.id === neu)!.struckBy).toBe(old);
+  });
+
+  it('an answer naming the proposed winner keeps the proposal', () => {
+    const { f, old, neu, id } = seedContradiction();
+    applyDraft(db, id, { answer: 'neuf fait' }, 't2');
+    expect(getFiche(db, f)!.facts.find((x) => x.id === old)!.struckBy).toBe(neu);
+  });
+
+  it('a free answer replaces both facts with the answer', () => {
+    const { f, old, neu, id } = seedContradiction();
+    applyDraft(db, id, { answer: 'Chez Lulu' }, 't2');
+    const facts = getFiche(db, f)!.facts;
+    const added = facts.find((x) => x.text === 'Chez Lulu')!;
+    expect(added.struckBy).toBeUndefined();
+    expect(facts.find((x) => x.id === old)!.struckBy).toBe(added.id);
+    expect(facts.find((x) => x.id === neu)!.struckBy).toBe(added.id);
+  });
+
+  it('an answer naming the other fiche merges the doublon the other way', () => {
+    const { a, b, id } = seedDoublon();
+    applyDraft(db, id, { answer: 'Dorah' }, 't2');
+    expect(getFiche(db, a)!.mergedInto).toBe(b);
+  });
+
+  it('refuses a free answer to a doublon and any answer to a fiche, writing nothing', () => {
+    const { id: dup } = seedDoublon();
+    expect(() => applyDraft(db, dup, { answer: 'Autre' }, 't2')).toThrow('Choisis l’une des deux fiches.');
+    expect(getDraft(db, dup)!.status).toBe('pending');
+    const fd = draft();
+    expect(() => applyDraft(db, fd, { answer: 'x' }, 't2')).toThrow('Cette carte n’attend pas de réponse.');
+    expect(getDraft(db, fd)!.status).toBe('pending');
+  });
+});
