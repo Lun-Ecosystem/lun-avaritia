@@ -26,6 +26,12 @@ export function setting<K extends keyof Settings>(db: DatabaseSync, key: K): Set
   return getSetting(db, key, DEFAULTS[key]);
 }
 
+/** The name the user gave the agent, or undefined while it is empty or the neutral default. */
+export function declaredAgentName(db: DatabaseSync): string | undefined {
+  const name = setting(db, 'agent.name').trim();
+  return name && name !== DEFAULTS['agent.name'] ? name : undefined;
+}
+
 export function readSettings(db: DatabaseSync): Settings {
   return Object.fromEntries(
     (Object.keys(DEFAULTS) as (keyof Settings)[]).map((k) => [k, setting(db, k)]),

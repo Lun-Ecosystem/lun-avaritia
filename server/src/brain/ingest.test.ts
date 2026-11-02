@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { putSetting } from '../db.ts';
+import { setPaused } from '../contract/state.ts';
 import { recordCost } from '../contract/costs.ts';
 import { brainDeps } from '../app.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
@@ -75,6 +76,25 @@ describe('brain.ingest', () => {
     await t.settle();
     expect(t.status(1).status).toBe('done');
     expect(lastRun(t.h.db)).toMatchObject({ observations: 1, drafts: 1, questions: 0 });
+  });
+
+  it('under a core pause, a lot waits queued with no model call', async () => {
+    const t = setup();
+    setPaused(t.h.db, true, 'core');
+    t.replies.push(...t.goodReplies());
+    const pushed = t.replies.length;
+    await t.ingest({ version: 1, observations: [obs('Le client X a signé le devis.')] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(t.status(1).status).toBe('queued');
+    expect(t.replies).toHaveLength(pushed);
+    const token = await t.h.pairClient();
+    await t.h.app.request('/lun/v1/resume', {
+      method: 'POST',
+      headers: t.h.auth(token),
+      body: '{"by":"core"}',
+    });
+    await t.settle();
+    expect(t.status(1).status).toBe('done');
   });
 
   it('refuses an oversized text and 501 observations: 400, nothing stored, no LLM call', async () => {
