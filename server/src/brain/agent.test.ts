@@ -8,6 +8,7 @@ import { ProviderError } from '../llm/types.ts';
 import { recordCost } from '../contract/costs.ts';
 import { eventsSince } from '../contract/events.ts';
 import { putSetting } from '../db.ts';
+import { setPaused } from '../contract/state.ts';
 import { addFact, createFiche, link, listTypes, strikeFact, editFiche } from './store.ts';
 
 const NOW = '2026-11-02T08:00:00.000Z';
@@ -344,5 +345,22 @@ describe('agent routes', () => {
     });
     expect(res.status).toBe(200);
     expect(t.fake.chatCalls[0]!.messages).toHaveLength(3);
+  });
+
+  it('answers under a core pause, refuses under a local pause', async () => {
+    const t = setup([{ text: 'Rien.', toolCalls: [] }]);
+    const token = await t.h.pairClient();
+    const post = (json: unknown) =>
+      t.h.app.request('/lun/v1/agent', {
+        method: 'POST',
+        headers: t.h.auth(token),
+        body: JSON.stringify(json),
+      });
+    setPaused(t.h.db, true, 'core');
+    expect(await (await post({ request: 'salut' })).json()).toMatchObject({ summary: 'Rien.' });
+    setPaused(t.h.db, true);
+    const body = await (await post({ request: 'salut' })).json();
+    expect(body.summary).toMatch(/en pause/);
+    expect(body.cost.amount).toBe(0);
   });
 });

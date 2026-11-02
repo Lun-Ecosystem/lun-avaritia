@@ -66,7 +66,13 @@
     upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form).finally(() => void readCounts()),
   } satisfies Api);
 
-  let status = $state<{ paused: boolean; degraded: boolean; spend?: { spent: number; cap: number } }>({
+  let status = $state<{
+    held: boolean;
+    paused: boolean;
+    degraded: boolean;
+    spend?: { spent: number; cap: number };
+  }>({
+    held: false,
     paused: false,
     degraded: false,
   });
@@ -77,9 +83,11 @@
     const a = api;
     if (!a) return;
     await a
-      .get<{ status: string; paused?: boolean }>('/lun/v1/health')
+      .get<{ status: string; paused?: boolean; pausedBy?: 'core' | 'local' }>('/lun/v1/health')
       .then((h) => {
-        status.paused = h.status === 'paused' || h.paused === true;
+        status.held = h.status === 'paused' || h.paused === true;
+        // Only this front's own pause can be resumed from here; another one answers 409.
+        status.paused = status.held && h.pausedBy !== 'core';
         status.degraded = h.status === 'degraded';
       })
       .catch(() => {});

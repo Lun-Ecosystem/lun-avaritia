@@ -57,7 +57,14 @@ export const DraftPayloadSchema = z.discriminatedUnion('kind', [
     ),
     links: z.array(z.object({ to: z.union([id, z.string().min(1)]), relation: z.string().min(1) })),
   }),
-  z.object({ kind: z.literal('contradiction'), ficheId: id, keep: id, strike: id, reason: z.string() }),
+  z.object({
+    kind: z.literal('contradiction'),
+    ficheId: id,
+    keep: id,
+    strike: id,
+    reason: z.string(),
+    answer: z.string().trim().min(1).max(1000).optional(),
+  }),
   z.object({ kind: z.literal('doublon'), keep: id, merge: id, reason: z.string() }),
   z.object({ kind: z.literal('import'), fiches: z.array(ImportedNoteSchema), warnings: z.array(z.string()) }),
 ]);
@@ -89,6 +96,10 @@ export interface Card {
   error?: string;
   /** Path in this satellite's own front (contract v1.3), only when the card targets an existing fiche. */
   link?: string;
+  /** Contract v1.4: what the card is, why it asks, and the answers it proposes (questions only). */
+  kind?: string;
+  reason?: string;
+  options?: string[];
 }
 
 const toDraft = (r: Row): Draft => ({
@@ -241,7 +252,11 @@ function applyContradiction(
     !!db.prepare('SELECT 1 FROM facts WHERE id = ? AND struck_at IS NULL').get(fact);
   if (!active(p.strike)) throw new InvalidInputError('Le fait à barrer l’est déjà.');
   if (!active(p.keep)) throw new InvalidInputError('Le fait à garder n’est plus actif.');
-  strikeFact(db, p.strike, p.keep, now);
+  if (p.answer === undefined) return strikeFact(db, p.strike, p.keep, now);
+  // A free answer is a new fact that supersedes both.
+  const added = addFact(db, p.ficheId, p.answer, { kind: 'core', at: now }, now);
+  strikeFact(db, p.keep, added, now);
+  strikeFact(db, p.strike, added, now);
 }
 
 function applyDoublon(db: DatabaseSync, p: Extract<DraftPayload, { kind: 'doublon' }>, now: string) {
@@ -272,7 +287,9 @@ export function applyDraft(
   const current = getDraft(db, draftId);
   if (!current) throw new NotFoundError();
   let payload = current.payload;
-  if (input !== undefined) {
+  const answer = AnswerSchema.safeParse(input);
+  if (answer.success) payload = answered(db, payload, answer.data.answer);
+  else if (input !== undefined) {
     payload = parsePayload(input);
     if (payload.kind !== current.payload.kind)
       throw new InvalidInputError('Le type de brouillon ne change pas.');
@@ -318,15 +335,43 @@ const CARD_STATUS: Record<DraftStatus, Card['status']> = {
   failed: 'failed',
 };
 
+const ficheTitleOf = (db: DatabaseSync, n: number) =>
+  ((db.prepare('SELECT title FROM fiches WHERE id = ?').get(n) as Row | undefined)?.title as string) ??
+  `fiche n° ${n}`;
+const factTextOf = (db: DatabaseSync, n: number) =>
+  ((db.prepare('SELECT text FROM facts WHERE id = ?').get(n) as Row | undefined)?.text as string) ??
+  `fait n° ${n}`;
+
+/** The two answers a question proposes, read now from the same helpers the card uses. */
+function optionsOf(db: DatabaseSync, p: DraftPayload): string[] | undefined {
+  if (p.kind === 'contradiction') return [factTextOf(db, p.keep), factTextOf(db, p.strike)];
+  if (p.kind === 'doublon') return [ficheTitleOf(db, p.keep), ficheTitleOf(db, p.merge)];
+  return undefined;
+}
+
+const AnswerSchema = z.strictObject({ answer: z.string().trim().min(1).max(1000) });
+
+/** An answer becomes the payload that is applied; a refused one throws before anything is written. */
+function answered(db: DatabaseSync, p: DraftPayload, answer: string): DraftPayload {
+  const options = optionsOf(db, p);
+  if (p.kind === 'contradiction') {
+    if (answer === options![0]) return p;
+    if (answer === options![1]) return { ...p, keep: p.strike, strike: p.keep };
+    return { ...p, answer };
+  }
+  if (p.kind === 'doublon') {
+    if (answer === options![0]) return p;
+    if (answer === options![1]) return { ...p, keep: p.merge, merge: p.keep };
+    throw new InvalidInputError('Choisis l’une des deux fiches.');
+  }
+  throw new InvalidInputError('Cette carte n’attend pas de réponse.');
+}
+
 /** The card a human reads: names and texts, not ids. */
 export function cardOf(db: DatabaseSync, d: Draft): Card {
   const p = d.payload;
-  const ficheTitle = (n: number) =>
-    ((db.prepare('SELECT title FROM fiches WHERE id = ?').get(n) as Row | undefined)?.title as string) ??
-    `fiche n° ${n}`;
-  const factText = (n: number) =>
-    ((db.prepare('SELECT text FROM facts WHERE id = ?').get(n) as Row | undefined)?.text as string) ??
-    `fait n° ${n}`;
+  const ficheTitle = (n: number) => ficheTitleOf(db, n);
+  const factText = (n: number) => factTextOf(db, n);
   const lines: string[] = [];
   let title: string;
   const target =
@@ -351,14 +396,10 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     if (d.skippedSynthesis) lines.push('Synthèse non appliquée : la fiche a été modifiée depuis.');
   } else if (p.kind === 'contradiction') {
     title = `Contradiction sur la fiche : ${ficheTitle(p.ficheId)}`;
-    lines.push(`Garder : ${factText(p.keep)}`, `Barrer : ${factText(p.strike)}`, `Raison : ${p.reason}`);
+    lines.push(`Garder : ${factText(p.keep)}`, `Barrer : ${factText(p.strike)}`);
   } else if (p.kind === 'doublon') {
     title = `Doublon probable : ${ficheTitle(p.keep)} et ${ficheTitle(p.merge)}`;
-    lines.push(
-      `Garder la fiche : ${ficheTitle(p.keep)}`,
-      `Fusionner dedans : ${ficheTitle(p.merge)}`,
-      `Raison : ${p.reason}`,
-    );
+    lines.push(`Garder la fiche : ${ficheTitle(p.keep)}`, `Fusionner dedans : ${ficheTitle(p.merge)}`);
   } else {
     title = `Import de ${p.fiches.length} note${p.fiches.length > 1 ? 's' : ''}`;
     for (const n of p.fiches.slice(0, 10)) lines.push(`Note : ${n.title}`);
@@ -375,6 +416,18 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     at: d.createdAt,
     ...(d.error && { error: d.error }),
     ...(target !== undefined && { link: `/memoire?fiche=${target}` }),
+    kind:
+      p.kind === 'fiche'
+        ? p.ficheId === undefined
+          ? 'Nouvelle fiche'
+          : 'Fiche enrichie'
+        : p.kind === 'import'
+          ? 'Import'
+          : 'Question',
+    ...((p.kind === 'contradiction' || p.kind === 'doublon') && {
+      reason: p.reason,
+      options: optionsOf(db, p)!,
+    }),
   };
 }
 

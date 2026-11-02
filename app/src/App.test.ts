@@ -7,7 +7,11 @@ import App from './App.svelte';
 const TOKEN_KEY = 'lunavaritia.token';
 
 /** A fake Lun'Avaritia server: records each call as `METHOD /path`; `revoked` answers 401 to all. */
-function fakeServer({ revoked = false, paused = true } = {}) {
+function fakeServer({
+  revoked = false,
+  paused = true,
+  pausedBy,
+}: { revoked?: boolean; paused?: boolean; pausedBy?: 'core' | 'local' } = {}) {
   const calls: string[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -20,7 +24,12 @@ function fakeServer({ revoked = false, paused = true } = {}) {
       return json({ status: 'paused' });
     }
     if (key === 'GET /lun/v1/health')
-      return json({ status: paused ? 'paused' : 'ok', version: '0.0.0', agent: true });
+      return json({
+        status: paused ? 'paused' : 'ok',
+        ...(paused && pausedBy ? { pausedBy } : {}),
+        version: '0.0.0',
+        agent: true,
+      });
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
@@ -423,6 +432,17 @@ describe('App, top bar and palette', () => {
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
     expect(calls).toContain('POST /lun/v1/pause');
     expect(screen.getByRole('button', { name: 'Reprendre le traitement' })).toBeInTheDocument();
+  });
+
+  it('under a pause it did not set, shows the pause and offers to pause', async () => {
+    const { calls } = fakeServer({ pausedBy: 'core' });
+    const user = userEvent.setup();
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mettre le traitement en pause' }));
+    await waitFor(() => expect(calls).toContain('POST /lun/v1/pause'));
+    expect(calls).not.toContain('POST /lun/v1/resume');
   });
 
   it('« Nouvelle note » of the palette opens the agent with « Note que » and the focus in the field', async () => {

@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
 import type { AppDeps } from '../app.ts';
-import { SATELLITE } from '../identity.ts';
+import { CONTRACT, SATELLITE } from '../identity.ts';
 import { z } from 'zod';
 import {
   applyDraft,
@@ -14,7 +14,7 @@ import {
   refuseDraft,
   type DraftStatus,
 } from '../brain/drafts.ts';
-import { setting } from '../brain/settings.ts';
+import { declaredAgentName, setting } from '../brain/settings.ts';
 import { runPending } from '../brain/ingest.ts';
 import { ask, DelegationSchema } from '../brain/agent.ts';
 import { brainDeps } from '../app.ts';
@@ -23,7 +23,7 @@ import { pair, recordPairingFailure, requireToken } from './auth.ts';
 import { authorizationPage, exchangeAuthorizationCode, readAuthorizationRequest } from './authorize.ts';
 import { costsSince } from './costs.ts';
 import { eventsSince, subscribe, type LunEvent } from './events.ts';
-import { getState, setPaused, statusOf } from './state.ts';
+import { getState, setPaused, statusOf, type PausedBy } from './state.ts';
 
 const HEARTBEAT_MS = 25_000;
 const tooBig = bodyLimit({
@@ -31,6 +31,8 @@ const tooBig = bodyLimit({
   onError: (c) => c.json({ error: 'Envoi trop volumineux' }, 413),
 });
 const STATUSES = ['pending', 'done', 'refused', 'failed', 'expired'];
+const PauseBody = z.object({ reason: z.string().max(500).optional(), by: z.literal('core').optional() });
+const ResumeBody = z.object({ by: z.literal('core').optional() });
 const Accept = z.object({ input: z.unknown().optional() });
 
 async function readJson(req: Request): Promise<unknown> {
@@ -93,7 +95,16 @@ export function contractRoutes(deps: AppDeps): Hono {
     const status = statusOf(state);
     // Degraded hides the pause in `status`: said apart, so a front can still offer to resume.
     const paused = status.status === 'degraded' && state.paused ? { paused: true } : {};
-    return c.json({ ...status, ...paused, version: deps.version, agent: true });
+    const name = declaredAgentName(db);
+    return c.json({
+      ...status,
+      ...paused,
+      ...(state.pausedBy && { pausedBy: state.pausedBy }),
+      version: deps.version,
+      contract: CONTRACT,
+      agent: true,
+      ...(name && { agentName: name }),
+    });
   });
 
   r.get('/costs', (c) => {
@@ -103,15 +114,25 @@ export function contractRoutes(deps: AppDeps): Hono {
     return c.json(costsSince(db, since, clock()));
   });
 
-  r.post('/pause', (c) => {
-    if (getState(db).paused) return c.json({ error: 'Déjà en pause' }, 409);
-    setPaused(db, true);
+  // An empty body is `{}`; bad JSON or an unknown origin is a 400.
+  const origin = async (c: Context, schema: typeof PauseBody | typeof ResumeBody) => {
+    const parsed = schema.safeParse(await readJson(c.req.raw).catch(() => undefined));
+    return parsed.success ? ((parsed.data.by ?? 'local') as PausedBy) : parsed.error.message;
+  };
+
+  r.post('/pause', async (c) => {
+    const by = await origin(c, PauseBody);
+    if (by !== 'core' && by !== 'local') return c.json({ error: by }, 400);
+    if (getState(db)[by]) return c.json({ error: 'Déjà en pause' }, 409);
+    setPaused(db, true, by);
     return c.json({ status: 'paused' });
   });
 
-  r.post('/resume', (c) => {
-    if (!getState(db).paused) return c.json({ error: 'Déjà actif' }, 409);
-    setPaused(db, false);
+  r.post('/resume', async (c) => {
+    const by = await origin(c, ResumeBody);
+    if (by !== 'core' && by !== 'local') return c.json({ error: by }, 400);
+    if (!getState(db)[by]) return c.json({ error: 'Déjà actif' }, 409);
+    setPaused(db, false, by);
     runPending(brainDeps(deps)).catch((err) => deps.log?.(`Traitement des lots : ${err}`));
     return c.json({ status: statusOf(getState(db)).status });
   });
@@ -189,7 +210,7 @@ export function contractRoutes(deps: AppDeps): Hono {
   r.post('/agent', async (c) => {
     const parsed = DelegationSchema.safeParse(await readJson(c.req.raw).catch(() => undefined));
     if (!parsed.success) return c.json({ error: parsed.error.message }, 400);
-    if (getState(db).paused)
+    if (getState(db).pausedBy === 'local')
       return c.json({
         summary: 'Avaritia est en pause : je ne fais rien tant qu’elle n’est pas reprise.',
         cards: [],
