@@ -34,3 +34,10 @@ jobs:
         run: |
           printf '%s\n' "$TITLE" | grep -Eq '^(feat|fix|docs|chore|ci|test|refactor)(\([a-z0-9-]+\))?!?: .+' \
             || { echo "PR title must follow Conventional Commits: $TITLE"; exit 1; }
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The release image builds
+        run: docker build -t check .
