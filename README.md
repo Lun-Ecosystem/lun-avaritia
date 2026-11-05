@@ -5,6 +5,11 @@ par un agent. Chaque fiche (personne, lieu, projet, idée...) garde ses faits, s
 trie les observations et propose des brouillons, mais rien n'entre dans une fiche sans validation ; un
 fait démenti est barré et daté, jamais effacé.
 
+**Rôle dans l'écosystème** : satellite, le cerveau. Il possède le wiki neutre, ses brouillons, le traitement du
+lot quotidien, l'import Obsidian et l'export Markdown. Lun'Anima s'y branche par le
+[contrat satellite](https://github.com/Lun-Ecosystem/lun-docs/blob/main/standards/contrat-satellite.md) (v1.4),
+lui envoie un lot par jour et garde pour lui la mémoire de la relation.
+
 ## Démarrer en local
 
 ```bash
