@@ -2,10 +2,10 @@
   import { getContext } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { ApiError, type Api } from '../api.ts';
-  import { Banner, bindShortcuts, Button, EmptyState, icons, Skeleton, toast } from '../lib/ui/index.ts';
-  import { idsByTitle, listFiches } from '../memoire/titles.ts';
+  import { Banner, bindShortcuts, Chip, EmptyState, icons, Skeleton, toast } from '../lib/ui/index.ts';
+  import { go, idsByTitle, listFiches } from '../memoire/titles.ts';
   import DraftItem from '../valider/DraftItem.svelte';
-  import { matches, type DraftPayload, type DraftView } from '../valider/drafts.ts';
+  import { FILTRES, matches, type DraftPayload, type DraftView } from '../valider/drafts.ts';
 
   /*
    * The drafts to validate, one card each, in the order served (contradictions first). Nothing enters
@@ -48,8 +48,12 @@
 
   const shown = $derived((queue ?? []).filter((d) => matches(d, filtre)));
   const active = $derived(shown.find((d) => d.id === chosen) ?? shown[0]);
-  const scope = $derived(
-    filtre === 'contradictions' ? 'Contradictions' : filtre === 'doublons' ? 'Doublons probables' : null,
+  const scope = $derived(FILTRES.find((f) => f.value === filtre));
+  // A filter with nothing in it is not offered, unless it is the one on.
+  const offerts = $derived(
+    FILTRES.map((f) => ({ ...f, n: (queue ?? []).filter((d) => matches(d, f.value)).length })).filter(
+      (f) => f.n > 0 || f.value === filtre,
+    ),
   );
 
   async function decide(d: DraftView, verb: 'accept' | 'refuse', input?: DraftPayload) {
@@ -89,11 +93,21 @@
     <h1>À valider</h1>
     {#if queue}
       <span class="muted">
-        {scope ? `${scope} : ` : ''}{shown.length} brouillon{shown.length > 1 ? 's' : ''}
+        {shown.length} brouillon{shown.length > 1 ? 's' : ''}
       </span>
     {/if}
-    {#if scope}<Button variant="fantome" size="petit" href="/valider">Tout voir</Button>{/if}
   </header>
+
+  {#if queue?.length}
+    <div class="filtres" role="group" aria-label="Filtrer les brouillons">
+      <Chip on={!scope} count={queue.length} onclick={() => go('/valider')}>Tous</Chip>
+      {#each offerts as f (f.value)}
+        <Chip on={scope?.value === f.value} count={f.n} onclick={() => go(`/valider?filtre=${f.value}`)}>
+          {f.label}
+        </Chip>
+      {/each}
+    </div>
+  {/if}
 
   {#if failure}
     <Banner title="File indisponible">{failure}</Banner>
@@ -117,8 +131,10 @@
     {:else}
       <EmptyState
         size="grand"
-        title="Rien à valider."
-        message="Les brouillons du prochain passage arriveront ici."
+        title={queue.length ? 'Rien ici.' : 'Rien à valider.'}
+        message={queue.length
+          ? 'Il reste des brouillons sous les autres filtres.'
+          : 'Les brouillons du prochain passage arriveront ici.'}
         icon={icons.Check}
       />
     {/each}
@@ -149,8 +165,10 @@
     color: var(--texte-2);
     font-size: 12.5px;
   }
-  .entete :global(.btn) {
-    margin-left: auto;
+  .filtres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .pied {
     margin: 4px 0 0;

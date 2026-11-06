@@ -12,13 +12,45 @@ export interface Dashboard {
   monthSpend: number;
   /** The monthly cost cap, shown beside the spend. */
   monthlyCap: number;
-  recent: { at: string; what: string }[];
+  recent: ActivityLine[];
+  /** There is more activity than `recent` shows: `GET /api/activity` has the rest. */
+  recentMore: boolean;
 }
+
+export interface ActivityLine {
+  at: string;
+  what: string;
+}
+
+const RECENT = 5;
+export const ACTIVITY_PAGE = 20;
 
 const count = (db: DatabaseSync, sql: string) => (db.prepare(sql).get() as { n: number }).n;
 const PENDING = "status IN ('pending', 'applying')";
 
+/** The events of the memory, newest first; one line more is read to know whether others follow. */
+export function activity(
+  db: DatabaseSync,
+  limit: number,
+  offset: number,
+): { items: ActivityLine[]; more: boolean } {
+  const rows = db
+    .prepare(
+      `SELECT at, what FROM (
+           SELECT decided_at AS at,
+                  CASE status WHEN 'done' THEN 'Brouillon appliqué (' ELSE 'Brouillon refusé (' END || kind || ')' AS what
+             FROM drafts WHERE status IN ('done', 'refused') AND decided_at IS NOT NULL
+           UNION ALL SELECT created_at, 'Dépôt ajouté : ' || name FROM depots
+           UNION ALL SELECT r.at, CASE l.status WHEN 'done' THEN 'Lot traité (n° ' ELSE 'Lot en échec (n° ' END || l.id || ')'
+             FROM runs r JOIN lots l ON l.id = r.lot WHERE l.status IN ('done', 'failed')
+         ) ORDER BY at DESC LIMIT ? OFFSET ?`,
+    )
+    .all(limit + 1, offset) as unknown as ActivityLine[];
+  return { items: rows.slice(0, limit), more: rows.length > limit };
+}
+
 export function dashboard(db: DatabaseSync, now: Date): Dashboard {
+  const recent = activity(db, RECENT, 0);
   return {
     lastRun: lastRun(db),
     pending: {
@@ -35,17 +67,7 @@ export function dashboard(db: DatabaseSync, now: Date): Dashboard {
     heldLots: count(db, "SELECT COUNT(*) AS n FROM lots WHERE status = 'held'"),
     monthSpend: monthSpend(db, now),
     monthlyCap: setting(db, 'cost.monthlyCap'),
-    recent: db
-      .prepare(
-        `SELECT at, what FROM (
-           SELECT decided_at AS at,
-                  CASE status WHEN 'done' THEN 'Brouillon appliqué (' ELSE 'Brouillon refusé (' END || kind || ')' AS what
-             FROM drafts WHERE status IN ('done', 'refused') AND decided_at IS NOT NULL
-           UNION ALL SELECT created_at, 'Dépôt ajouté : ' || name FROM depots
-           UNION ALL SELECT r.at, CASE l.status WHEN 'done' THEN 'Lot traité (n° ' ELSE 'Lot en échec (n° ' END || l.id || ')'
-             FROM runs r JOIN lots l ON l.id = r.lot WHERE l.status IN ('done', 'failed')
-         ) ORDER BY at DESC LIMIT 10`,
-      )
-      .all() as unknown as { at: string; what: string }[],
+    recent: recent.items,
+    recentMore: recent.more,
   };
 }

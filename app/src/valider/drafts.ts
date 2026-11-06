@@ -52,11 +52,19 @@ export function kindOf(p: DraftPayload): { label: string; tone: Tone } {
     : { label: 'enrichissement', tone: 'info' };
 }
 
-/** `?filtre=` of the dashboard: contradictions (fiches replacing a fact included) or duplicates. */
+/** The filters of the queue, `?filtre=` in the address; each is a label of `kindOf`. */
+export const FILTRES = [
+  { value: 'contradictions', label: 'Contradictions', kind: 'contradiction' },
+  { value: 'doublons', label: 'Doublons', kind: 'doublon' },
+  { value: 'nouvelles', label: 'Nouvelles fiches', kind: 'nouvelle fiche' },
+  { value: 'enrichissements', label: 'Enrichissements', kind: 'enrichissement' },
+  { value: 'imports', label: 'Imports', kind: 'import' },
+];
+
+/** An unknown filter shows everything. */
 export function matches(d: DraftView, filtre: string | null): boolean {
-  if (filtre === 'contradictions') return d.kind === 'contradiction' || replacesFact(d.payload);
-  if (filtre === 'doublons') return d.kind === 'doublon';
-  return true;
+  const f = FILTRES.find((x) => x.value === filtre);
+  return !f || kindOf(d.payload).label === f.kind;
 }
 
 /** The other choice of a contradiction or a duplicate: the two fiches or facts swapped. */

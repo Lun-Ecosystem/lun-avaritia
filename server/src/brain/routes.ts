@@ -7,7 +7,7 @@ import { brainDeps, type AppDeps } from '../app.ts';
 import { ask, ChatSchema, keptFiche } from './agent.ts';
 import { addDraft, draftView, queue, type DraftPayload } from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
-import { dashboard } from './dashboard.ts';
+import { ACTIVITY_PAGE, activity, dashboard } from './dashboard.ts';
 import { exportMarkdown } from './export.ts';
 import { parseVault } from './obsidian.ts';
 import { readSettings, saveSettings, setting } from './settings.ts';
@@ -50,6 +50,11 @@ export function brainRoutes(deps: AppDeps): Hono {
   r.get('/settings', (c) => c.json({ settings: readSettings(deps.db) }));
   r.put('/settings', async (c) => c.json({ settings: saveSettings(deps.db, await jsonBody(c)) }));
   r.get('/dashboard', (c) => c.json(dashboard(deps.db, deps.clock())));
+  r.get('/activity', (c) => {
+    const offset = Number(c.req.query('offset') ?? 0);
+    if (!Number.isInteger(offset) || offset < 0) return c.json({ error: 'Position illisible' }, 400);
+    return c.json(activity(deps.db, ACTIVITY_PAGE, offset));
+  });
 
   r.get('/drafts', (c) => {
     const shown = queue(deps.db, setting(deps.db, 'drafts.cap'));
