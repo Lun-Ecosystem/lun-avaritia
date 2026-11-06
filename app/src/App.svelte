@@ -196,29 +196,31 @@
       <AgentPanel fiche={route === 'memoire' ? fiche : null} />
     {/snippet}
     {#key route}
-      {#if route === 'tableau'}
-        <Tableau />
-      {:else if route === 'valider'}
-        <Valider {filtre} />
-      {:else if route === 'memoire'}
-        <Memoire {fiche} {mode} q={search} />
-      {:else if route === 'depots'}
-        {#await import('./screens/Depots.svelte')}
-          {@render loading()}
-        {:then m}
-          <m.default />
-        {:catch e}
-          {@render failed(e)}
-        {/await}
-      {:else}
-        {#await import('./screens/Reglages.svelte')}
-          {@render loading()}
-        {:then m}
-          <m.default paused={status.paused} onservice={readHealth} {theme} />
-        {:catch e}
-          {@render failed(e)}
-        {/await}
-      {/if}
+      <div class="lieu">
+        {#if route === 'tableau'}
+          <Tableau />
+        {:else if route === 'valider'}
+          <Valider {filtre} />
+        {:else if route === 'memoire'}
+          <Memoire {fiche} {mode} q={search} />
+        {:else if route === 'depots'}
+          {#await import('./screens/Depots.svelte')}
+            {@render loading()}
+          {:then m}
+            <m.default />
+          {:catch e}
+            {@render failed(e)}
+          {/await}
+        {:else}
+          {#await import('./screens/Reglages.svelte')}
+            {@render loading()}
+          {:then m}
+            <m.default paused={status.paused} onservice={readHealth} {theme} />
+          {:catch e}
+            {@render failed(e)}
+          {/await}
+        {/if}
+      </div>
     {/key}
   </Shell>
 {:else}
@@ -230,6 +232,21 @@
     margin: 0;
     background: var(--fond);
     color-scheme: dark;
+  }
+  /* Each screen comes in softly: going from one to another must not cut. */
+  .lieu {
+    height: 100%;
+    animation: apparait 180ms ease-out;
+  }
+  @keyframes apparait {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lieu {
+      animation: none;
+    }
   }
   .chargement {
     max-width: 900px;
