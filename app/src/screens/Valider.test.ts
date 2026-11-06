@@ -128,6 +128,22 @@ describe('Valider', () => {
     expect(within(cards[1]!).getByText('Recette le 12 juin')).toBeInTheDocument();
   });
 
+  it('offers the filters that have something, with their counts, in the address', async () => {
+    const user = userEvent.setup();
+    const pushed = vi.spyOn(history, 'pushState');
+    show([{ drafts: [contradiction, doublon, fiche(1, 'Client Exemple')], held: 0 }]);
+    const group = await screen.findByRole('group', { name: 'Filtrer les brouillons' });
+    expect(within(group).getByRole('button', { name: /Tous/ })).toHaveTextContent('3');
+    expect(within(group).queryByRole('button', { name: /Imports/ })).toBeNull();
+    await user.click(within(group).getByRole('button', { name: /Doublons/ }));
+    expect(pushed).toHaveBeenCalledWith(null, '', '/valider?filtre=doublons');
+  });
+
+  it('says when a filter is empty while others are not', async () => {
+    show([{ drafts: [doublon], held: 0 }], { filtre: 'contradictions' });
+    expect(await screen.findByText('Il reste des brouillons sous les autres filtres.')).toBeInTheDocument();
+  });
+
   it('filters the duplicates', async () => {
     show([{ drafts: [contradiction, doublon], held: 0 }], { filtre: 'doublons' });
     const cards = await screen.findAllByRole('region');

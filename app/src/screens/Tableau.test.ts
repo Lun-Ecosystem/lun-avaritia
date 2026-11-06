@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api.ts';
 import Tableau from './Tableau.svelte';
@@ -94,5 +95,36 @@ describe('Tableau', () => {
     expect(screen.queryByText(/dont \d+ du dernier/)).toBeNull();
     expect(screen.queryByText(/Plafond de coût/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the rest of the activity on demand, without a line twice', async () => {
+    const line = (h: number) => ({ at: ago(h), what: `Dépôt ${h}` });
+    const first = [1, 2, 3, 4, 5].map(line);
+    const get = vi.fn(async (p: string) =>
+      p === '/api/drafts'
+        ? { drafts: [], held: 0 }
+        : p.startsWith('/api/activity')
+          ? { items: [first[4], line(6)], more: false }
+          : { ...empty, recent: first, recentMore: true },
+    );
+    render(Tableau, { context: new Map([['api', { get } as unknown as Api]]) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Voir plus' }));
+    expect(await screen.findByText('Dépôt 6')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith('/api/activity?offset=5');
+    expect(screen.getAllByText('Dépôt 5')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Voir plus' })).toBeNull();
+  });
+
+  it('caps the summary and links to the rest', async () => {
+    const many = Array.from({ length: 7 }, (_, i) =>
+      draft(i + 1, 'fiche', `Fiche ${i}`, inRun(), { facts: [] }),
+    );
+    show(full, { held: 0, drafts: many });
+    const summary = await screen.findByRole('region', { name: 'Résumé' });
+    expect(within(summary).queryByText('Fiche 5')).toBeNull();
+    expect(within(summary).getByRole('link', { name: 'Voir les 2 autres' })).toHaveAttribute(
+      'href',
+      '/valider',
+    );
   });
 });

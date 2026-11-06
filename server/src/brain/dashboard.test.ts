@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recordCost } from '../contract/costs.ts';
 import { makeHarness } from '../testing/harness.ts';
-import { dashboard } from './dashboard.ts';
+import { activity, dashboard } from './dashboard.ts';
 import { addDraft } from './drafts.ts';
 import { createFiche, listTypes } from './store.ts';
 
@@ -49,6 +49,25 @@ describe('dashboard', () => {
     expect(d.recent.map((e) => e.what)).toEqual(
       expect.arrayContaining([expect.stringContaining('d.txt'), expect.stringContaining('refusé')]),
     );
-    expect(d.recent.length).toBeLessThanOrEqual(10);
+    expect(d.recent.length).toBeLessThanOrEqual(5);
+  });
+
+  it('serves the activity by pages, the dashboard only its first lines', () => {
+    const { db } = makeHarness();
+    const add = db.prepare(
+      "INSERT INTO drafts (kind, payload, origin, status, created_at, decided_at) VALUES ('fiche', '{}', '{}', 'refused', ?, ?)",
+    );
+    for (let i = 0; i < 7; i++) {
+      const at = `2026-11-0${i + 1}T08:00:00.000Z`;
+      add.run(at, at);
+    }
+    const d = dashboard(db, new Date('2026-11-08T08:00:00.000Z'));
+    expect(d.recent).toHaveLength(5);
+    expect(d.recentMore).toBe(true);
+    expect(d.recent[0]?.at).toBe('2026-11-07T08:00:00.000Z');
+
+    const next = activity(db, 5, 5);
+    expect(next.items.map((e) => e.at)).toEqual(['2026-11-02T08:00:00.000Z', '2026-11-01T08:00:00.000Z']);
+    expect(next.more).toBe(false);
   });
 });

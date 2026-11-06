@@ -6,19 +6,23 @@
   import {
     Badge,
     Banner,
+    Button,
     EmptyState,
     icons,
     ListRow,
     SettingsCard,
     Skeleton,
     StatCard,
+    toast,
   } from '../lib/ui/index.ts';
 
+  type Line = { at: string; what: string };
   interface Dashboard {
     lastRun?: { at: string; durationMs: number; cost: number; observations: number; drafts: number };
     pending: { drafts: number; contradictions: number; doublons: number };
     heldLots: number;
-    recent: { at: string; what: string }[];
+    recent: Line[];
+    recentMore?: boolean;
   }
   interface QueueDraft {
     id: number;
@@ -41,6 +45,28 @@
       data = d;
     })
     .catch((e: Error) => (failure = e.message));
+
+  const RESUME = 5;
+  let plus = $state<Line[]>([]);
+  let suite = $state<boolean | null>(null);
+  let chargement = $state(false);
+  const lignes = $derived([...(data?.recent ?? []), ...plus]);
+  const encore = $derived(suite ?? data?.recentMore ?? false);
+
+  async function voirPlus() {
+    chargement = true;
+    try {
+      const page = await api.get<{ items: Line[]; more: boolean }>(`/api/activity?offset=${lignes.length}`);
+      // A new event shifts the pages: a line already shown does not come back.
+      const vues = new Set(lignes.map((r) => r.at + r.what));
+      plus = [...plus, ...page.items.filter((r) => !vues.has(r.at + r.what))];
+      suite = page.more;
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'L’activité ne s’est pas chargée.');
+    } finally {
+      chargement = false;
+    }
+  }
 
   const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
   const paris = (d: Date, o: Intl.DateTimeFormatOptions) =>
@@ -111,7 +137,7 @@
               'brouillons créés',
             )}.
           </p>
-          {#each night.slice(0, 5) as d (d.id)}
+          {#each night.slice(0, RESUME) as d (d.id)}
             {@const t = kindOf(d.payload)}
             <ListRow
               ><div class="ligne">
@@ -120,17 +146,29 @@
               </div></ListRow
             >
           {/each}
+          {#if night.length > RESUME}
+            <div class="suite">
+              <Button variant="fantome" size="petit" href="/valider">
+                {night.length - RESUME > 1 ? `Voir les ${night.length - RESUME} autres` : 'Voir l’autre'}
+              </Button>
+            </div>
+          {/if}
         {:else}
           <EmptyState title="Rien pour l’instant" icon={icons.Clock} />
         {/if}
       </SettingsCard>
 
       <SettingsCard title="Activité récente">
-        {#each data.recent as r (r.at + r.what)}
+        {#each lignes as r (r.at + r.what)}
           <ListRow><span class="muted when">{formatWhen(r.at, now)}</span> <span>{r.what}</span></ListRow>
         {:else}
           <EmptyState title="Rien pour l’instant" icon={icons.Inbox} />
         {/each}
+        {#if encore}
+          <div class="suite">
+            <Button variant="fantome" size="petit" loading={chargement} onclick={voirPlus}>Voir plus</Button>
+          </div>
+        {/if}
       </SettingsCard>
     </div>
   {/if}
@@ -179,6 +217,9 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+  }
+  .suite {
+    padding: 8px 18px 12px;
   }
   .when {
     display: inline-block;
