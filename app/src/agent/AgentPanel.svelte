@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext, tick, untrack } from 'svelte';
   import type { Api } from '../api.ts';
-  import { formatCost } from '../format.ts';
+  import { formatCost, formatWhen } from '../format.ts';
   import { bindShortcuts, ICON_STROKE, IconButton, icons } from '../lib/ui/index.ts';
   import { comboOf } from '../lib/ui/shortcuts.ts';
   import Prose from '../Prose.svelte';
@@ -50,6 +50,7 @@
   /** Where the focus was at opening (the top bar's button on a phone), given back at closing. */
   let opener: HTMLElement | null = null;
   $effect.pre(() => {
+    if (agentPanel.open) untrack(() => conversation.keepToday());
     if (agentPanel.open)
       opener = untrack(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   });
@@ -311,6 +312,7 @@
       {#each conversation.messages as m, i (i)}
         {#if m.role === 'user'}
           <div class="msg moi">{m.text}</div>
+          <time class="quand moi-a" datetime={m.at}>{formatWhen(m.at, new Date())}</time>
         {:else}
           <div class={['msg', 'ia', { erreur: m.error }]}>
             <Prose text={m.text} />
@@ -319,6 +321,7 @@
             {/if}
             {#if m.cost}<span class="cout">{formatCost(m.cost)}</span>{/if}
           </div>
+          <time class="quand ia-a" datetime={m.at}>{formatWhen(m.at, new Date())}</time>
         {/if}
       {/each}
       {#if conversation.asking}
@@ -461,6 +464,17 @@
     font-size: 13px;
     line-height: 1.55;
     color: var(--texte-3);
+  }
+  .quand {
+    margin-top: -8px;
+    color: var(--texte-3);
+    font-size: 11.5px;
+  }
+  .moi-a {
+    align-self: flex-end;
+  }
+  .ia-a {
+    align-self: flex-start;
   }
   .msg {
     max-width: 86%;
