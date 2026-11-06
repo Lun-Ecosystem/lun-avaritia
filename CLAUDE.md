@@ -28,7 +28,7 @@ Prérequis : Node `^22.13.0 || >=24`. `npm run demo` tourne sans clé.
   Dialog, Select et Switch s'importent de leur fichier, hors du barrel, pour rester hors du premier chargement.
 - Écrans Dépôts et Réglages, et le graphe, chargés à la demande : chaque morceau du build reste sous 500 kB.
 - Jamais de `{@html}` : synthèses et réponses de l'agent passent par `Prose.svelte`.
-- L'agent est une bulle flottante (`app/src/agent`), son échange vit dans la page seulement.
+- L'agent est une bulle flottante (`app/src/agent`), son échange vit dans la page seulement, pour la journée en cours.
 
 ## Spécificités
 

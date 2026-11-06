@@ -13,6 +13,9 @@ const part = (d: Date, opts: Intl.DateTimeFormatOptions) =>
   d.toLocaleString('fr-FR', { timeZone: TZ, ...opts });
 const day = (d: Date) => part(d, { year: 'numeric', month: '2-digit', day: '2-digit' });
 
+/** The Paris calendar day of an instant, to compare two of them. */
+export const parisDay = day;
+
 /** `18:12` today, `hier 18:12`, else `26/10` (Paris time). */
 export function formatWhen(iso: string, now: Date): string {
   const d = new Date(iso);
