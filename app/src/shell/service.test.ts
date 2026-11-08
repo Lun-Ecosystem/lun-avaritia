@@ -5,22 +5,33 @@ const base = { held: false, paused: false, degraded: false, spend: { spent: 1.2,
 const spend = `${(1.2).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} $ sur ${(5).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} $`;
 
 describe('serviceCard', () => {
-  it('is active with the month’s spend while a key is in service, or not read yet', () => {
-    expect(serviceCard({ ...base, noKey: false })).toEqual({ state: 'actif', detail: spend });
+  it('is active with the month’s spend while the server can process, or before it is read', () => {
+    expect(serviceCard({ ...base, stopped: false })).toEqual({ state: 'actif', detail: spend });
     expect(serviceCard(base)).toEqual({ state: 'actif', detail: spend });
   });
 
   it('says the processing is stopped when there is no key at all', () => {
-    expect(serviceCard({ ...base, noKey: true })).toEqual({
+    expect(serviceCard({ ...base, stopped: 'no-key' })).toEqual({
       state: 'pause',
       title: 'Traitement à l’arrêt',
       detail: 'Aucune clé de fournisseur d’IA',
     });
   });
 
-  it('puts a pause, then a degraded service, before the missing key', () => {
-    expect(serviceCard({ ...base, held: true, noKey: true })).toEqual({ state: 'pause', detail: spend });
-    expect(serviceCard({ ...base, degraded: true, noKey: true })).toEqual({
+  it('says the processing is stopped while a model is missing for the tri or the agent', () => {
+    expect(serviceCard({ ...base, stopped: 'no-model' })).toEqual({
+      state: 'pause',
+      title: 'Traitement à l’arrêt',
+      detail: 'Aucun modèle choisi',
+    });
+  });
+
+  it('puts a pause, then a degraded service, before the stop', () => {
+    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toEqual({
+      state: 'pause',
+      detail: spend,
+    });
+    expect(serviceCard({ ...base, degraded: true, stopped: 'no-model' })).toEqual({
       state: 'cle-refusee',
       detail: spend,
     });

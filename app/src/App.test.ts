@@ -6,18 +6,28 @@ import App from './App.svelte';
 
 const TOKEN_KEY = 'lunavaritia.token';
 
-/** A fake Lun'Avaritia server: records each call as `METHOD /path`; `revoked` answers 401 to all. */
+type Use = 'tri' | 'agent';
+
+/**
+ * A fake Lun'Avaritia server: records each call as `METHOD /path`; `revoked` answers 401 to all. The keys and the
+ * models chosen are not read (404) without `providers`; `set` changes them between two reads.
+ */
 function fakeServer({
   revoked = false,
   paused = true,
   pausedBy,
   providers,
+  chosen,
 }: {
   revoked?: boolean;
   paused?: boolean;
   pausedBy?: 'core' | 'local';
-  providers?: 'absent' | 'ok';
+  providers?: 'absent' | 'ok' | 'broken';
+  /** The uses with a model; both with a key in service, none without. */
+  chosen?: Use[];
 } = {}) {
+  let uses = chosen ?? (providers === 'ok' ? ['tri', 'agent'] : []);
+  const model = { provider: 'openai', model: 'gpt-5-mini' };
   const calls: string[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -36,12 +46,25 @@ function fakeServer({
         version: '0.0.0',
         agent: true,
       });
+    if (providers === 'broken' && key.startsWith('GET /api/llm/')) return json({ error: 'Panne' }, 500);
     if (key === 'GET /api/llm/providers' && providers)
       return json({ providers: [{ id: 'openai', label: 'OpenAI', state: providers }] });
+    if (key === 'GET /api/llm/choice' && providers)
+      return json({ tri: uses.includes('tri') ? model : null, agent: uses.includes('agent') ? model : null });
+    // A key saved in Réglages: the server takes the first model of the provider for both uses.
+    if (key === 'PUT /api/llm/providers/openai/key') {
+      providers = 'ok';
+      uses = ['tri', 'agent'];
+      return json({ id: 'openai', label: 'OpenAI', state: 'ok', last4: '0000', source: 'saved' });
+    }
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
-  return { calls };
+  const set = (next: { providers: 'absent' | 'ok' | 'broken'; chosen?: Use[] }) => {
+    providers = next.providers;
+    if (next.chosen) uses = next.chosen;
+  };
+  return { calls, set };
 }
 
 const authorizeQuery = (redirect = 'http://127.0.0.1:53682/callback') =>
@@ -197,6 +220,47 @@ describe('App', () => {
     expect(card).toHaveTextContent('Aucune clé de fournisseur d’IA');
   });
 
+  it('says in the rail that the processing is stopped while the agent has no model, as the server does', async () => {
+    fakeServer({ paused: false, providers: 'ok', chosen: ['tri'] });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement à l’arrêt'));
+    expect(card).toHaveTextContent('Aucun modèle choisi');
+  });
+
+  it('a key saved in Réglages reaches the rail at once, without reloading', async () => {
+    fakeServer({ paused: false, providers: 'absent' });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', '/reglages?theme=fournisseurs');
+    const user = userEvent.setup();
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement à l’arrêt'));
+    await user.click(await screen.findByRole('button', { name: 'Ajouter une clé' }, { timeout: 5000 }));
+    await user.type(await screen.findByLabelText('Nouvelle clé'), 'sk-essai-0000');
+    await user.click(screen.getByRole('button', { name: 'Vérifier et enregistrer' }));
+    await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
+  });
+
+  it('keeps « Traitement à l’arrêt » while the keys cannot be read, then follows them again', async () => {
+    const { set } = fakeServer({ paused: false, providers: 'absent' });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement à l’arrêt'));
+    set({ providers: 'broken' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(card).toHaveTextContent('Traitement à l’arrêt');
+    set({ providers: 'ok', chosen: ['tri', 'agent'] });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
+  });
+
   it('Pause in the settings turns the service card of the rail to paused at once', async () => {
     fakeServer({ paused: false });
     localStorage.setItem(TOKEN_KEY, 'tok-1');
@@ -225,6 +289,7 @@ describe('App', () => {
     expect(calls.toSorted()).toEqual([
       'GET /api/dashboard',
       'GET /api/drafts',
+      'GET /api/llm/choice',
       'GET /api/llm/providers',
       'GET /api/settings',
       'GET /lun/v1/health',

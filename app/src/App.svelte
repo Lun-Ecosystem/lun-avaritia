@@ -121,10 +121,16 @@
           status.spend = { spent: d.monthSpend, cap: d.monthlyCap };
         })
         .catch(() => {}),
-      // Without any key the deposits wait; a list that cannot be read keeps the last word.
-      a
-        .get<{ providers: { state: string }[] }>('/api/llm/providers')
-        .then((r) => (status.noKey = r.providers.every((p) => p.state === 'absent')))
+      // The server processes only with a model for the tri and one for the agent (choiceFor), else the deposits
+      // wait; the keys say why. Lists that cannot be read keep the last word.
+      Promise.all([
+        a.get<{ tri: unknown; agent: unknown }>('/api/llm/choice'),
+        a.get<{ providers: { state: string }[] }>('/api/llm/providers'),
+      ])
+        .then(([choice, keys]) => {
+          if (choice.tri && choice.agent) status.stopped = false;
+          else status.stopped = keys.providers.every((p) => p.state === 'absent') ? 'no-key' : 'no-model';
+        })
         .catch(() => {}),
     ]);
   }
