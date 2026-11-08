@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { brainDeps, createApp, type AppDeps } from './app.ts';
+import { backupIfMissing } from './backup.ts';
 import { runPending } from './brain/ingest.ts';
 import { ActionRegistry } from './contract/actions.ts';
 import { bootstrapPairing } from './contract/auth.ts';
@@ -63,7 +64,15 @@ checkKeyExpiry();
 setInterval(checkKeyExpiry, 3600_000).unref();
 setInterval(() => pruneEvents(db, clock()), 3600_000).unref();
 
+// The base is copied next to itself, in backups/: once listening, then every hour if the day's copy is missing.
+const backup = () =>
+  backupIfMissing(db, resolve(dirname(dbPath), 'backups'), clock(), (line) => console.log(line));
+setInterval(backup, 3600_000).unref();
+
 const port = Number(process.env.PORT ?? 8789);
 // Loopback by default: a deployment that must be reachable gives its address explicitly.
 const hostname = process.env.HOST?.trim() || '127.0.0.1';
-serve({ fetch: app.fetch, port, hostname }, () => console.log(`Lun'Avaritia écoute sur ${hostname}:${port}`));
+serve({ fetch: app.fetch, port, hostname }, () => {
+  console.log(`Lun'Avaritia écoute sur ${hostname}:${port}`);
+  backup();
+});

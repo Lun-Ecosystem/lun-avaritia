@@ -57,6 +57,13 @@ npm run pair-code    # dans un autre terminal, le code à saisir dans le front
 Aucune dépendance au NAS : tout tourne sur le poste. En développement, `npm run dev -w @lun-avaritia/app` lance Vite, qui
 relaie `/api` et `/lun` vers le serveur.
 
+La base est copiée une fois par jour dans `backups/`, à côté d'elle (`data/backups/avaritia-AAAA-MM-JJ.db` par défaut) :
+dès que le serveur écoute, puis chaque heure si la copie du jour manque, ce qui rattrape un poste éteint la nuit. Les
+sept dernières restent ; une copie ratée laisse une ligne au journal du serveur et se retente l'heure suivante. Les clés
+d'IA saisies y restent chiffrées : seule la même `AVARITIA_SECRET_KEY` les relit. Restaurer une copie :
+[Mettre le desktop en service](https://github.com/Lun-Ecosystem/lun-docs/blob/main/docs/mise-en-service-desktop.md#restaurer-une-copie),
+dans lun-docs.
+
 ## Si ça coince
 
 | Ce que tu vois | Quoi faire |
