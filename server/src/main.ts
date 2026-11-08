@@ -65,8 +65,7 @@ setInterval(checkKeyExpiry, 3600_000).unref();
 setInterval(() => pruneEvents(db, clock()), 3600_000).unref();
 
 // The base is copied next to itself, in backups/: once listening, then every hour if the day's copy is missing.
-const backup = () =>
-  backupIfMissing(db, resolve(dirname(dbPath), 'backups'), clock(), (line) => console.log(line));
+const backup = () => backupIfMissing(db, dbPath, clock(), (line) => console.log(line));
 setInterval(backup, 3600_000).unref();
 
 const port = Number(process.env.PORT ?? 8789);
