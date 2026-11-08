@@ -7,10 +7,12 @@
     state: ServiceState;
     /** What goes with the state (« Synchronisé il y a 1 min », « Clé refusée »). */
     detail: string;
+    /** The product's own wording of the state; the sorting service's by default. */
+    title?: string | undefined;
     class?: string | undefined;
   };
 
-  let { state, detail, class: className }: Props = $props();
+  let { state, detail, title, class: className }: Props = $props();
 
   const TITLES: Record<ServiceState, string> = {
     actif: 'Traitement actif',
@@ -22,7 +24,7 @@
 <div class={['service', state, className]} role="status">
   <span class="point" aria-hidden="true"></span>
   <div>
-    <b>{TITLES[state]}</b>
+    <b>{title ?? TITLES[state]}</b>
     <span class="detail">{detail}</span>
   </div>
 </div>

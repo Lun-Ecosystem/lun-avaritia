@@ -11,7 +11,13 @@ function fakeServer({
   revoked = false,
   paused = true,
   pausedBy,
-}: { revoked?: boolean; paused?: boolean; pausedBy?: 'core' | 'local' } = {}) {
+  providers,
+}: {
+  revoked?: boolean;
+  paused?: boolean;
+  pausedBy?: 'core' | 'local';
+  providers?: 'absent' | 'ok';
+} = {}) {
   const calls: string[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -30,6 +36,8 @@ function fakeServer({
         version: '0.0.0',
         agent: true,
       });
+    if (key === 'GET /api/llm/providers' && providers)
+      return json({ providers: [{ id: 'openai', label: 'OpenAI', state: providers }] });
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
@@ -179,6 +187,16 @@ describe('App', () => {
     expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
   });
 
+  it('says in the rail that the processing is stopped without any key', async () => {
+    fakeServer({ paused: false, providers: 'absent' });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement à l’arrêt'));
+    expect(card).toHaveTextContent('Aucune clé de fournisseur d’IA');
+  });
+
   it('Pause in the settings turns the service card of the rail to paused at once', async () => {
     fakeServer({ paused: false });
     localStorage.setItem(TOKEN_KEY, 'tok-1');
@@ -207,6 +225,7 @@ describe('App', () => {
     expect(calls.toSorted()).toEqual([
       'GET /api/dashboard',
       'GET /api/drafts',
+      'GET /api/llm/providers',
       'GET /api/settings',
       'GET /lun/v1/health',
     ]);

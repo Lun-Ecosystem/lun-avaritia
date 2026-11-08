@@ -659,6 +659,7 @@
           <h3>État du service</h3>
           <ServiceCard state="actif" detail="Seuil d’auto-rangement : 95 %" />
           <ServiceCard state="pause" detail="Mis en pause à 08:40" />
+          <ServiceCard state="pause" title="Traitement à l’arrêt" detail="Aucune clé de fournisseur d’IA" />
           <ServiceCard state="cle-refusee" detail="Clé refusée" />
         </div>
         <div class="planche col">

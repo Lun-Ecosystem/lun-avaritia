@@ -17,6 +17,15 @@ describe('ServiceCard', () => {
     expect(status).toHaveTextContent(title);
     expect(status).toHaveTextContent('Synchronisé il y a 1 min');
   });
+
+  it('reads its title instead of the state’s when given one', () => {
+    render(ServiceCard, {
+      props: { state: 'pause', title: 'Traitement à l’arrêt', detail: 'Aucune clé de fournisseur d’IA' },
+    });
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Traitement à l’arrêt');
+    expect(status).not.toHaveTextContent('Traitement en pause');
+  });
 });
 
 describe('StandaloneCard', () => {

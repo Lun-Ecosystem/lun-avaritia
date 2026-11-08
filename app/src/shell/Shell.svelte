@@ -18,8 +18,8 @@
   import { agentIdentity, agentPanel, openAgent } from '../agent/conversation.svelte.ts';
   import { agentIcon } from '../agent/icons.ts';
   import { go } from '../memoire/titles.ts';
-  import { formatCost } from '../format.ts';
   import { pathOf, type Route } from './routes.ts';
+  import { serviceCard, type ServiceStatus } from './service.ts';
 
   /*
    * Shell of the standalone app, as Lun'Acedia's (plate 03): the rail with its counters and the
@@ -31,13 +31,8 @@
   type Props = {
     route: Route;
     counts: { valider: number; fiches: number };
-    /** The service paused by hand or degraded, and the month's spend against its cap (unknown until read). */
-    status: {
-      held: boolean;
-      paused: boolean;
-      degraded: boolean;
-      spend?: { spent: number; cap: number } | undefined;
-    };
+    /** The service paused by hand or degraded, its keys, and the month's spend against its cap (unknown until read). */
+    status: ServiceStatus;
     /** Pauses or resumes the processing. */
     ontogglepause: () => void;
     /** The agent's bubble, above the screens (it never resizes them). */
@@ -139,10 +134,7 @@
     {/each}
     {#snippet footer()}
       {@render link(items[4]!)}
-      <ServiceCard
-        state={status.held ? 'pause' : status.degraded ? 'cle-refusee' : 'actif'}
-        detail={status.spend ? `${formatCost(status.spend.spent)} sur ${formatCost(status.spend.cap)}` : ''}
-      />
+      <ServiceCard {...serviceCard(status)} />
     {/snippet}
   </Rail>
 
