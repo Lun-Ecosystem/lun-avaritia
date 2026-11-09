@@ -60,9 +60,16 @@ function fakeServer({
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
-  const set = (next: { providers: 'absent' | 'ok' | 'broken'; chosen?: Use[] }) => {
-    providers = next.providers;
+  const set = (next: {
+    providers?: 'absent' | 'ok' | 'broken';
+    chosen?: Use[];
+    paused?: boolean;
+    pausedBy?: 'core' | 'local';
+  }) => {
+    if (next.providers) providers = next.providers;
     if (next.chosen) uses = next.chosen;
+    if (next.paused !== undefined) paused = next.paused;
+    if (next.pausedBy) pausedBy = next.pausedBy;
   };
   return { calls, set };
 }
@@ -259,6 +266,19 @@ describe('App', () => {
     set({ providers: 'ok', chosen: ['tri', 'agent'] });
     await vi.advanceTimersByTimeAsync(30_000);
     await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
+  });
+
+  it('reads a pause the core sets meanwhile within 30 s, without reloading', async () => {
+    const { set } = fakeServer({ paused: false, providers: 'ok' });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
+    set({ paused: true, pausedBy: 'core' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await waitFor(() => expect(card).toHaveTextContent('Lots en pause'));
   });
 
   it('Pause in the settings turns the service card of the rail to paused at once', async () => {

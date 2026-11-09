@@ -74,7 +74,7 @@
   });
   let counts = $state({ valider: 0, fiches: 0 });
 
-  /** Reads the service state again (at pairing, after a pause or a resume in the settings). */
+  /** Reads the service state again (at pairing, after a pause or a resume here, and every 30 s). */
   async function readHealth() {
     const a = api;
     if (!a) return;
@@ -142,7 +142,10 @@
   $effect(() => {
     if (!api) return;
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void readCounts();
+      if (document.visibilityState !== 'visible') return;
+      void readCounts();
+      // A pause of the core, or a key refused meanwhile, reaches the rail too.
+      void readHealth();
     }, 30_000);
     return () => clearInterval(timer);
   });
