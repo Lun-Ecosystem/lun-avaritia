@@ -8,6 +8,7 @@
   import { clearToken, loadToken, saveToken } from './session.ts';
   import { pathOf, ROUTES, routeFromPath, type Route } from './shell/routes.ts';
   import Shell from './shell/Shell.svelte';
+  import type { ServiceStatus } from './shell/service.ts';
   import AgentPanel from './agent/AgentPanel.svelte';
   import Memoire from './screens/Memoire.svelte';
   import Tableau from './screens/Tableau.svelte';
@@ -66,12 +67,7 @@
     upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form).finally(() => void readCounts()),
   } satisfies Api);
 
-  let status = $state<{
-    held: boolean;
-    paused: boolean;
-    degraded: boolean;
-    spend?: { spent: number; cap: number };
-  }>({
+  let status = $state<ServiceStatus>({
     held: false,
     paused: false,
     degraded: false,
@@ -110,20 +106,33 @@
     }
   }
 
-  /** Rail counters: at each change of screen, after each change made here, and every 30 s. */
+  /** Rail counters and keys: at each change of screen, after each change made here, and every 30 s. */
   async function readCounts() {
     const a = api;
     if (!a) return;
-    await a
-      .get<{ pending: { drafts: number }; fiches: number; monthSpend: number; monthlyCap: number }>(
-        '/api/dashboard',
-      )
-      .then((d) => {
-        counts.valider = d.pending.drafts;
-        counts.fiches = d.fiches;
-        status.spend = { spent: d.monthSpend, cap: d.monthlyCap };
-      })
-      .catch(() => {});
+    await Promise.all([
+      a
+        .get<{ pending: { drafts: number }; fiches: number; monthSpend: number; monthlyCap: number }>(
+          '/api/dashboard',
+        )
+        .then((d) => {
+          counts.valider = d.pending.drafts;
+          counts.fiches = d.fiches;
+          status.spend = { spent: d.monthSpend, cap: d.monthlyCap };
+        })
+        .catch(() => {}),
+      // The server processes only with a model for the tri and one for the agent (choiceFor), else the deposits
+      // wait; the keys say why. Lists that cannot be read keep the last word.
+      Promise.all([
+        a.get<{ tri: unknown; agent: unknown }>('/api/llm/choice'),
+        a.get<{ providers: { state: string }[] }>('/api/llm/providers'),
+      ])
+        .then(([choice, keys]) => {
+          if (choice.tri && choice.agent) status.stopped = false;
+          else status.stopped = keys.providers.every((p) => p.state === 'absent') ? 'no-key' : 'no-model';
+        })
+        .catch(() => {}),
+    ]);
   }
   $effect(() => {
     void route;
