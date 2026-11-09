@@ -17,8 +17,12 @@ export interface ServiceStatus {
 /** The service card of the rail: a pause first, then a degraded service, the cap reached, a processing stopped. */
 export function serviceCard(status: ServiceStatus): { state: ServiceState; title?: string; detail: string } {
   const spend = status.spend ? `${formatCost(status.spend.spent)} sur ${formatCost(status.spend.cap)}` : '';
-  // A pause holds the lots; a depot, asked by hand, still goes through (server inputs.ts).
-  if (status.held) return { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts passent' };
+  // A pause holds the lots; a depot, asked by hand, still goes through (server inputs.ts), unless the rest stops it.
+  if (status.held) {
+    const rest = serviceCard({ ...status, held: false });
+    const detail = rest.state === 'actif' ? 'Les dépôts passent' : 'Les dépôts attendent aussi';
+    return { state: 'pause', title: 'Lots en pause', detail };
+  }
   if (status.degraded) return { state: 'cle-refusee', detail: spend };
   // The server's own test (overCap): the lots and the depots wait for the next month, or a higher cap.
   if (status.spend && status.spend.spent >= status.spend.cap)

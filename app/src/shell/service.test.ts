@@ -32,6 +32,14 @@ describe('serviceCard', () => {
     expect(serviceCard({ ...base, held: true, paused: false })).toEqual(paused);
   });
 
+  it('in a pause, says the depots wait too when the cap, a refused key or no key stops them', () => {
+    const waiting = { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts attendent aussi' };
+    expect(serviceCard({ ...base, held: true, spend: { spent: 5, cap: 5 } })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, degraded: true })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, stopped: 'no-model' })).toEqual(waiting);
+  });
+
   it('puts a pause, then a degraded service, before the stop', () => {
     expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toMatchObject({ title: 'Lots en pause' });
     expect(serviceCard({ ...base, degraded: true, stopped: 'no-model' })).toEqual({
