@@ -82,7 +82,7 @@ export function backupIfMissing(
       // Marked once told: a failure the core could not be told of is told the next hour.
       putSetting(db, FAILED_DAY, ymd(now));
     } catch (e) {
-      log(`Copie ratée non signalée : ${String(e)}`);
+      log(`Copie ratée non signalée : ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 }

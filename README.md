@@ -59,9 +59,9 @@ relaie `/api` et `/lun` vers le serveur.
 
 La base est copiée une fois par jour dans `backups/`, à côté d'elle (`data/backups/avaritia-AAAA-MM-JJ.db` par défaut) :
 dès que le serveur écoute, puis chaque heure si la copie du jour manque, ce qui rattrape un poste éteint la nuit. Les
-sept dernières restent ; une copie ratée laisse une ligne au journal du serveur et se retente l'heure suivante. Relié
-à Lun'Anima, elle lui envoie aussi un événement `backup.failed`, une fois par jour au plus, même en pause. Une
-copie s'ouvre sans clé, comme la base : seules les clés d'IA saisies y restent chiffrées, et seule la même
+sept dernières restent ; une copie ratée laisse une ligne au journal du serveur et se retente l'heure suivante.
+Reliée à Lun'Anima, Avaritia lui envoie aussi un événement `backup.failed`, une fois par jour au plus, même en pause.
+Une copie s'ouvre sans clé, comme la base : seules les clés d'IA saisies y restent chiffrées, et seule la même
 `AVARITIA_SECRET_KEY` les relit. Restaurer une copie :
 [Mettre le desktop en service](https://github.com/Lun-Ecosystem/lun-docs/blob/main/docs/mise-en-service-desktop.md#restaurer-une-copie),
 dans lun-docs.

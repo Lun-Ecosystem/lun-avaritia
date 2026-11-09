@@ -17,9 +17,7 @@ describe('secret encryption', () => {
     // The random IV makes that character an A about once in 64: drawn until it is, the test no longer depends on it.
     let blob = encrypt('secret', key);
     while (blob.at(-2) !== 'A') blob = encrypt('secret', key);
-    const tampered = blob.slice(0, -2) + (blob.at(-2) === 'A' ? 'B' : 'A') + blob.slice(-1);
-    expect(tampered).not.toBe(blob);
-    expect(() => decrypt(tampered, key)).toThrow();
+    expect(() => decrypt(blob.slice(0, -2) + 'B' + blob.slice(-1), key)).toThrow();
   });
 
   it('rejects a key that is not 32 bytes', () => {
