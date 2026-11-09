@@ -35,8 +35,8 @@ Prérequis : Node `^22.13.0 || >=24`. `npm run demo` tourne sans clé.
 - Rien n'entre dans une fiche sans validation : l'agent propose des brouillons (cartes du contrat).
 - Un fait démenti est barré et daté, jamais effacé ; une fiche fusionnée redirige vers sa cible.
 - Pas de savoir général (« le ketchup est rouge ») : seulement ce qui transite dans l'écosystème.
-- Tout ce qui est automatique s'arrête en pause, ce qui est demandé à la main passe ; le plafond mensuel de coût est
-  vérifié avant chaque appel.
+- Tout ce qui est automatique s'arrête en pause, sauf l'entretien qui n'agit sur rien (copie de la base, échéance
+  des clés) ; ce qui est demandé à la main passe. Le plafond mensuel de coût est vérifié avant chaque appel.
 - Les données vont dans un bloc utilisateur délimité, jamais dans le prompt système.
 - Dépôt public : aucun secret, aucune donnée réelle, aucune adresse interne.
 - Cahier des attendus : `docs/specs/2026-10-28-lun-avaritia-v1-design.md` dans lun-docs.
