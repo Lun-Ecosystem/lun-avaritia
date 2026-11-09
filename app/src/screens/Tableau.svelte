@@ -178,7 +178,7 @@
   .ecran {
     display: grid;
     gap: 16px;
-    padding: 24px;
+    padding: 24px 24px calc(24px + var(--agent-coin));
   }
   .entete {
     display: flex;

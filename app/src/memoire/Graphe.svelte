@@ -336,7 +336,7 @@
     right: 0;
     bottom: 0;
     width: min(420px, 45%);
-    padding: 16px;
+    padding: 16px 16px calc(16px + var(--agent-coin));
     border: 1px solid var(--bordure-forte);
     border-radius: var(--r-2);
     background: var(--surface-1);
