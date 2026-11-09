@@ -40,6 +40,25 @@ describe('serviceCard', () => {
     });
   });
 
+  it('says the cap reached once the month’s spend reaches it, after a pause and a degraded service', () => {
+    const full = { spent: 5, cap: 5 };
+    const words = `${(5).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} $`;
+    expect(serviceCard({ ...base, spend: full })).toEqual({
+      state: 'pause',
+      title: 'Plafond atteint',
+      detail: `${words} sur ${words}`,
+    });
+    expect(serviceCard({ ...base, spend: full, held: true })).toMatchObject({ title: 'Lots en pause' });
+    expect(serviceCard({ ...base, spend: full, degraded: true })).toEqual({
+      state: 'cle-refusee',
+      detail: `${words} sur ${words}`,
+    });
+  });
+
+  it('a spend under the cap says nothing of the cap', () => {
+    expect(serviceCard({ ...base, spend: { spent: 4.99, cap: 5 } }).title).toBeUndefined();
+  });
+
   it('says nothing of the spend before it is read', () => {
     expect(serviceCard({ held: false, paused: false, degraded: false })).toEqual({
       state: 'actif',

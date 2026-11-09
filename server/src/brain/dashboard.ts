@@ -8,6 +8,7 @@ export interface Dashboard {
   pending: { drafts: number; contradictions: number; doublons: number };
   /** Kept fiches (merged ones don't count): the rail counter. */
   fiches: number;
+  /** Lots held by the monthly cap only: the Tableau's banner names the cap. */
   heldLots: number;
   monthSpend: number;
   /** The monthly cost cap, shown beside the spend. */
@@ -64,7 +65,7 @@ export function dashboard(db: DatabaseSync, now: Date): Dashboard {
       doublons: count(db, `SELECT COUNT(*) AS n FROM drafts WHERE ${PENDING} AND kind = 'doublon'`),
     },
     fiches: count(db, 'SELECT COUNT(*) AS n FROM fiches WHERE merged_into IS NULL'),
-    heldLots: count(db, "SELECT COUNT(*) AS n FROM lots WHERE status = 'held'"),
+    heldLots: count(db, "SELECT COUNT(*) AS n FROM lots WHERE status = 'held' AND reason = 'cost-cap'"),
     monthSpend: monthSpend(db, now),
     monthlyCap: setting(db, 'cost.monthlyCap'),
     recent: recent.items,

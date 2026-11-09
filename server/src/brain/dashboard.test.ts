@@ -34,6 +34,9 @@ describe('dashboard', () => {
     const refused = addDraft(db, fiche(), { source: 'note' }, now);
     db.prepare("UPDATE drafts SET status = 'refused', decided_at = ? WHERE id = ?").run(now, refused);
     db.prepare("INSERT INTO lots (status, reason, created_at) VALUES ('held', 'cost-cap', ?)").run(now);
+    // Held without a provider, or on an outage: the cap's banner does not count them.
+    db.prepare("INSERT INTO lots (status, reason, created_at) VALUES ('held', 'no-provider', ?)").run(now);
+    db.prepare("INSERT INTO lots (status, reason, created_at) VALUES ('held', 'http-503', ?)").run(now);
     db.prepare(
       "INSERT INTO depots (name, type, bytes, created_at) VALUES ('d.txt', 'text/plain', x'00', ?)",
     ).run(now);
