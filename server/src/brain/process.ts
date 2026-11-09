@@ -21,6 +21,8 @@ export interface BrainDeps {
   db: DatabaseSync;
   clock: () => Date;
   provider: (use: 'tri' | 'agent') => { provider: LlmProvider; model: string } | undefined;
+  /** Whether any provider has a key; unknown when absent. */
+  keyed?: (() => boolean) | undefined;
   /** Where a provider failure is told in full (the result only carries its kind). */
   log?: ((line: string) => void) | undefined;
 }
