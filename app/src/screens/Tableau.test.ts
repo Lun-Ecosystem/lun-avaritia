@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api.ts';
+import { dismissAll, toasts } from '../lib/ui/toasts.svelte.ts';
 import Tableau from './Tableau.svelte';
 
 const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
@@ -47,7 +48,10 @@ function show(dash: unknown, queue: unknown = { drafts: [], held: 0 }) {
   render(Tableau, { context: new Map([['api', api]]) });
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  dismissAll();
+});
 
 describe('Tableau', () => {
   it('shows the last-run header, the stat cards, the summary and the activity', async () => {
@@ -113,6 +117,18 @@ describe('Tableau', () => {
     expect(get).toHaveBeenCalledWith('/api/activity?offset=5');
     expect(screen.getAllByText('Dépôt 5')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Voir plus' })).toBeNull();
+  });
+
+  it('says a failed "Voir plus" in the danger tone, so it stays as long as an error', async () => {
+    const get = vi.fn(async (p: string) => {
+      if (p.startsWith('/api/activity')) throw new Error('L’activité ne s’est pas chargée.');
+      const recent = [{ at: ago(1), what: 'Dépôt 1' }];
+      return p === '/api/drafts' ? { drafts: [], held: 0 } : { ...empty, recent, recentMore: true };
+    });
+    render(Tableau, { context: new Map([['api', { get } as unknown as Api]]) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Voir plus' }));
+    await vi.waitFor(() => expect(toasts()).toHaveLength(1));
+    expect(toasts()[0]).toMatchObject({ message: 'L’activité ne s’est pas chargée.', tone: 'danger' });
   });
 
   it('caps the summary and links to the rest', async () => {

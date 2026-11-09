@@ -8,6 +8,14 @@
   /* The agent's bubble: its height and its offset from the corner (lifted above the bottom navigation on a phone, by the shell). */
   --agent-lanceur-h: 44px;
   --agent-lanceur-bas: 22px;
+  /* Room at the end of what scrolls under the bubble: its offset, its height and a gap. */
+  --agent-coin: calc(var(--agent-lanceur-h) + var(--agent-lanceur-bas) + 12px);
+}
+/* No bubble on a phone: the agent's button is in the top bar. */
+@media (max-width: 767.98px) {
+  :root {
+    --agent-coin: 0px;
+  }
 }
 
 .lun-avaritia {

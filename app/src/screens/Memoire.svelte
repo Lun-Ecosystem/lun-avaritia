@@ -258,6 +258,7 @@
     min-width: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    padding-bottom: var(--agent-coin);
   }
   .resultats {
     display: grid;

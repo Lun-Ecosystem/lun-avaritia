@@ -6,21 +6,37 @@
   import { dismiss, lastUndoable, toasts, undo, undoLast } from './toasts.svelte.ts';
 
   /*
-   * Shows the toasts of the page, at the bottom, above the mobile bar. Mounted once by the app,
-   * inside the view root (it takes the world's accent from there).
+   * Shows the toast of the page (one at a time), at the bottom, above the mobile bar, or centred in
+   * its parent when `contained`. Mounted once by the app, inside the view root (it takes the
+   * world's accent from there).
    */
+
+  let { contained = false }: { contained?: boolean } = $props();
 
   const list = $derived(toasts());
   const undoable = $derived(lastUndoable());
+  let now = $state(Date.now());
 
-  // Z undoes the last toast, only while one can be undone (never from a field: bindShortcuts).
+  // Ctrl Z undoes the toast, only while one can be undone (never from a field: bindShortcuts).
   $effect(() => {
     if (!undoable) return;
-    return bindShortcuts({ z: undoLast });
+    return bindShortcuts({ 'Ctrl+z': undoLast });
+  });
+
+  // Before the first paint of an undoable toast, so it never shows a stale count.
+  $effect.pre(() => {
+    if (undoable) now = Date.now();
+  });
+
+  // The seconds left are refreshed only while an undoable toast counts down.
+  $effect(() => {
+    if (!undoable) return;
+    const interval = setInterval(() => (now = Date.now()), 1000);
+    return () => clearInterval(interval);
   });
 </script>
 
-<div class="toaster" aria-live="polite" aria-relevant="additions text">
+<div class="toaster" class:contained aria-live="polite" aria-relevant="additions text">
   {#each list as item (item.id)}
     <div class="toast" data-ton={item.tone ?? 'ok'}>
       {#if item.tone === 'danger'}
@@ -34,7 +50,10 @@
           <Button variant="fantome" size="petit" loading={item.undoing} onclick={() => undo(item.id)}
             >Annuler</Button
           >
-          {#if item.id === undoable?.id}<Kbd>Z</Kbd>{/if}
+          {#if item.id === undoable?.id}
+            <span aria-hidden="true"><Kbd>Ctrl Z</Kbd></span>
+            <span class="reste" aria-hidden="true">{Math.max(0, Math.ceil((item.endsAt - now) / 1000))} s</span>
+          {/if}
         </span>
       {:else}
         <button type="button" class="fermer" aria-label="Fermer" onclick={() => dismiss(item.id)}>
@@ -59,6 +78,15 @@
     max-width: calc(100vw - 32px);
     transform: translateX(-50%);
     pointer-events: none;
+  }
+  .toaster.contained {
+    position: absolute;
+    max-width: calc(100% - 32px);
+  }
+  .reste {
+    min-width: 2.5ch;
+    color: var(--texte-3);
+    font-variant-numeric: tabular-nums;
   }
   .toast {
     box-sizing: border-box;
@@ -136,7 +164,7 @@
   }
   /* Above the bottom bar of the mobile layout (68 px). */
   @media (max-width: 767.98px) {
-    .toaster {
+    .toaster:not(.contained) {
       bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     }
     .toast {

@@ -38,7 +38,15 @@ export * as icons from './Icon.ts';
 export { ICON_STROKE, type IconComponent } from './Icon.ts';
 export { mondeOf } from './monde.ts';
 export { bindShortcuts } from './shortcuts.ts';
-export { dismiss, dismissAll, toast, TOAST_DURATION, type ToastOptions } from './toasts.svelte.ts';
+export {
+  dismiss,
+  dismissAll,
+  toast,
+  DANGER_DURATION,
+  INFO_DURATION,
+  UNDO_DURATION,
+  type ToastOptions,
+} from './toasts.svelte.ts';
 export type {
   ButtonVariant,
   DemoState,

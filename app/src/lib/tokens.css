@@ -19,6 +19,10 @@
   --ombre-1:0 1px 2px rgba(0,0,0,.35);
   --ombre-2:0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
   --serif:'Cormorant Garamond',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
+  /* marques du monde (sceau, fil, étoile) : ivoire atténué */
+  --marque:rgba(240,235,225,.78); --marque-doux:rgba(240,235,225,.22);
+  /* cadre de focus façon Ender Lilies : filet clair et halo très doux */
+  --cadre-focus:0 0 0 1px rgba(240,235,225,.34), 0 0 14px rgba(240,235,225,.07);
 }
 
 /* monde : seule couche qui change d’une interface à l’autre.
@@ -30,3 +34,4 @@
   --accent:#745716; --accent-survol:#7F611A; --accent-texte:#D9BE7A;
   --accent-doux:rgba(116,87,22,.28); --accent-bord:rgba(217,190,122,.40);
 }
+
