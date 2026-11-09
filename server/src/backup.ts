@@ -33,6 +33,8 @@ export function backupDatabase(
   // `VACUUM INTO` refuses a target that exists: the copy is written here first, never counted among the copies.
   const tmp = join(dir, `.${name}-copie.tmp`);
   rmSync(tmp, { force: true });
+  // shortcut: VACUUM INTO holds the server while it copies (about 0.1 s for 30 MB); move to the asynchronous
+  // backup() of node:sqlite once a base reaches a few hundred MB, after checking the Node versions accepted.
   db.prepare('VACUUM INTO ?').run(tmp);
   renameSync(tmp, file);
   // The names sort by date: the oldest go first.

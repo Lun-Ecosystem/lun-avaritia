@@ -65,6 +65,7 @@ setInterval(checkKeyExpiry, 3600_000).unref();
 setInterval(() => pruneEvents(db, clock()), 3600_000).unref();
 
 // The base is copied next to itself, in backups/: once listening, then every hour if the day's copy is missing.
+// Even in pause, like the other hourly tasks: a copy acts on nothing, and a paused week still needs its copies.
 const backup = () => backupIfMissing(db, dbPath, clock(), (line) => console.log(line));
 setInterval(backup, 3600_000).unref();
 
