@@ -1,8 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { emitEvent } from './contract/events.ts';
+import { getSetting, putSetting } from './db.ts';
 
 const DAY = /^\d{4}-\d{2}-\d{2}\.db$/;
+/** The day of the last failed copy told to the core: one event a day, however many hours it keeps failing. */
+const FAILED_DAY = 'backup.failedDay';
 
 const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -54,7 +58,8 @@ export function backupDatabase(
 
 /**
  * The day's copy, when it is missing: called at start then every hour, so a post off at night catches up as soon
- * as it is back. A failed copy is only logged, never thrown: the next call tries again.
+ * as it is back. A failed copy is never thrown: it is logged, told to the core once a day (its Journal and the
+ * phone, even in pause), and the next call tries again.
  */
 export function backupIfMissing(
   db: DatabaseSync,
@@ -68,6 +73,16 @@ export function backupIfMissing(
     log(`Base copiée : ${file}`);
     for (const old of stuck) log(`Ancienne copie non retirée : ${old}`);
   } catch (err) {
-    log(`Copie de la base ratée : ${err instanceof Error ? err.message : String(err)}`);
+    const reason = err instanceof Error ? err.message : String(err);
+    log(`Copie de la base ratée : ${reason}`);
+    try {
+      if (getSetting<string>(db, FAILED_DAY, '') === ymd(now)) return;
+      const title = `La copie de la base a échoué : ${reason}`;
+      emitEvent(db, { type: 'backup.failed', importance: 'normal', title }, now);
+      // Marked once told: a failure the core could not be told of is told the next hour.
+      putSetting(db, FAILED_DAY, ymd(now));
+    } catch (e) {
+      log(`Copie ratée non signalée : ${String(e)}`);
+    }
   }
 }
