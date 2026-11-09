@@ -27,6 +27,8 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/Lun-Ecosystem/lun-docs "$RUNNER_TEMP/lun-docs"
           node "$RUNNER_TEMP/lun-docs/tools/check-repo.mjs" --addresses .
+      - name: Shared design tokens are in sync
+        run: node "$RUNNER_TEMP/lun-docs/tools/sync-tokens.mjs" --check --monde avaritia app/src/lib/tokens.css
       - name: Conventional PR title
         if: github.event_name == 'pull_request'
         env:
