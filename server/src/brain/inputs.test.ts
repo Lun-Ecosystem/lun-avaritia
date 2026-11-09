@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recordCost } from '../contract/costs.ts';
+import { setPaused } from '../contract/state.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { vault } from '../testing/load-vault.ts';
 import { makeHarness } from '../testing/harness.ts';
@@ -71,6 +72,20 @@ describe('notes and depots', () => {
     expect(await res.json()).toEqual({ drafts: 1 });
     expect(t.count('depots')).toBe(1);
     expect(t.h.db.prepare('SELECT origin FROM drafts').get()).toEqual({ origin: 'note' });
+  });
+
+  it('a pause, local or of the core, holds the lots but lets a note and a depot through: they are asked by hand', async () => {
+    for (const by of ['local', 'core'] as const) {
+      const t = setup();
+      setPaused(t.h.db, true, by);
+      t.queue.push(...t.good());
+      const note = await t.req('/api/notes', { method: 'POST', json: { text: 'Le client X a signé.' } });
+      expect(await note.json()).toEqual({ drafts: 1 });
+      t.queue.push(...t.good());
+      expect(await (await t.upload('d.txt', 'text/plain', 'Le client X a signé.')).json()).toMatchObject({
+        drafts: 1,
+      });
+    }
   });
 
   it('a .md depot gives drafts attached to it, listed with their count; deleting keeps the drafts', async () => {

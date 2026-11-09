@@ -147,7 +147,7 @@ describe('App', () => {
     localStorage.setItem(TOKEN_KEY, 'tok-1');
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
   });
 
   it('the rail counter follows a validation, and a change made elsewhere', async () => {
@@ -270,7 +270,7 @@ describe('App', () => {
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
     expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Pause' }, { timeout: 5000 }));
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
   });
 
   it('a 401 on the way clears the token and goes back to pairing, without a loop', async () => {
@@ -513,7 +513,7 @@ describe('App, top bar and palette', () => {
     expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
     await user.keyboard('{Control>}k{/Control}');
     await user.click(await screen.findByText('Mettre le traitement en pause'));
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
     expect(calls).toContain('POST /lun/v1/pause');
     expect(screen.getByRole('button', { name: 'Reprendre le traitement' })).toBeInTheDocument();
   });
@@ -523,7 +523,7 @@ describe('App, top bar and palette', () => {
     const user = userEvent.setup();
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Mettre le traitement en pause' }));
     await waitFor(() => expect(calls).toContain('POST /lun/v1/pause'));
     expect(calls).not.toContain('POST /lun/v1/resume');

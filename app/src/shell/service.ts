@@ -17,7 +17,8 @@ export interface ServiceStatus {
 /** The service card of the rail: a pause first, then a degraded service, then a processing stopped. */
 export function serviceCard(status: ServiceStatus): { state: ServiceState; title?: string; detail: string } {
   const spend = status.spend ? `${formatCost(status.spend.spent)} sur ${formatCost(status.spend.cap)}` : '';
-  if (status.held) return { state: 'pause', detail: spend };
+  // A pause holds the lots; a depot, asked by hand, still goes through (server inputs.ts).
+  if (status.held) return { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts passent' };
   if (status.degraded) return { state: 'cle-refusee', detail: spend };
   if (status.stopped)
     return {

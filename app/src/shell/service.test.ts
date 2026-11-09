@@ -26,11 +26,14 @@ describe('serviceCard', () => {
     });
   });
 
+  it('in a pause, local or of the core, says the lots wait and the depots go through', () => {
+    const paused = { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts passent' };
+    expect(serviceCard({ ...base, held: true, paused: true })).toEqual(paused);
+    expect(serviceCard({ ...base, held: true, paused: false })).toEqual(paused);
+  });
+
   it('puts a pause, then a degraded service, before the stop', () => {
-    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toEqual({
-      state: 'pause',
-      detail: spend,
-    });
+    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toMatchObject({ title: 'Lots en pause' });
     expect(serviceCard({ ...base, degraded: true, stopped: 'no-model' })).toEqual({
       state: 'cle-refusee',
       detail: spend,
