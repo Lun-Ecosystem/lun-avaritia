@@ -106,10 +106,46 @@ describe('backupIfMissing', () => {
     const closed = new DatabaseSync(':memory:');
     closed.close();
     expect(() => backupIfMissing(closed, path, day(7), (l) => lines.push(l))).not.toThrow();
-    expect(lines).toHaveLength(1);
+    // A closed base cannot be told of either: the second line says so.
+    expect(lines).toHaveLength(2);
     expect(lines[0]).toMatch(/^Copie de la base ratée : /);
+    expect(lines[1]).toMatch(/^Copie ratée non signalée : /);
     backupIfMissing(db, path, day(7, 6), (l) => lines.push(l));
     expect(readdirSync(backups)).toEqual(['avaritia-2026-11-07.db']);
+  });
+
+  it('tells the core of a failed copy once a day, and says nothing of a good one', () => {
+    const { db, path, backups } = base();
+    const failures = () =>
+      db
+        .prepare("SELECT title, importance, data FROM events WHERE type = 'backup.failed' ORDER BY id")
+        .all() as { title: string; importance: string; data: string }[];
+    backupIfMissing(db, path, day(6), () => {});
+    expect(failures()).toEqual([]);
+    // A folder in the way of the temporary file: the copy fails, the base stays open.
+    mkdirSync(join(backups, TMP, 'occupé'), { recursive: true });
+    backupIfMissing(db, path, day(7, 5), () => {});
+    backupIfMissing(db, path, day(7, 6), () => {});
+    expect(failures()).toHaveLength(1);
+    // A short title for the core's Journal and the phone; Node's own words, in English with a path, stay in the data.
+    expect(failures()[0]).toMatchObject({ importance: 'normal', title: 'La copie de la base a échoué' });
+    expect(JSON.parse(failures()[0]!.data)).toEqual({ reason: expect.stringMatching(/\S/) });
+    backupIfMissing(db, path, day(8), () => {});
+    expect(failures()).toHaveLength(2);
+  });
+
+  it('a failure the core could not be told of is told the next hour', () => {
+    const { db, path, backups } = base();
+    const lines: string[] = [];
+    mkdirSync(join(backups, TMP, 'occupé'), { recursive: true });
+    db.exec('ALTER TABLE events RENAME TO events_hors');
+    backupIfMissing(db, path, day(7, 5), (l) => lines.push(l));
+    expect(lines.at(-1)).toMatch(/^Copie ratée non signalée : /);
+    db.exec('ALTER TABLE events_hors RENAME TO events');
+    backupIfMissing(db, path, day(7, 6), () => {});
+    expect(db.prepare("SELECT count(*) AS n FROM events WHERE type = 'backup.failed'").get()).toEqual({
+      n: 1,
+    });
   });
 
   it('says an old copy it could not remove apart from the copy, which is made', () => {

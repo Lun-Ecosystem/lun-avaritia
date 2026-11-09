@@ -26,15 +26,45 @@ describe('serviceCard', () => {
     });
   });
 
+  it('in a pause, local or of the core, says the lots wait and the depots go through', () => {
+    const paused = { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts passent' };
+    expect(serviceCard({ ...base, held: true, paused: true })).toEqual(paused);
+    expect(serviceCard({ ...base, held: true, paused: false })).toEqual(paused);
+  });
+
+  it('in a pause, says the depots wait too when the cap, a refused key or no key stops them', () => {
+    const waiting = { state: 'pause', title: 'Lots en pause', detail: 'Les dépôts attendent aussi' };
+    expect(serviceCard({ ...base, held: true, spend: { spent: 5, cap: 5 } })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, degraded: true })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toEqual(waiting);
+    expect(serviceCard({ ...base, held: true, stopped: 'no-model' })).toEqual(waiting);
+  });
+
   it('puts a pause, then a degraded service, before the stop', () => {
-    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toEqual({
-      state: 'pause',
-      detail: spend,
-    });
+    expect(serviceCard({ ...base, held: true, stopped: 'no-key' })).toMatchObject({ title: 'Lots en pause' });
     expect(serviceCard({ ...base, degraded: true, stopped: 'no-model' })).toEqual({
       state: 'cle-refusee',
       detail: spend,
     });
+  });
+
+  it('says the cap reached once the month’s spend reaches it, after a pause and a degraded service', () => {
+    const full = { spent: 5, cap: 5 };
+    const words = `${(5).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} $`;
+    expect(serviceCard({ ...base, spend: full })).toEqual({
+      state: 'pause',
+      title: 'Plafond atteint',
+      detail: `${words} sur ${words}`,
+    });
+    expect(serviceCard({ ...base, spend: full, held: true })).toMatchObject({ title: 'Lots en pause' });
+    expect(serviceCard({ ...base, spend: full, degraded: true })).toEqual({
+      state: 'cle-refusee',
+      detail: `${words} sur ${words}`,
+    });
+  });
+
+  it('a spend under the cap says nothing of the cap', () => {
+    expect(serviceCard({ ...base, spend: { spent: 4.99, cap: 5 } }).title).toBeUndefined();
   });
 
   it('says nothing of the spend before it is read', () => {

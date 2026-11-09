@@ -13,10 +13,11 @@ describe('secret encryption', () => {
     expect(encrypt('1//refresh-token', key)).not.toContain('refresh');
   });
 
-  it('rejects a tampered blob', () => {
-    const blob = encrypt('secret', key);
-    const tampered = blob.slice(0, -2) + (blob.endsWith('A') ? 'B' : 'A') + blob.slice(-1);
-    expect(() => decrypt(tampered, key)).toThrow();
+  it('rejects a tampered blob, even when the character changed was an A', () => {
+    // The random IV makes that character an A about once in 64: drawn until it is, the test no longer depends on it.
+    let blob = encrypt('secret', key);
+    while (blob.at(-2) !== 'A') blob = encrypt('secret', key);
+    expect(() => decrypt(blob.slice(0, -2) + 'B' + blob.slice(-1), key)).toThrow();
   });
 
   it('rejects a key that is not 32 bytes', () => {

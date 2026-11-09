@@ -60,9 +60,16 @@ function fakeServer({
     return json({ error: 'Introuvable' }, 404);
   });
   vi.stubGlobal('fetch', fetch);
-  const set = (next: { providers: 'absent' | 'ok' | 'broken'; chosen?: Use[] }) => {
-    providers = next.providers;
+  const set = (next: {
+    providers?: 'absent' | 'ok' | 'broken';
+    chosen?: Use[];
+    paused?: boolean;
+    pausedBy?: 'core' | 'local';
+  }) => {
+    if (next.providers) providers = next.providers;
     if (next.chosen) uses = next.chosen;
+    if (next.paused !== undefined) paused = next.paused;
+    if (next.pausedBy) pausedBy = next.pausedBy;
   };
   return { calls, set };
 }
@@ -147,7 +154,7 @@ describe('App', () => {
     localStorage.setItem(TOKEN_KEY, 'tok-1');
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
   });
 
   it('the rail counter follows a validation, and a change made elsewhere', async () => {
@@ -261,6 +268,19 @@ describe('App', () => {
     await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
   });
 
+  it('reads a pause the core sets meanwhile within 30 s, without reloading', async () => {
+    const { set } = fakeServer({ paused: false, providers: 'ok' });
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(App);
+    const rail = await screen.findByRole('navigation', { name: 'Sections' });
+    const card = await within(rail).findByRole('status');
+    await waitFor(() => expect(card).toHaveTextContent('Traitement actif'));
+    set({ paused: true, pausedBy: 'core' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await waitFor(() => expect(card).toHaveTextContent('Lots en pause'));
+  });
+
   it('Pause in the settings turns the service card of the rail to paused at once', async () => {
     fakeServer({ paused: false });
     localStorage.setItem(TOKEN_KEY, 'tok-1');
@@ -270,7 +290,7 @@ describe('App', () => {
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
     expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Pause' }, { timeout: 5000 }));
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
   });
 
   it('a 401 on the way clears the token and goes back to pairing, without a loop', async () => {
@@ -513,7 +533,7 @@ describe('App, top bar and palette', () => {
     expect(await within(rail).findByText('Traitement actif')).toBeInTheDocument();
     await user.keyboard('{Control>}k{/Control}');
     await user.click(await screen.findByText('Mettre le traitement en pause'));
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
     expect(calls).toContain('POST /lun/v1/pause');
     expect(screen.getByRole('button', { name: 'Reprendre le traitement' })).toBeInTheDocument();
   });
@@ -523,7 +543,7 @@ describe('App, top bar and palette', () => {
     const user = userEvent.setup();
     render(App);
     const rail = await screen.findByRole('navigation', { name: 'Sections' });
-    expect(await within(rail).findByText('Traitement en pause')).toBeInTheDocument();
+    expect(await within(rail).findByText('Lots en pause')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Mettre le traitement en pause' }));
     await waitFor(() => expect(calls).toContain('POST /lun/v1/pause'));
     expect(calls).not.toContain('POST /lun/v1/resume');

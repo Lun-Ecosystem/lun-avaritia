@@ -16,7 +16,14 @@ import { registerCatalog } from './contract/catalog.ts';
 import { contractRoutes } from './contract/routes.ts';
 import { brainRoutes } from './brain/routes.ts';
 import type { BrainDeps } from './brain/process.ts';
-import { choiceFor, makeProvider, providerFor, type KeyChecker, type LlmEnv } from './llm/keys.ts';
+import {
+  choiceFor,
+  configuredProviders,
+  makeProvider,
+  providerFor,
+  type KeyChecker,
+  type LlmEnv,
+} from './llm/keys.ts';
 import { llmRoutes, type ModelLister } from './llm/routes.ts';
 import { serveApp } from './static.ts';
 
@@ -49,6 +56,7 @@ export function brainDeps(deps: AppDeps): BrainDeps {
     db: deps.db,
     clock: deps.clock,
     log: deps.log ?? console.warn,
+    keyed: () => configuredProviders(deps.db, deps.secretKey, deps.llmEnv ?? {}).length > 0,
     provider:
       deps.brainProvider ??
       ((use) => {

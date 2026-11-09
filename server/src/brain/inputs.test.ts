@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recordCost } from '../contract/costs.ts';
+import { setPaused } from '../contract/state.ts';
+import { ProviderError } from '../llm/types.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { vault } from '../testing/load-vault.ts';
 import { makeHarness } from '../testing/harness.ts';
@@ -7,12 +9,13 @@ import { dashboard } from './dashboard.ts';
 import { applyDraft } from './drafts.ts';
 import { getFiche, listTypes } from './store.ts';
 
-function setup(withProvider = true) {
+function setup(withProvider = true, extra: Parameters<typeof makeHarness>[0] = {}) {
   const queue: unknown[] = [];
   const fake = fakeProvider(queue);
-  const h = makeHarness(
-    withProvider ? { brainProvider: () => ({ provider: fake.provider, model: 'claude-sonnet-5-5' }) } : {},
-  );
+  const h = makeHarness({
+    ...(withProvider && { brainProvider: () => ({ provider: fake.provider, model: 'claude-sonnet-5-5' }) }),
+    ...extra,
+  });
   const typeId = listTypes(h.db)[0]!.id;
   const good = () => [
     { groups: [{ observations: [0], ficheId: null, typeId, title: 'Client X' }] },
@@ -73,6 +76,20 @@ describe('notes and depots', () => {
     expect(t.h.db.prepare('SELECT origin FROM drafts').get()).toEqual({ origin: 'note' });
   });
 
+  it('a pause, local or of the core, lets a note and a depot through: they are asked by hand', async () => {
+    for (const by of ['local', 'core'] as const) {
+      const t = setup();
+      setPaused(t.h.db, true, by);
+      t.queue.push(...t.good());
+      const note = await t.req('/api/notes', { method: 'POST', json: { text: 'Le client X a signé.' } });
+      expect(await note.json()).toEqual({ drafts: 1 });
+      t.queue.push(...t.good());
+      expect(await (await t.upload('d.txt', 'text/plain', 'Le client X a signé.')).json()).toMatchObject({
+        drafts: 1,
+      });
+    }
+  });
+
   it('a .md depot gives drafts attached to it, listed with their count; deleting keeps the drafts', async () => {
     const t = setup();
     t.queue.push(...t.good());
@@ -106,15 +123,52 @@ describe('notes and depots', () => {
     expect(t.count('depots') + t.count('drafts')).toBe(0);
   });
 
-  it('maps pending and failed outcomes, keeping the text', async () => {
-    const none = setup(false);
+  it('maps pending and failed outcomes, keeping the text, and says what to do with it', async () => {
     const note = { method: 'POST', json: { text: 'Un texte.' } };
-    expect((await none.req('/api/notes', note)).status).toBe(503);
+    const said = async (t: ReturnType<typeof setup>) => {
+      const res = await t.req('/api/notes', note);
+      return { status: res.status, error: ((await res.json()) as { error: string }).error };
+    };
+    // Nothing processes a kept text again: each answer says where it stays, and how to have it processed.
+    const kept = /le texte est gardé dans Dépôts, sans traitement\. .*envoie-le à nouveau/;
+
+    const none = setup(false);
+    const noKey = await said(none);
+    expect(noKey.status).toBe(503);
+    expect(noKey.error).toMatch(/^Aucune clé de fournisseur d’IA : .*Ajoute une clé dans Réglages/);
+    expect(noKey.error).toMatch(kept);
     expect(none.count('depots')).toBe(1);
+
+    // A key, but no model for one of the uses.
+    const noModel = await said(
+      setup(false, { brainProvider: () => undefined, llmEnv: { openai: { key: 'sk-x' } } }),
+    );
+    expect(noModel.status).toBe(503);
+    expect(noModel.error).toMatch(/^Aucun modèle d’IA choisi : .*Choisis un modèle dans Réglages/);
+    expect(noModel.error).toMatch(kept);
 
     const capped = setup();
     recordCost(capped.h.db, { provider: 'anthropic', amount: 99, calls: 1 }, capped.h.clock(), 'tri');
-    expect((await capped.req('/api/notes', note)).status).toBe(409);
+    const cap = await said(capped);
+    expect(cap.status).toBe(409);
+    expect(cap.error).toMatch(/^Plafond de coût mensuel atteint : /);
+    expect(cap.error).toMatch(kept);
+
+    // The provider's own words, as the agent says them; never its raw code.
+    const refusals = {
+      key: /^Le fournisseur d’IA refuse la clé : .*Vérifie-la dans Réglages/,
+      credit: /^Plus de crédit chez le fournisseur d’IA : .*Recharge ton crédit/,
+      unavailable: /^Le fournisseur d’IA ne répond pas : .*Envoie-le à nouveau dans un instant\.$/,
+    };
+    for (const [kind, words] of Object.entries(refusals)) {
+      const down = setup();
+      down.queue.push(new ProviderError(kind as keyof typeof refusals, 'x'));
+      const said503 = await said(down);
+      expect(said503.status).toBe(503);
+      expect(said503.error).toMatch(words);
+      expect(said503.error).toMatch(/le texte est gardé dans Dépôts, sans traitement\./);
+      expect(said503.error).not.toMatch(/provider-/);
+    }
 
     const bad = setup();
     bad.queue.push({ nope: 1 }, { nope: 1 });

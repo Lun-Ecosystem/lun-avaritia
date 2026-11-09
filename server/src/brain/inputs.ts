@@ -13,20 +13,27 @@ export class InputError extends Error {
 
 export const MAX_DEPOT_CHARS = 200_000;
 
-const PENDING: Record<string, string> = {
+/** Nothing processes a kept text again (no timer, no queue): the answer says where it stays and what to do. */
+const KEPT = 'le texte est gardé dans Dépôts, sans traitement.';
+const PENDING: Record<Extract<ProcessResult, { status: 'pending' }>['reason'] | 'no-key', string> = {
   'cost-cap':
-    'Plafond de coût mensuel atteint : le texte est gardé, sans traitement tant que le plafond est atteint.',
-  'no-provider': "Aucun modèle d'IA configuré : le texte est gardé, choisis un modèle dans Réglages.",
+    `Plafond de coût mensuel atteint : ${KEPT} Relève le plafond dans Réglages, ou attends le mois prochain, ` +
+    'puis envoie-le à nouveau.',
+  'no-key': `Aucune clé de fournisseur d’IA : ${KEPT} Ajoute une clé dans Réglages, puis envoie-le à nouveau.`,
+  'no-provider': `Aucun modèle d’IA choisi : ${KEPT} Choisis un modèle dans Réglages, puis envoie-le à nouveau.`,
+  // The agent's own words for the provider (agent.ts FAILED).
+  'provider-key': `Le fournisseur d’IA refuse la clé : ${KEPT} Vérifie-la dans Réglages, puis envoie-le à nouveau.`,
+  'provider-credit': `Plus de crédit chez le fournisseur d’IA : ${KEPT} Recharge ton crédit, puis envoie-le à nouveau.`,
+  'provider-unavailable': `Le fournisseur d’IA ne répond pas : ${KEPT} Envoie-le à nouveau dans un instant.`,
 };
 
 /** done → drafts; pending → 409 (cap) or 503 (no provider, provider down); failed → 502. The text stays stored. */
-function outcome(r: ProcessResult): number {
+function outcome(deps: BrainDeps, r: ProcessResult): number {
   if (r.status === 'done') return r.drafts;
   if (r.status === 'failed') throw new InputError(502, r.reason);
-  throw new InputError(
-    r.reason === 'cost-cap' ? 409 : 503,
-    PENDING[r.reason] ?? `Fournisseur indisponible (${r.reason}) : le texte est gardé.`,
-  );
+  // No model at all for want of any key: the models can only be chosen once a key is in (as the rail says).
+  const reason = r.reason === 'no-provider' && deps.keyed?.() === false ? 'no-key' : r.reason;
+  throw new InputError(r.reason === 'cost-cap' ? 409 : 503, PENDING[reason]);
 }
 
 function store(db: DatabaseSync, name: string, type: string, bytes: Uint8Array, now: string): number {
@@ -46,7 +53,7 @@ async function ingest(deps: BrainDeps, kind: 'note' | 'depot', depot: number, te
       source: kind,
     },
   );
-  const drafts = outcome(r);
+  const drafts = outcome(deps, r);
   // « Dernier traitement » also shows what a note or a depot just did (no lot behind it).
   const end = deps.clock();
   deps.db
