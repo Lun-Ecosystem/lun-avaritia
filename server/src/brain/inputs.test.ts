@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recordCost } from '../contract/costs.ts';
 import { setPaused } from '../contract/state.ts';
+import { ProviderError } from '../llm/types.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { vault } from '../testing/load-vault.ts';
 import { makeHarness } from '../testing/harness.ts';
@@ -75,7 +76,7 @@ describe('notes and depots', () => {
     expect(t.h.db.prepare('SELECT origin FROM drafts').get()).toEqual({ origin: 'note' });
   });
 
-  it('a pause, local or of the core, holds the lots but lets a note and a depot through: they are asked by hand', async () => {
+  it('a pause, local or of the core, lets a note and a depot through: they are asked by hand', async () => {
     for (const by of ['local', 'core'] as const) {
       const t = setup();
       setPaused(t.h.db, true, by);
@@ -129,7 +130,7 @@ describe('notes and depots', () => {
       return { status: res.status, error: ((await res.json()) as { error: string }).error };
     };
     // Nothing processes a kept text again: each answer says where it stays, and how to have it processed.
-    const kept = /le texte est gardé dans Dépôts, sans traitement\. .*dépose-le à nouveau/;
+    const kept = /le texte est gardé dans Dépôts, sans traitement\. .*envoie-le à nouveau/;
 
     const none = setup(false);
     const noKey = await said(none);
@@ -152,6 +153,22 @@ describe('notes and depots', () => {
     expect(cap.status).toBe(409);
     expect(cap.error).toMatch(/^Plafond de coût mensuel atteint : /);
     expect(cap.error).toMatch(kept);
+
+    // The provider's own words, as the agent says them; never its raw code.
+    const refusals = {
+      key: /^Le fournisseur d’IA refuse la clé : .*Vérifie-la dans Réglages/,
+      credit: /^Plus de crédit chez le fournisseur d’IA : .*Recharge ton crédit/,
+      unavailable: /^Le fournisseur d’IA ne répond pas : .*Envoie-le à nouveau dans un instant\.$/,
+    };
+    for (const [kind, words] of Object.entries(refusals)) {
+      const down = setup();
+      down.queue.push(new ProviderError(kind as keyof typeof refusals, 'x'));
+      const said503 = await said(down);
+      expect(said503.status).toBe(503);
+      expect(said503.error).toMatch(words);
+      expect(said503.error).toMatch(/le texte est gardé dans Dépôts, sans traitement\./);
+      expect(said503.error).not.toMatch(/provider-/);
+    }
 
     const bad = setup();
     bad.queue.push({ nope: 1 }, { nope: 1 });
