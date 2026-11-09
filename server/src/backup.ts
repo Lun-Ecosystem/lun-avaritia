@@ -77,8 +77,9 @@ export function backupIfMissing(
     log(`Copie de la base ratée : ${reason}`);
     try {
       if (getSetting<string>(db, FAILED_DAY, '') === ymd(now)) return;
-      const title = `La copie de la base a échoué : ${reason}`;
-      emitEvent(db, { type: 'backup.failed', importance: 'normal', title }, now);
+      // A short title for the core's Journal and the phone; Node's own words (English, a local path) stay in the data.
+      const title = 'La copie de la base a échoué';
+      emitEvent(db, { type: 'backup.failed', importance: 'normal', title, data: { reason } }, now);
       // Marked once told: a failure the core could not be told of is told the next hour.
       putSetting(db, FAILED_DAY, ymd(now));
     } catch (e) {
