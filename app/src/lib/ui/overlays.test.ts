@@ -20,51 +20,153 @@ describe('toast', () => {
 
   const user = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
 
-  it('Z runs the undo of the toast, which then goes away', async () => {
+  const ctrlZ = '{Control>}z{/Control}';
+
+  it('Ctrl Z runs the undo of the toast, which then goes away', async () => {
     render(Toaster);
     const undo = vi.fn(() => Promise.resolve());
-    toast('3 mails rangés dans Factures', { undo });
+    toast('Validée : Paul Mercier.', { undo });
     await tick();
-    expect(screen.getByText('3 mails rangés dans Factures')).toBeInTheDocument();
-
-    await user().keyboard('z');
+    expect(screen.getByText('Ctrl Z')).toBeInTheDocument();
+    await user().keyboard(ctrlZ);
     await vi.advanceTimersByTimeAsync(0);
     expect(undo).toHaveBeenCalledOnce();
-    expect(screen.queryByText('3 mails rangés dans Factures')).toBeNull();
+    expect(screen.queryByText('Validée : Paul Mercier.')).toBeNull();
   });
 
-  it('an undo that fails replaces the toast by its message, in the danger tone', async () => {
+  it('Z alone does nothing', async () => {
     render(Toaster);
-    const undo = vi.fn(() => Promise.reject(new Error('Le mail a changé depuis, annulation refusée.')));
-    toast('Rangé dans Administratif', { undo });
+    const undo = vi.fn(() => Promise.resolve());
+    toast('Validée : A.', { undo });
     await tick();
-
-    await user().click(screen.getByRole('button', { name: 'Annuler' }));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(undo).toHaveBeenCalledOnce();
-    expect(screen.queryByText('Rangé dans Administratif')).toBeNull();
-    const message = screen.getByText('Le mail a changé depuis, annulation refusée.');
-    expect(message.closest('[data-ton]')).toHaveAttribute('data-ton', 'danger');
-    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+    await user().keyboard('z');
+    expect(undo).not.toHaveBeenCalled();
   });
 
-  it('stays 6 s, then goes away', async () => {
+  it('Ctrl Z does nothing from a field', async () => {
+    render(Toaster);
+    const input = document.createElement('input');
+    document.body.append(input);
+    const undo = vi.fn(() => Promise.resolve());
+    toast('Validée : A.', { undo });
+    await tick();
+    input.focus();
+    await user().keyboard(ctrlZ);
+    expect(undo).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it('an undoable toast shows the seconds left, and leaves after 5 s', async () => {
+    render(Toaster);
+    toast('Refusée : Adresse de Marion.', {
+      undo: vi.fn(() => Promise.resolve()),
+    });
+    await tick();
+    expect(screen.getByText('5 s')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(screen.getByText('4 s')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(screen.getByText('Refusée : Adresse de Marion.')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(screen.queryByText('Refusée : Adresse de Marion.')).toBeNull();
+  });
+
+  it('an information toast stays 3 s, without Annuler', async () => {
     render(Toaster);
     toast('Réglage enregistré');
     await tick();
-    await vi.advanceTimersByTimeAsync(5999);
+    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+    await vi.advanceTimersByTimeAsync(2999);
     expect(screen.getByText('Réglage enregistré')).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(1);
     expect(screen.queryByText('Réglage enregistré')).toBeNull();
   });
 
-  it('Z does nothing once the toast is gone', async () => {
+  it('one toast at a time: a new gesture replaces the toast and the first can no longer be undone', async () => {
     render(Toaster);
-    const undo = vi.fn(() => Promise.resolve());
-    toast('Archivé', { undo });
-    await vi.advanceTimersByTimeAsync(6000);
-    await user().keyboard('z');
-    expect(undo).not.toHaveBeenCalled();
+    const first = vi.fn(() => Promise.resolve());
+    const second = vi.fn(() => Promise.resolve());
+    toast('Validée : A.', { undo: first });
+    toast('Validée : B.', { undo: second });
+    await tick();
+    expect(screen.queryByText('Validée : A.')).toBeNull();
+    await user().keyboard(ctrlZ);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledOnce();
+  });
+
+  it('an information toast waits for the undoable one to end', async () => {
+    render(Toaster);
+    toast('Validée : A.', { undo: vi.fn(() => Promise.resolve()) });
+    toast('Déjà tranchée ailleurs.');
+    await tick();
+    expect(screen.getByText('Validée : A.')).toBeInTheDocument();
+    expect(screen.queryByText('Déjà tranchée ailleurs.')).toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(screen.getByText('Déjà tranchée ailleurs.')).toBeInTheDocument();
+  });
+
+  it('an undo that fails replaces the toast by its message, in the danger tone', async () => {
+    render(Toaster);
+    const undo = vi.fn(() => Promise.reject(new Error('Trop tard pour annuler.')));
+    toast('Rangé dans Administratif', { undo });
+    await tick();
+    await user().click(screen.getByRole('button', { name: 'Annuler' }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(undo).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Rangé dans Administratif')).toBeNull();
+    const message = screen.getByText('Trop tard pour annuler.');
+    expect(message.closest('[data-ton]')).toHaveAttribute('data-ton', 'danger');
+    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+  });
+
+  it('a danger toast stays 5 s', async () => {
+    render(Toaster);
+    toast('Échec.', { tone: 'danger' });
+    await tick();
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(screen.getByText('Échec.')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(screen.queryByText('Échec.')).toBeNull();
+  });
+
+  it('of several information toasts waiting, only the latest shows after the undoable one, for 3 s', async () => {
+    render(Toaster);
+    toast('Validée : A.', { undo: vi.fn(() => Promise.resolve()) });
+    toast('Info 1.');
+    toast('Info 2.');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(screen.queryByText('Info 1.')).toBeNull();
+    expect(screen.getByText('Info 2.')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(screen.getByText('Info 2.')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(screen.queryByText('Info 2.')).toBeNull();
+  });
+
+  it('a waiting information toast survives a new undoable toast', async () => {
+    render(Toaster);
+    toast('Validée : A.', { undo: vi.fn(() => Promise.resolve()) });
+    toast('Déjà tranchée ailleurs.');
+    toast('Validée : B.', { undo: vi.fn(() => Promise.resolve()) });
+    await tick();
+    expect(screen.getByText('Validée : B.')).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(screen.getByText('Déjà tranchée ailleurs.')).toBeInTheDocument();
+  });
+
+  it('the seconds and the key hint are hidden from the live region', async () => {
+    render(Toaster);
+    toast('Validée : A.', { undo: vi.fn(() => Promise.resolve()) });
+    await tick();
+    expect(screen.getByText('5 s')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Ctrl Z').closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('contained changes the placement', async () => {
+    const { container } = render(Toaster, { contained: true });
+    expect(container.querySelector('.toaster')).toHaveClass('contained');
   });
 });
 

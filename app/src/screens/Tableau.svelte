@@ -62,7 +62,7 @@
       plus = [...plus, ...page.items.filter((r) => !vues.has(r.at + r.what))];
       suite = page.more;
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'L’activité ne s’est pas chargée.');
+      toast(e instanceof Error ? e.message : 'L’activité ne s’est pas chargée.', { tone: 'danger' });
     } finally {
       chargement = false;
     }
