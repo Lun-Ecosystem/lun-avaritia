@@ -50,7 +50,8 @@ for (const id of PROVIDERS) {
 startLoops(appDeps);
 
 // The base is copied next to itself, in backups/: once listening, then every hour if the day's copy is missing.
-// Even in pause, like the other hourly tasks: a copy acts on nothing, and a paused week still needs its copies.
+// Even in pause, like the key expiry and the event purge (the lots wait): a copy acts on nothing, and a paused week
+// still needs its copies.
 const backup = () => backupIfMissing(db, dbPath, clock(), (line) => console.log(line));
 setInterval(backup, 3600_000).unref();
 
