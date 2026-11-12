@@ -49,11 +49,7 @@ export function ingestLot(deps: BrainDeps, observations: Observation[]): IngestR
 
 const running = new WeakSet<DatabaseSync>();
 
-/**
- * Processes the queued lots one at a time, after giving the held ones another chance when the cap allows.
- * shortcut: a held lot is only retried on the next ingest or restart, not on a timer; add one if nights
- * under the cap must resume by themselves.
- */
+/** Processes the queued lots one at a time, after giving the held ones another chance when the cap allows. */
 export async function runPending(deps: BrainDeps): Promise<void> {
   const { db } = deps;
   // A pause stops the automatic actions: lots wait, and `resume` runs them again.

@@ -2,9 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
-import { brainDeps, createApp, startLoops, type AppDeps } from './app.ts';
+import { createApp, startLoops, type AppDeps } from './app.ts';
 import { backupIfMissing } from './backup.ts';
-import { runPending } from './brain/ingest.ts';
 import { ActionRegistry } from './contract/actions.ts';
 import { bootstrapPairing } from './contract/auth.ts';
 import { openDb } from './db.ts';
@@ -39,8 +38,6 @@ const appDeps: AppDeps = {
   dataDir: dirname(dbPath),
 };
 const app = createApp(appDeps);
-// Lots left waiting by the last run (a restart is also a chance for the held ones).
-runPending(brainDeps(appDeps)).catch((err) => console.warn('Traitement des lots :', err));
 
 bootstrapPairing(db, clock(), (line) => console.log(line));
 if (!configuredProviders(db, secretKey, llmEnv).length)

@@ -16,6 +16,7 @@ import { registerCatalog } from './contract/catalog.ts';
 import { pruneEvents } from './contract/events.ts';
 import { contractRoutes } from './contract/routes.ts';
 import { brainRoutes } from './brain/routes.ts';
+import { runPending } from './brain/ingest.ts';
 import type { BrainDeps } from './brain/process.ts';
 import {
   checkKeyExpiries,
@@ -86,6 +87,9 @@ export function startLoops(deps: AppDeps): void {
     checkKeyExpiries(deps.db, deps.secretKey, deps.llmEnv ?? {}, deps.clock()),
   );
   hourly('Purge des événements', () => pruneEvents(deps.db, deps.clock()));
+  // The lots left waiting: a held one runs within the hour its provider or its cap is back, with no lot from the
+  // core. A pause skips the pass, and it never runs alongside another (`runPending`).
+  hourly('Traitement des lots', () => runPending(brainDeps(deps)));
 }
 
 export function createApp(deps: AppDeps): Hono {

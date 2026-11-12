@@ -73,5 +73,4 @@ Coût mesuré d’un lot réel : _à renseigner après la passe avec le core loc
 
 ## 5. Limites connues
 
-- Un lot retenu par le plafond de coût n’est repris qu’au prochain envoi ou au redémarrage, pas sur minuterie.
 - L’export écrit un dossier sur le volume du serveur ; il n’y a pas d’archive à télécharger.
