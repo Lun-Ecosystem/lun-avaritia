@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  vi.clearAllMocks();
+  vi.resetAllMocks(); // back to the real task, with no throw left over by a test that stopped short
 });
 afterEach(() => {
   vi.useRealTimers(); // drops the loops' timers
