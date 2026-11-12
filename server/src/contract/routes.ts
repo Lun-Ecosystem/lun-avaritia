@@ -133,7 +133,7 @@ export function contractRoutes(deps: AppDeps): Hono {
     if (by !== 'core' && by !== 'local') return c.json({ error: by }, 400);
     if (!getState(db)[by]) return c.json({ error: 'Déjà actif' }, 409);
     setPaused(db, false, by);
-    runPending(brainDeps(deps)).catch((err) => deps.log?.(`Traitement des lots : ${err}`));
+    runPending(brainDeps(deps)).catch((err) => (deps.log ?? console.warn)(`Traitement des lots : ${err}`));
     return c.json({ status: statusOf(getState(db)).status });
   });
 

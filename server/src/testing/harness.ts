@@ -7,7 +7,10 @@ import type { KeyCheck, KeyChecker } from '../llm/keys.ts';
 /** A fresh app on an in-memory database, with a clock the test moves by hand. */
 export function makeHarness(
   extra: Partial<
-    Pick<AppDeps, 'staticDir' | 'secretKey' | 'llmEnv' | 'listCustomModels' | 'brainProvider' | 'dataDir'>
+    Pick<
+      AppDeps,
+      'staticDir' | 'secretKey' | 'llmEnv' | 'listCustomModels' | 'brainProvider' | 'dataDir' | 'log'
+    >
   > = {},
 ) {
   const db = openDb(':memory:');
