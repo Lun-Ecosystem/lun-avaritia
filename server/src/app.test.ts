@@ -18,6 +18,10 @@ vi.mock(import('./llm/keys.ts'), async (actual) => {
   const m = await actual();
   return { ...m, checkKeyExpiries: vi.fn(m.checkKeyExpiries) };
 });
+vi.mock(import('./brain/ingest.ts'), async (actual) => {
+  const m = await actual();
+  return { ...m, runPending: vi.fn(m.runPending) };
+});
 
 const HOUR = 3_600_000;
 /** Only the loops' timer is simulated: a real tick lets the passes it started run. */
@@ -99,6 +103,30 @@ describe('startLoops', () => {
     expect(pruneEvents).toHaveBeenCalledTimes(2);
     expect(eventsSince(h.db)).toEqual([]); // the purge went through this time
     expect(errors).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs a pass of the lots that throws, and runs it again the next hour', async () => {
+    const t = setup();
+    const fake = fakeProvider(t.lotReplies());
+    const deps: AppDeps = {
+      ...t.deps,
+      brainProvider: (use) => ({ provider: fake.provider, model: model(use) }),
+    };
+    vi.mocked(runPending).mockRejectedValueOnce(new Error('database is locked'));
+    const lot = t.addLot('queued');
+    startLoops(deps);
+    await tick();
+    expect(t.errors).toHaveBeenCalledWith(
+      'Traitement des lots :',
+      expect.objectContaining({ message: 'database is locked' }),
+    );
+    expect(t.status(lot)).toBe('queued');
+
+    vi.advanceTimersByTime(HOUR);
+    await t.until(() => t.status(lot) === 'done');
+    expect(t.status(lot)).toBe('done'); // the pass went through this time
+    expect(runPending).toHaveBeenCalledTimes(2);
+    expect(t.errors).toHaveBeenCalledTimes(1);
   });
 
   it('runs a held lot within the hour its provider is back, with no lot from the core', async () => {
