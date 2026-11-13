@@ -6,6 +6,7 @@ import { listTypes } from './brain/store.ts';
 import { emitEvent, eventsSince, pruneEvents } from './contract/events.ts';
 import { setPaused } from './contract/state.ts';
 import { checkKeyExpiries } from './llm/keys.ts';
+import { ProviderError } from './llm/types.ts';
 import { fakeProvider } from './testing/fake-provider.ts';
 import { makeHarness } from './testing/harness.ts';
 
@@ -146,6 +147,62 @@ describe('startLoops', () => {
     expect(t.status(lot)).toBe('done');
     expect(fake.calls).toHaveLength(2);
     expect(t.errors).not.toHaveBeenCalled();
+  });
+
+  it('runs again a day later, not the next hour, a lot whose tri was paid and whose drafting failed', async () => {
+    const t = setup();
+    const replies: unknown[] = [t.lotReplies()[0], new ProviderError('unavailable', '503')];
+    const fake = fakeProvider(replies);
+    const deps: AppDeps = {
+      ...t.deps,
+      log: () => {},
+      brainProvider: (use) => ({ provider: fake.provider, model: model(use) }),
+    };
+    const lot = t.addLot('queued');
+    startLoops(deps);
+    await t.until(() => t.status(lot) === 'held');
+    expect(t.status(lot)).toBe('held'); // the tri paid, the drafting refused
+    expect(fake.calls).toHaveLength(2);
+
+    t.h.advance(HOUR); // the provider is back, but the tri is not paid again within the day
+    vi.advanceTimersByTime(HOUR);
+    await tick(20);
+    expect(t.status(lot)).toBe('held');
+    expect(fake.calls).toHaveLength(2);
+
+    replies.push(...t.lotReplies());
+    t.h.advance(22 * HOUR);
+    vi.advanceTimersByTime(22 * HOUR);
+    await tick(20);
+    expect(t.status(lot)).toBe('held'); // 23 hours after
+    t.h.advance(HOUR);
+    vi.advanceTimersByTime(HOUR);
+    await t.until(() => t.status(lot) === 'done');
+    expect(t.status(lot)).toBe('done'); // a day after
+    expect(fake.calls).toHaveLength(4);
+    expect(t.errors).not.toHaveBeenCalled();
+  });
+
+  it('runs within the hour a lot held on a provider failure at the tri itself, nothing paid', async () => {
+    const t = setup();
+    const replies: unknown[] = [new ProviderError('unavailable', '503')];
+    const fake = fakeProvider(replies);
+    const deps: AppDeps = {
+      ...t.deps,
+      log: () => {},
+      brainProvider: (use) => ({ provider: fake.provider, model: model(use) }),
+    };
+    const lot = t.addLot('queued');
+    startLoops(deps);
+    await t.until(() => t.status(lot) === 'held');
+    expect(t.status(lot)).toBe('held');
+
+    replies.push(...t.lotReplies());
+    t.h.advance(HOUR);
+    vi.advanceTimersByTime(HOUR);
+    await t.until(() => t.status(lot) === 'done');
+    expect(t.status(lot)).toBe('done');
+    expect(fake.calls).toHaveLength(3);
   });
 
   it('skips the hourly pass in pause, and never runs it alongside another pass', async () => {
