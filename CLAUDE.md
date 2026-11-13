@@ -38,6 +38,6 @@ Prérequis : Node `^22.13.0 || >=24`. `npm run demo` tourne sans clé.
 - Tout ce qui est automatique s'arrête en pause, sauf l'entretien qui n'agit sur rien (copie de la base, échéance
   des clés) ; ce qui est demandé à la main passe. Le plafond mensuel de coût est vérifié avant chaque appel.
 - Les données vont dans un bloc utilisateur délimité, jamais dans le prompt système.
-- Dépôt public : aucun secret, aucune donnée réelle, aucune adresse interne, aucun son ni modèle non tracé.
+- Dépôt public : aucun secret, aucune donnée réelle, aucune adresse interne, aucun son, aucun modèle non tracé.
   Le contrôle, lun-docs cloné à côté : `node ../lun-docs/tools/check-repo.mjs --public .`.
 - Cahier des attendus : `docs/specs/2026-10-28-lun-avaritia-v1-design.md` dans lun-docs.
