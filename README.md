@@ -76,7 +76,7 @@ dans lun-docs.
 
 ## Dans l'écosystème
 
-**Rôle dans l'écosystème** : satellite, le cerveau. Il possède le wiki neutre, ses brouillons, le traitement du lot
+**Rôle dans l'écosystème** : satellite, la bibliothèque. Il possède le wiki neutre, ses brouillons, le traitement du lot
 quotidien, l'import et l'export. Il fonctionne seul. Lun'Anima s'y branche par le [contrat satellite](https://github.com/Lun-Ecosystem/lun-docs/blob/main/standards/contrat-satellite.md) (v1.4), lui envoie un lot par
 jour et garde pour lui la mémoire de la relation.
 

@@ -6,11 +6,11 @@
 
 ## Ce projet
 
-- **Rôle** : satellite « cerveau », inscrit dans `registry.yaml` de lun-docs. Dépôt **public**.
+- **Rôle** : satellite « bibliothèque », inscrit dans `registry.yaml` de lun-docs. Dépôt **public**.
 - **Possède** : le wiki neutre de l'écosystème (fiches normalisées, faits sourcés, liens nommés), les
   brouillons à valider, le traitement du lot quotidien, l'entrée manuelle, le dépôt de documents,
   l'import Obsidian, l'export Markdown, son agent.
-- **Ne possède pas** : la mémoire affective et personnelle, la relation, le contexte chaud (Lun'Anima,
+- **Ne possède pas** : les souvenirs de Natsume, la relation, le contexte chaud (Lun'Anima,
   le core, qui envoie un lot par jour et consomme Avaritia par le contrat satellite).
 
 ## Lancer en local
@@ -38,5 +38,6 @@ Prérequis : Node `^22.13.0 || >=24`. `npm run demo` tourne sans clé.
 - Tout ce qui est automatique s'arrête en pause, sauf l'entretien qui n'agit sur rien (copie de la base, échéance
   des clés) ; ce qui est demandé à la main passe. Le plafond mensuel de coût est vérifié avant chaque appel.
 - Les données vont dans un bloc utilisateur délimité, jamais dans le prompt système.
-- Dépôt public : aucun secret, aucune donnée réelle, aucune adresse interne.
+- Dépôt public : aucun secret, aucune donnée réelle, aucune adresse interne, aucun son ni modèle non tracé.
+  Le contrôle, lun-docs cloné à côté : `node ../lun-docs/tools/check-repo.mjs --public .`.
 - Cahier des attendus : `docs/specs/2026-10-28-lun-avaritia-v1-design.md` dans lun-docs.
