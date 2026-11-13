@@ -50,7 +50,10 @@ export function ingestLot(deps: BrainDeps, observations: Observation[]): IngestR
 const running = new WeakSet<DatabaseSync>();
 const DAY = 86_400_000;
 
-/** Processes the queued lots one at a time, after giving the held ones another chance when the cap allows. */
+/**
+ * Processes the queued lots one at a time, after giving the held ones another chance when the cap and the
+ * providers allow; a lot whose tri was paid gets it only once its day of wait (`retry_at`) is over.
+ */
 export async function runPending(deps: BrainDeps): Promise<void> {
   const { db } = deps;
   // A pause stops the automatic actions: lots wait, and `resume` runs them again.
@@ -61,7 +64,7 @@ export async function runPending(deps: BrainDeps): Promise<void> {
     db.exec("UPDATE lots SET status = 'queued' WHERE status = 'running'");
     if (!overCap(db, deps.clock()) && deps.provider('tri') && deps.provider('agent'))
       db.prepare(
-        "UPDATE lots SET status = 'queued', reason = NULL WHERE status = 'held' AND (retry_at IS NULL OR retry_at <= ?)",
+        "UPDATE lots SET status = 'queued', reason = NULL, retry_at = NULL WHERE status = 'held' AND (retry_at IS NULL OR retry_at <= ?)",
       ).run(deps.clock().toISOString());
     for (;;) {
       if (getState(db).paused) return; // a pause during the pass: no further LLM call
@@ -97,6 +100,7 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
     }),
   );
   // Its tri paid, the lot runs again a day later at the earliest: not a tri paid every hour.
+  // Taken at the lot's end, `retry_at` falls just after the pass a day on: the next one takes it, near +25 h.
   if (r.status === 'pending')
     return void set(
       'held',

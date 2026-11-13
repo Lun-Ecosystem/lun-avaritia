@@ -88,7 +88,8 @@ export function startLoops(deps: AppDeps): void {
   );
   hourly('Purge des événements', () => pruneEvents(deps.db, deps.clock()));
   // The lots left waiting: a held one runs within the hour its provider or its cap is back, with no lot from the
-  // core. A pause skips the pass, and it never runs alongside another (`runPending`).
+  // core, unless its tri was paid: that one waits a day. A pause skips the pass, and it never runs alongside
+  // another (`runPending`).
   hourly('Traitement des lots', () => runPending(brainDeps(deps)));
 }
 

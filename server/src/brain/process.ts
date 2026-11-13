@@ -29,8 +29,9 @@ export interface BrainDeps {
 
 /**
  * `done`: drafts written. `pending`: nothing written, the lot waits for the next pass (`cost-cap`, no
- * provider configured, or a provider failure other than a bad answer). `failed`: an answer still invalid
- * after its retry; `reason` is for the user. `cost` is what the pass paid, in dollars.
+ * provider configured, or a provider failure other than a bad answer), or for a day after a paid tri
+ * (`afterTri`). `failed`: an answer still invalid after its retry; `reason` is for the user. `cost` is what
+ * the pass paid, in dollars.
  */
 export type ProcessResult =
   | { status: 'done'; drafts: number; questions: number; cost: number }
