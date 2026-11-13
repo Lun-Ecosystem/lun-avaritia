@@ -29,8 +29,9 @@ export interface BrainDeps {
 
 /**
  * `done`: drafts written. `pending`: nothing written, the lot waits for the next pass (`cost-cap`, no
- * provider configured, or a provider failure other than a bad answer). `failed`: an answer still invalid
- * after its retry; `reason` is for the user. `cost` is what the pass paid, in dollars.
+ * provider configured, or a provider failure other than a bad answer), or for a day after a paid tri
+ * (`afterTri`). `failed`: an answer still invalid after its retry; `reason` is for the user. `cost` is what
+ * the pass paid, in dollars.
  */
 export type ProcessResult =
   | { status: 'done'; drafts: number; questions: number; cost: number }
@@ -38,6 +39,8 @@ export type ProcessResult =
       status: 'pending';
       reason: 'cost-cap' | 'no-provider' | `provider-${Exclude<ProviderError['kind'], 'format'>}`;
       cost: number;
+      /** The provider failed after the tri answered: running the lot again pays its tri again. */
+      afterTri?: true;
     }
   | { status: 'failed'; reason: string; cost: number };
 
@@ -263,6 +266,7 @@ export async function processLot(
 ): Promise<ProcessResult> {
   const { db } = deps;
   const paid = { cost: 0 };
+  let afterTri = false;
   if (!observations.length) return { status: 'done', drafts: 0, questions: 0, cost: 0 };
   if (overCap(db, deps.clock())) return { status: 'pending', reason: 'cost-cap', cost: 0 };
   const tri = deps.provider('tri');
@@ -294,6 +298,7 @@ export async function processLot(
       triSchema(observations.length, new Set(candidates.map((c) => c.id)), new Set(types.map((t) => t.id))),
       paid,
     );
+    afterTri = true;
 
     // shortcut: the cap is checked between the two calls only, so one pass with a large depot may overrun it by its own calls; add a per-chunk check if depots get big.
     if (overCap(db, deps.clock())) return { status: 'pending', reason: 'cost-cap', cost: paid.cost };
@@ -386,6 +391,7 @@ export async function processLot(
         status: 'pending',
         reason: `provider-${err.kind as Exclude<ProviderError['kind'], 'format'>}`,
         cost: paid.cost,
+        ...(afterTri && { afterTri: true as const }),
       };
     }
     throw err;

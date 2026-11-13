@@ -48,11 +48,11 @@ export function ingestLot(deps: BrainDeps, observations: Observation[]): IngestR
 }
 
 const running = new WeakSet<DatabaseSync>();
+const DAY = 86_400_000;
 
 /**
- * Processes the queued lots one at a time, after giving the held ones another chance when the cap allows.
- * shortcut: a held lot is only retried on the next ingest or restart, not on a timer; add one if nights
- * under the cap must resume by themselves.
+ * Processes the queued lots one at a time, after giving the held ones another chance when the cap and the
+ * providers allow; a lot whose tri was paid gets it only once its day of wait (`retry_at`) is over.
  */
 export async function runPending(deps: BrainDeps): Promise<void> {
   const { db } = deps;
@@ -63,7 +63,9 @@ export async function runPending(deps: BrainDeps): Promise<void> {
     // A lot left `running` by a crash is replayed.
     db.exec("UPDATE lots SET status = 'queued' WHERE status = 'running'");
     if (!overCap(db, deps.clock()) && deps.provider('tri') && deps.provider('agent'))
-      db.exec("UPDATE lots SET status = 'queued', reason = NULL WHERE status = 'held'");
+      db.prepare(
+        "UPDATE lots SET status = 'queued', reason = NULL, retry_at = NULL WHERE status = 'held' AND (retry_at IS NULL OR retry_at <= ?)",
+      ).run(deps.clock().toISOString());
     for (;;) {
       if (getState(db).paused) return; // a pause during the pass: no further LLM call
       const lot = db.prepare("SELECT id FROM lots WHERE status = 'queued' ORDER BY id LIMIT 1").get() as
@@ -78,8 +80,10 @@ export async function runPending(deps: BrainDeps): Promise<void> {
 
 async function runLot(deps: BrainDeps, id: number): Promise<void> {
   const { db } = deps;
-  const set = (status: string, reason: string | null) =>
-    db.prepare('UPDATE lots SET status = ?, reason = ? WHERE id = ?').run(status, reason, id);
+  const set = (status: string, reason: string | null, retryAt: string | null = null) =>
+    db
+      .prepare('UPDATE lots SET status = ?, reason = ?, retry_at = ? WHERE id = ?')
+      .run(status, reason, retryAt, id);
   set('running', null);
   const observations = (
     db.prepare('SELECT text, source FROM observations WHERE lot = ? ORDER BY id').all(id) as {
@@ -95,7 +99,14 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
       cost: 0,
     }),
   );
-  if (r.status === 'pending') return void set('held', r.reason);
+  // Its tri paid, the lot runs again a day later at the earliest: not a tri paid every hour.
+  // Taken at the lot's end, `retry_at` falls just after the pass a day on: the next one takes it, near +25 h.
+  if (r.status === 'pending')
+    return void set(
+      'held',
+      r.reason,
+      r.afterTri ? new Date(deps.clock().getTime() + DAY).toISOString() : null,
+    );
   set(r.status, r.status === 'failed' ? r.reason : null);
   const at = deps.clock();
   db.prepare(

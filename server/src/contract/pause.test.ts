@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { putSetting } from '../db.ts';
 import { makeHarness } from '../testing/harness.ts';
 import { getState } from './state.ts';
@@ -33,6 +33,19 @@ describe('POST /lun/v1/pause and /resume', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: 'ok' });
     expect(getState(h.db).paused).toBe(false);
+  });
+
+  it('writes the error of the pass a resume starts, with no log given as in production', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
+    const h = makeHarness({ log: undefined });
+    const token = await h.pairClient();
+    await h.app.request('/lun/v1/pause', { method: 'POST', headers: h.auth(token) });
+    h.db.exec('ALTER TABLE lots RENAME TO lots_off'); // the pass fails on its first query
+    const res = await h.app.request('/lun/v1/resume', { method: 'POST', headers: h.auth(token) });
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Traitement des lots : .*no such table: lots/));
   });
 
   const call = (h: ReturnType<typeof makeHarness>, token: string, path: string, body = '') =>

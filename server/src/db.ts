@@ -136,6 +136,8 @@ const MIGRATIONS: string[] = [
    ALTER TABLE runs_new RENAME TO runs;`,
   // The day a thing to do is due (ISO date), when the note said one.
   `ALTER TABLE facts ADD COLUMN due TEXT;`,
+  // A held lot whose tri was paid waits until this instant (ISO) before a pass takes it again.
+  `ALTER TABLE lots ADD COLUMN retry_at TEXT;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

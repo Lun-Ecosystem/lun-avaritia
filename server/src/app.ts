@@ -13,10 +13,13 @@ import {
 } from './contract/auth.ts';
 import { allowAuthorization, denyAuthorization, readAuthorizationRequest } from './contract/authorize.ts';
 import { registerCatalog } from './contract/catalog.ts';
+import { pruneEvents } from './contract/events.ts';
 import { contractRoutes } from './contract/routes.ts';
 import { brainRoutes } from './brain/routes.ts';
+import { runPending } from './brain/ingest.ts';
 import type { BrainDeps } from './brain/process.ts';
 import {
+  checkKeyExpiries,
   choiceFor,
   configuredProviders,
   makeProvider,
@@ -26,6 +29,7 @@ import {
 } from './llm/keys.ts';
 import { llmRoutes, type ModelLister } from './llm/routes.ts';
 import { serveApp } from './static.ts';
+import { startLoop } from './util.ts';
 
 /** Everything the app needs; later tasks add their own dependencies here. */
 export interface AppDeps {
@@ -66,6 +70,27 @@ export function brainDeps(deps: AppDeps): BrainDeps {
         return choice && provider ? { provider, model: choice.model } : undefined;
       }),
   };
+}
+
+/**
+ * The hourly tasks, at start then every hour, each by `startLoop`: an error is logged and the next hour tries again.
+ * The copy of the base keeps its own timer, from listening on, and its net in `backupIfMissing`.
+ */
+export function startLoops(deps: AppDeps): void {
+  const hourly = (what: string, run: () => unknown) =>
+    startLoop(async () => run(), {
+      intervalMs: 3_600_000,
+      onError: (err) => console.error(`${what} :`, err),
+    });
+  // The declared expiry of each key in service.
+  hourly('Échéance des clés', () =>
+    checkKeyExpiries(deps.db, deps.secretKey, deps.llmEnv ?? {}, deps.clock()),
+  );
+  hourly('Purge des événements', () => pruneEvents(deps.db, deps.clock()));
+  // The lots left waiting: a held one runs within the hour its provider or its cap is back, with no lot from the
+  // core, unless its tri was paid: that one waits a day. A pause skips the pass, and it never runs alongside
+  // another (`runPending`).
+  hourly('Traitement des lots', () => runPending(brainDeps(deps)));
 }
 
 export function createApp(deps: AppDeps): Hono {
