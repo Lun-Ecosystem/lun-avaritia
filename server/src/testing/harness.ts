@@ -9,7 +9,14 @@ export function makeHarness(
   extra: Partial<
     Pick<
       AppDeps,
-      'staticDir' | 'secretKey' | 'llmEnv' | 'listCustomModels' | 'brainProvider' | 'dataDir' | 'log'
+      | 'staticDir'
+      | 'secretKey'
+      | 'llmEnv'
+      | 'listCustomModels'
+      | 'brainProvider'
+      | 'dataDir'
+      | 'log'
+      | 'localOrigin'
     >
   > = {},
 ) {

@@ -14,6 +14,7 @@ import {
 import { allowAuthorization, denyAuthorization, readAuthorizationRequest } from './contract/authorize.ts';
 import { registerCatalog } from './contract/catalog.ts';
 import { pruneEvents } from './contract/events.ts';
+import { firstCodeRoutes } from './contract/first-code.ts';
 import { contractRoutes } from './contract/routes.ts';
 import { brainRoutes } from './brain/routes.ts';
 import { runPending } from './brain/ingest.ts';
@@ -53,6 +54,8 @@ export interface AppDeps {
   brainProvider?: BrainDeps['provider'] | undefined;
   /** The directory of the database file; exports are written under it. */
   dataDir?: string | undefined;
+  /** Avaritia's own address, set only when it listens on loopback: `POST /first-code` answers nowhere else. */
+  localOrigin?: string | undefined;
 }
 
 export function brainDeps(deps: AppDeps): BrainDeps {
@@ -138,6 +141,8 @@ export function createApp(deps: AppDeps): Hono {
   app.route('/api', api);
   app.route('/api/llm', llmRoutes(deps));
   app.route('/api', brainRoutes(deps));
+  // Outside /api (devices only) and the /lun/v1 contract: the first device has no token yet.
+  app.route('/first-code', firstCodeRoutes(deps));
   if (deps.staticDir) serveApp(app, deps.staticDir);
 
   app.onError((err, c) => c.json({ error: err.message }, 500));
