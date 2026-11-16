@@ -29,9 +29,10 @@ function callerAddress(c: Context): string | undefined {
 /** The page of this machine, at Avaritia's own address, asked directly. */
 function fromThisMachine(c: Context, localOrigin: string): boolean {
   if (!isLoopback(callerAddress(c))) return false;
+  // Both as the browser writes them: a default port (`:80`) is left out.
+  const { host, origin } = new URL(localOrigin);
   // A `no-referrer` policy (secureHeaders()' default) makes the browser send `Origin: null`: no code then.
-  if (c.req.header('host') !== new URL(localOrigin).host || c.req.header('origin') !== localOrigin)
-    return false;
+  if (c.req.header('host') !== host || c.req.header('origin') !== origin) return false;
   return ![...c.req.raw.headers.keys()].some((name) => RELAYED.test(name));
 }
 

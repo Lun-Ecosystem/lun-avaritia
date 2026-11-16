@@ -67,6 +67,11 @@ describe('POST /first-code', () => {
     }
   });
 
+  it('compares Host and Origin as the browser writes them, on the default port too', async () => {
+    const h = makeHarness({ localOrigin: localOriginFor('127.0.0.1', 80) });
+    expect((await ask(h, { host: '127.0.0.1', origin: 'http://127.0.0.1' })).status).toBe(200);
+  });
+
   it('gives the same code while it is valid, a new one 10 minutes later', async () => {
     const h = makeHarness({ localOrigin: LOCAL });
     const code = async () => ((await (await ask(h)).json()) as { code: string }).code;
