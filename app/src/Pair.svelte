@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Banner, Button, CodeInput, icons, ICON_STROKE, StandaloneCard, Steps } from './lib/ui/index.ts';
-  import { pair } from './session.ts';
+  import { firstCode, pair, REFUSED_CODE } from './session.ts';
 
   let {
     baseUrl,
@@ -27,6 +27,29 @@
 
   // The field stays enabled while sending: disabling it would drop the focus.
   const field = () => box?.querySelector('input');
+
+  /** The first device's code, shown only on the hosting machine while nothing is paired. */
+  let first = $state<{ code: string; expiresAt: string } | null>(null);
+  /** The field still holds the first code: the page says so, and when it expires. */
+  const holding = $derived(first !== null && code === first.code);
+  const expiresId = `${uid}-expire`;
+  const time = (iso: string) =>
+    new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  // Once at display, then once per « Nouveau code »: never on a timer.
+  async function ask() {
+    first = await firstCode(baseUrl);
+    // The answer may come while digits are being typed: they stay.
+    if (first && !code) code = first.code;
+  }
+  void ask();
+
+  async function renew() {
+    code = '';
+    error = null;
+    await ask();
+    field()?.focus();
+  }
 
   async function send(value: string) {
     if (busy) return;
@@ -72,9 +95,11 @@
 <div class="page lun-avaritia" data-monde="avaritia">
   <StandaloneCard
     title="Relier ce navigateur"
-    lead={authorizing
-      ? "Lun'Avaritia ne connaît pas ce navigateur. Saisir le code à 6 chiffres pour continuer."
-      : 'Saisir le code à 6 chiffres. Il ne sert qu’une fois.'}
+    lead={holding
+      ? "Aucun appareil n'est encore appairé à Lun'Avaritia. Le code du premier appareil est déjà saisi : seule cette page, ouverte sur la machine qui l'héberge, l'affiche."
+      : authorizing
+        ? "Lun'Avaritia ne connaît pas ce navigateur. Saisir le code à 6 chiffres pour continuer."
+        : 'Saisir le code à 6 chiffres. Il ne sert qu’une fois.'}
     steps={authorizing ? waiting : undefined}
   >
     {#if notice}<Banner tone="info" title={notice} class="avis" />{/if}
@@ -83,7 +108,7 @@
         <CodeInput
           bind:value={code}
           error={error !== null}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={error ? errorId : holding ? expiresId : undefined}
           oncomplete={send}
         />
       </div>
@@ -91,8 +116,18 @@
         <p class="erreur" id={errorId} role="alert">
           <icons.Ban size={14} strokeWidth={ICON_STROKE} aria-hidden="true" />{error}
         </p>
+      {:else if holding && first}
+        <p class="aide" id={expiresId}>Code du premier appareil. Il expire à {time(first.expiresAt)}.</p>
       {:else}
         <p class="aide">Le code peut être collé tel quel.</p>
+      {/if}
+      <!-- While an app waits for its authorization here, no sentence sends elsewhere. -->
+      {#if first && !authorizing}
+        <!-- Pasted in an app's linking form, this code would leave the browser without one. -->
+        <Banner tone="info" title="Ce code est pour ce navigateur." class="avis">
+          Pour relier une application : entrer, puis Réglages › Appareils et applications › Relier un
+          appareil.
+        </Banner>
       {/if}
       <Button
         type="submit"
@@ -104,33 +139,49 @@
       >
         {error ? 'Réessayer' : 'Relier'}
       </Button>
+      <!-- Offered as long as the field lost the first code: refused, cleared, or typed over. -->
+      {#if first && (error === REFUSED_CODE || !holding)}
+        <Button variant="secondaire" size="grand" class="plein nouveau" onclick={renew}>Nouveau code</Button>
+      {/if}
     </form>
-    <section class="sources" aria-labelledby="sources-titre">
-      <h2 id="sources-titre">Où trouver le code</h2>
-      <div class="source">
-        <span class="ico" aria-hidden="true"><icons.Monitor size={16} strokeWidth={ICON_STROKE} /></span>
-        <div class="texte">
-          <span>Sur la machine qui héberge Lun'Avaritia</span>
-          <code>{COMMAND}</code>
+    {#if !first}
+      <section class="sources" aria-labelledby="sources-titre">
+        <h2 id="sources-titre">Où trouver le code</h2>
+        <div class="source">
+          <span class="ico" aria-hidden="true"><icons.Settings size={16} strokeWidth={ICON_STROKE} /></span>
+          <div class="texte">
+            <span>Sur un appareil déjà relié</span>
+            <small>Réglages › Appareils et applications › Relier un appareil</small>
+          </div>
         </div>
-        {#if navigator.clipboard}
-          <Button
-            variant="fantome"
-            size="petit"
-            icon={copied ? icons.Check : icons.Copy}
-            aria-label={copied ? 'Commande copiée' : 'Copier la commande'}
-            onclick={copy}>{copied ? 'Copiée' : 'Copier'}</Button
-          >
-        {/if}
-      </div>
-      <div class="source">
-        <span class="ico" aria-hidden="true"><icons.Settings size={16} strokeWidth={ICON_STROKE} /></span>
-        <div class="texte">
-          <span>Sur un appareil déjà relié</span>
-          <small>Réglages › Appareils et applications › Relier un appareil</small>
+        <div class="source">
+          <span class="ico" aria-hidden="true"><icons.AppWindow size={16} strokeWidth={ICON_STROKE} /></span>
+          <div class="texte">
+            <span>Sur une installation neuve</span>
+            <small
+              >Cette page, ouverte sur la machine qui héberge Lun'Avaritia, affiche le code du premier
+              appareil.</small
+            >
+          </div>
         </div>
-      </div>
-    </section>
+        <div class="source">
+          <span class="ico" aria-hidden="true"><icons.Monitor size={16} strokeWidth={ICON_STROKE} /></span>
+          <div class="texte">
+            <span>Recours, dans un terminal de cette machine</span>
+            <code>{COMMAND}</code>
+          </div>
+          {#if navigator.clipboard}
+            <Button
+              variant="fantome"
+              size="petit"
+              icon={copied ? icons.Check : icons.Copy}
+              aria-label={copied ? 'Commande copiée' : 'Copier la commande'}
+              onclick={copy}>{copied ? 'Copiée' : 'Copier'}</Button
+            >
+          {/if}
+        </div>
+      </section>
+    {/if}
   </StandaloneCard>
 </div>
 
@@ -145,6 +196,9 @@
   }
   form :global(.plein) {
     width: 100%;
+  }
+  form :global(.nouveau) {
+    margin-top: 8px;
   }
   :global(.avis) {
     margin-bottom: 18px;

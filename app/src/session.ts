@@ -47,3 +47,24 @@ export async function pair(
   if (!res.ok || !body.token) throw new Error(body.error ?? `Erreur ${res.status}`);
   return body.token;
 }
+
+/**
+ * The first device's code, which the server gives only to its own page on the machine hosting it,
+ * while nothing is paired yet. Null for anything else, a failure included: the page then says where
+ * to find a code.
+ */
+export async function firstCode(baseUrl: string): Promise<{ code: string; expiresAt: string } | null> {
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/first-code`, { method: 'POST' });
+    const body = (await res.json()) as { code?: unknown; expiresAt?: unknown };
+    return res.status === 200 &&
+      typeof body.code === 'string' &&
+      /^\d{6}$/.test(body.code) &&
+      typeof body.expiresAt === 'string' &&
+      !Number.isNaN(Date.parse(body.expiresAt))
+      ? { code: body.code, expiresAt: body.expiresAt }
+      : null;
+  } catch {
+    return null;
+  }
+}

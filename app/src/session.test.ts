@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { clearToken, loadToken, pair, saveToken } from './session.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { clearToken, firstCode, loadToken, pair, saveToken } from './session.ts';
 
 function memory(): Storage {
   const m = new Map<string, string>();
@@ -79,5 +79,34 @@ describe('session', () => {
       },
     } as unknown as Storage;
     expect(() => saveToken(blocked, 'tok-9')).not.toThrow();
+  });
+});
+
+describe('firstCode', () => {
+  const answer = (body: string, status = 200) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async () => new Response(body, { status })),
+    );
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks the page’s own server and returns the code with its expiry', async () => {
+    answer(JSON.stringify({ code: '042517', expiresAt: '2026-11-16T13:32:00.000Z' }));
+    expect(await firstCode('http://avaritia.test/')).toEqual({
+      code: '042517',
+      expiresAt: '2026-11-16T13:32:00.000Z',
+    });
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0]!;
+    expect(url).toBe('http://avaritia.test/first-code');
+    expect(init?.method).toBe('POST');
+  });
+
+  it.each([
+    ['no expiry', JSON.stringify({ code: '042517' })],
+    ['an unreadable expiry', JSON.stringify({ code: '042517', expiresAt: 'demain' })],
+    ['an HTML body', '<!doctype html><title>Lun’Avaritia</title>'],
+  ])('returns null for %s', async (_, body) => {
+    answer(body);
+    expect(await firstCode('')).toBeNull();
   });
 });

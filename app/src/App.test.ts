@@ -305,7 +305,8 @@ describe('App', () => {
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Cet appareil n’est plus reconnu.');
     await new Promise((r) => setTimeout(r, 100));
-    // Health, the rail counters, the queue and the agent's settings fail once each; nothing retries.
+    // Health, the rail counters, the queue and the agent's settings fail once each, and the pairing
+    // page asks once for a first code; nothing retries.
     expect(calls.toSorted()).toEqual([
       'GET /api/dashboard',
       'GET /api/drafts',
@@ -313,6 +314,7 @@ describe('App', () => {
       'GET /api/llm/providers',
       'GET /api/settings',
       'GET /lun/v1/health',
+      'POST /first-code',
     ]);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
