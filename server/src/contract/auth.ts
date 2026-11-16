@@ -160,9 +160,22 @@ export function requireDevice(db: DatabaseSync): MiddlewareHandler {
   };
 }
 
+/**
+ * The first device's code: `undefined` once a client is live; otherwise the latest pending code
+ * still valid, or a new one. Asked again within its 10 minutes, it gives the same code.
+ */
+export function firstPairingCode(db: DatabaseSync, now: Date): string | undefined {
+  if (db.prepare('SELECT 1 FROM clients WHERE revoked_at IS NULL').get()) return undefined;
+  const pending = db
+    .prepare(
+      'SELECT code FROM pairing_codes WHERE used_at IS NULL AND expires_at > ? ORDER BY expires_at DESC LIMIT 1',
+    )
+    .get(now.toISOString()) as { code: string } | undefined;
+  return pending?.code ?? issuePairingCode(db, now);
+}
+
 /** First start: with no paired client yet, the pairing code of the first device goes to the logs. */
 export function bootstrapPairing(db: DatabaseSync, now: Date, log: (line: string) => void): void {
-  if (db.prepare('SELECT 1 FROM clients WHERE revoked_at IS NULL').get()) return;
-  const code = issuePairingCode(db, now);
-  log(`Aucun appareil appairé. Code d’appairage du premier appareil (10 min) : ${groupCode(code)}`);
+  const code = firstPairingCode(db, now);
+  if (code) log(`Aucun appareil appairé. Code d’appairage du premier appareil (10 min) : ${groupCode(code)}`);
 }

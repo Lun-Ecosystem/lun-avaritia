@@ -114,6 +114,16 @@ describe('first device pairing', () => {
     expect(lines.join('\n')).toMatch(/\d{3} \d{3}$/);
   });
 
+  it('logs the same code again while it is valid: a restart gives no new one', () => {
+    const h = makeHarness();
+    const lines: string[] = [];
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    h.advance(9 * 60_000);
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    expect(lines[1]).toBe(lines[0]);
+    expect(h.db.prepare('SELECT COUNT(*) AS n FROM pairing_codes').get()).toEqual({ n: 1 });
+  });
+
   it('logs nothing once a client exists', async () => {
     const h = makeHarness();
     await h.pairClient();
