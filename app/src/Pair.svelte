@@ -100,7 +100,7 @@
   <StandaloneCard
     title="Relier ce navigateur"
     lead={holding
-      ? "Aucun appareil n'est encore appairé à Lun'Avaritia. Le code du premier appareil est déjà saisi : seule cette page, ouverte sur la machine qui l'héberge, l'affiche."
+      ? "Aucun appareil n’est encore appairé à Lun'Avaritia. Le code du premier appareil est déjà saisi : seule cette page, ouverte sur la machine qui l’héberge, l’affiche."
       : authorizing
         ? "Lun'Avaritia ne connaît pas ce navigateur. Saisir le code à 6 chiffres pour continuer."
         : 'Saisir le code à 6 chiffres. Il ne sert qu’une fois.'}

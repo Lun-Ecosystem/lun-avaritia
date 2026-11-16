@@ -172,7 +172,7 @@ describe('Pair', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Relier ce navigateur' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Aucun appareil n'est encore appairé à Lun'Avaritia. Le code du premier appareil est déjà saisi : seule cette page, ouverte sur la machine qui l'héberge, l'affiche.",
+        "Aucun appareil n’est encore appairé à Lun'Avaritia. Le code du premier appareil est déjà saisi : seule cette page, ouverte sur la machine qui l’héberge, l’affiche.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText('Ce code est pour ce navigateur.')).toBeInTheDocument();
