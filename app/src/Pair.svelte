@@ -44,10 +44,14 @@
   }
   void ask();
 
+  // While asked, « Nouveau code » waits and ignores clicks: a double click asks once.
+  let renewing = $state(false);
   async function renew() {
+    renewing = true;
     code = '';
     error = null;
     await ask();
+    renewing = false;
     field()?.focus();
   }
 
@@ -141,7 +145,9 @@
       </Button>
       <!-- Offered as long as the field lost the first code: refused, cleared, or typed over. -->
       {#if first && (error === REFUSED_CODE || !holding)}
-        <Button variant="secondaire" size="grand" class="plein nouveau" onclick={renew}>Nouveau code</Button>
+        <Button variant="secondaire" size="grand" class="plein nouveau" loading={renewing} onclick={renew}
+          >Nouveau code</Button
+        >
       {/if}
     </form>
     {#if !first}

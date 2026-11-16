@@ -288,6 +288,26 @@ describe('Pair', () => {
     expect(screen.getByText('Ce code est pour ce navigateur.')).toBeInTheDocument();
   });
 
+  it('asks once for a « Nouveau code » clicked twice while its answer is awaited', async () => {
+    let answer!: (a: Answer) => void;
+    const { firstCode } = fakeServer(
+      [firstCodeOf('135790'), new Promise<Answer>((resolve) => (answer = resolve))],
+      [{ status: 401, body: { error: 'refusé' } }],
+    );
+    const { user, code } = setup();
+    await screen.findByText(EXPIRES);
+    await user.click(screen.getByRole('button', { name: 'Relier' }));
+    const renew = await screen.findByRole('button', { name: 'Nouveau code' });
+    await user.click(renew);
+    expect(renew).toHaveAttribute('aria-busy', 'true');
+    await user.click(renew);
+    expect(firstCode).toHaveBeenCalledTimes(2);
+
+    answer(firstCodeOf('246802'));
+    await vi.waitFor(() => expect(code).toHaveValue('246802'));
+    expect(firstCode).toHaveBeenCalledTimes(2);
+  });
+
   it('asks the route once at display and once per « Nouveau code », never by itself', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { firstCode } = fakeServer(
