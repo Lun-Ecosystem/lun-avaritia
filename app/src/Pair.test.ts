@@ -278,11 +278,14 @@ describe('Pair', () => {
     expect(code).toHaveValue('');
     expect(screen.queryByText(/déjà saisi/)).toBeNull();
     expect(screen.getByText('Saisir le code à 6 chiffres. Il ne sert qu’une fois.')).toBeInTheDocument();
+    // « Ce code » is gone from the field: the banner goes with it.
+    expect(screen.queryByText('Ce code est pour ce navigateur.')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Nouveau code' }));
     await vi.waitFor(() => expect(code).toHaveValue('246802'));
     expect(firstCode).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/Le code du premier appareil est déjà saisi/)).toBeInTheDocument();
+    expect(screen.getByText('Ce code est pour ce navigateur.')).toBeInTheDocument();
   });
 
   it('asks the route once at display and once per « Nouveau code », never by itself', async () => {

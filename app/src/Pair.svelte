@@ -122,7 +122,7 @@
         <p class="aide">Le code peut être collé tel quel.</p>
       {/if}
       <!-- While an app waits for its authorization here, no sentence sends elsewhere. -->
-      {#if first && !authorizing}
+      {#if holding && !authorizing}
         <!-- Pasted in an app's linking form, this code would leave the browser without one. -->
         <Banner tone="info" title="Ce code est pour ce navigateur." class="avis">
           Pour relier une application : entrer, puis Réglages › Appareils et applications › Relier un
