@@ -52,6 +52,9 @@ describe('standalone app hosting', () => {
     const contract = await app.request('/lun/v1/nope');
     expect(contract.status).not.toBe(200);
     expect(await contract.text()).not.toContain('Lun’Avaritia');
+    const firstCode = await app.request('/first-code');
+    expect(firstCode.status).toBe(404);
+    expect(await firstCode.text()).not.toContain('Lun’Avaritia');
   });
 
   it('never serves a file outside the app directory', async () => {
