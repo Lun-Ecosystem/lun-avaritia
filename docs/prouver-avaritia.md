@@ -61,8 +61,8 @@ Sur sa propre machine, avec une vraie clé de fournisseur (Réglages, ou `.env`)
 l’agent.
 
 1. Démarrer le satellite : `npm run dev`. Il écoute sur `127.0.0.1:8789`.
-2. Appairer : `npm run pair-code` affiche un code à usage unique. Dans le core, relier le satellite avec son adresse
-   et ce code.
+2. Appairer : Réglages › Appareils et applications › Relier un appareil affiche un code à usage unique (en recours,
+   `npm run pair-code`). Dans le core, relier le satellite avec son adresse et ce code.
 3. Depuis le core, appeler l’action `brain.ingest` avec quelques observations inventées. La réponse est immédiate
    (`queued`) ; le lot est traité ensuite et ses brouillons arrivent dans `GET /lun/v1/cards`.
 4. Accepter une carte, puis appeler `brain.read` sur la fiche créée : le fait y figure avec sa source.
