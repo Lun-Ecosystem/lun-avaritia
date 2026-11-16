@@ -6,6 +6,7 @@ import { createApp, startLoops, type AppDeps } from './app.ts';
 import { backupIfMissing } from './backup.ts';
 import { ActionRegistry } from './contract/actions.ts';
 import { bootstrapPairing } from './contract/auth.ts';
+import { localOriginFor } from './contract/first-code.ts';
 import { openDb } from './db.ts';
 import { isValidDate } from './keys/expiry.ts';
 import { checkWithProvider, configuredProviders, expiresEnvName, llmEnvFrom, PROVIDERS } from './llm/keys.ts';
@@ -26,6 +27,9 @@ const appDist = resolve(root, 'app/dist');
 const staticDir = existsSync(resolve(appDist, 'index.html')) ? appDist : undefined;
 const secretKey = process.env.AVARITIA_SECRET_KEY || undefined;
 const llmEnv = llmEnvFrom(process.env);
+const port = Number(process.env.PORT ?? 8789);
+// Loopback by default: a deployment that must be reachable gives its address explicitly.
+const hostname = process.env.HOST?.trim() || '127.0.0.1';
 const appDeps: AppDeps = {
   db,
   clock,
@@ -36,6 +40,8 @@ const appDeps: AppDeps = {
   llmEnv,
   checkKey: checkWithProvider,
   dataDir: dirname(dbPath),
+  // Listening elsewhere than loopback, no page gets the first code.
+  localOrigin: localOriginFor(hostname, port),
 };
 const app = createApp(appDeps);
 
@@ -55,9 +61,6 @@ startLoops(appDeps);
 const backup = () => backupIfMissing(db, dbPath, clock(), (line) => console.log(line));
 setInterval(backup, 3600_000).unref();
 
-const port = Number(process.env.PORT ?? 8789);
-// Loopback by default: a deployment that must be reachable gives its address explicitly.
-const hostname = process.env.HOST?.trim() || '127.0.0.1';
 serve({ fetch: app.fetch, port, hostname }, () => {
   console.log(`Lun'Avaritia écoute sur ${hostname}:${port}`);
   backup();

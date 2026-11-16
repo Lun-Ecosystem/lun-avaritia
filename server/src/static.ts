@@ -17,7 +17,7 @@ const TYPES: Record<string, string> = {
 };
 
 /** Paths owned by the server: never answered with the app shell. */
-const SERVER_PATHS = /^\/(api|lun|oauth)(\/|$)/;
+const SERVER_PATHS = /^\/(api|lun|oauth|first-code)(\/|$)/;
 
 async function fileIn(root: string, path: string): Promise<string | undefined> {
   let decoded: string;

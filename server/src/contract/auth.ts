@@ -68,12 +68,12 @@ export function createClient(db: DatabaseSync, name: string, kind: ClientKind, n
 
 /**
  * Records a failed `POST /lun/v1/pair`. The fifth failure within a sliding 10-minute window voids
- * every pending pairing and authorization code, starts the count over and re-issues the first-run
- * code if no client exists. The count lives in the database: the `pair-code` command and the server
+ * every pending pairing and authorization code, starts the count over and logs its line; it issues
+ * no code, client or not. The count lives in the database: the `pair-code` command and the server
  * share it, hence one write transaction from the count to the voiding.
  */
 export function recordPairingFailure(db: DatabaseSync, now: Date, log: (line: string) => void): void {
-  // Logged after the commit only: a rolled-back lock must not announce a code that does not exist.
+  // Logged after the commit only: a rolled-back lock must not be announced.
   const lines: string[] = [];
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -87,7 +87,6 @@ export function recordPairingFailure(db: DatabaseSync, now: Date, log: (line: st
       db.exec('DELETE FROM authorization_codes WHERE used_at IS NULL');
       db.exec('DELETE FROM pairing_failures');
       lines.push('Appairage verrouillé : 5 codes faux en 10 min, codes en cours annulés.');
-      bootstrapPairing(db, now, (line) => lines.push(line));
     }
     db.exec('COMMIT');
   } catch (err) {
@@ -161,9 +160,28 @@ export function requireDevice(db: DatabaseSync): MiddlewareHandler {
   };
 }
 
+/**
+ * The first device's code: `undefined` once a client is live; otherwise the latest pending code
+ * still valid, or a new one. Asked again within its 10 minutes, it gives the same code.
+ */
+export function firstPairingCode(db: DatabaseSync, now: Date): string | undefined {
+  if (db.prepare('SELECT 1 FROM clients WHERE revoked_at IS NULL').get()) return undefined;
+  const pending = db
+    .prepare(
+      'SELECT code FROM pairing_codes WHERE used_at IS NULL AND expires_at > ? ORDER BY expires_at DESC LIMIT 1',
+    )
+    .get(now.toISOString()) as { code: string } | undefined;
+  return pending?.code ?? issuePairingCode(db, now);
+}
+
 /** First start: with no paired client yet, the pairing code of the first device goes to the logs. */
 export function bootstrapPairing(db: DatabaseSync, now: Date, log: (line: string) => void): void {
-  if (db.prepare('SELECT 1 FROM clients WHERE revoked_at IS NULL').get()) return;
-  const code = issuePairingCode(db, now);
-  log(`Aucun appareil appairé. Code d’appairage du premier appareil (10 min) : ${groupCode(code)}`);
+  const code = firstPairingCode(db, now);
+  if (!code) return;
+  // The server's local time: a code given again after a restart has less than its 10 minutes left.
+  const at = new Date(codeExpiry(db, code)!).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  log(`Aucun appareil appairé. Code d’appairage du premier appareil (expire à ${at}) : ${groupCode(code)}`);
 }

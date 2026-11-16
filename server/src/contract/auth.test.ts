@@ -54,15 +54,13 @@ describe('pairing lock', () => {
     expect(pair(s.db, code, 'phone', s.now())).not.toBeNull();
   });
 
-  it('re-issues the first-run code when no client exists', () => {
+  it('issues no code at the lock, even when no client exists', () => {
     const s = setup();
     bootstrapPairing(s.db, s.now(), (l) => s.lines.push(l));
     const first = s.lines[0]!.match(/\d{3} \d{3}$/)![0].replace(' ', '');
     for (let i = 0; i < 5; i++) s.fail();
-    expect(s.lines[1]).toBe(LOCK_LINE);
-    expect(s.lines[2]).toMatch(/^Aucun appareil appairé\. .* : \d{3} \d{3}$/);
-    const reissued = s.lines[2]!.match(/\d{3} \d{3}$/)![0].replace(' ', '');
+    expect(s.lines.slice(1)).toEqual([LOCK_LINE]);
+    expect(s.db.prepare('SELECT COUNT(*) AS n FROM pairing_codes').get()).toEqual({ n: 0 });
     expect(pair(s.db, first, 'phone', s.now())).toBeNull();
-    expect(pair(s.db, reissued, 'phone', s.now())).not.toBeNull();
   });
 });

@@ -114,6 +114,29 @@ describe('first device pairing', () => {
     expect(lines.join('\n')).toMatch(/\d{3} \d{3}$/);
   });
 
+  it('logs the same code again while it is valid: a restart gives no new one', () => {
+    const h = makeHarness();
+    const lines: string[] = [];
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    h.advance(9 * 60_000);
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    expect(lines[1]).toBe(lines[0]);
+    expect(h.db.prepare('SELECT COUNT(*) AS n FROM pairing_codes').get()).toEqual({ n: 1 });
+  });
+
+  it('says when the logged code expires, a code given again included', () => {
+    const h = makeHarness();
+    const lines: string[] = [];
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    h.advance(9 * 60_000);
+    bootstrapPairing(h.db, h.clock(), (l) => lines.push(l));
+    const at = new Date('2026-11-02T08:10:00.000Z').toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    for (const line of lines) expect(line).toMatch(new RegExp(`\\(expire à ${at}\\) : \\d{3} \\d{3}$`));
+  });
+
   it('logs nothing once a client exists', async () => {
     const h = makeHarness();
     await h.pairClient();

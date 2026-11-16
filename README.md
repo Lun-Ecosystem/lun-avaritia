@@ -57,6 +57,10 @@ npm run pair-code    # dans un autre terminal, le code à saisir dans le front
 Aucune dépendance au NAS : tout tourne sur le poste. En développement, `npm run dev -w @lun-avaritia/app` lance Vite, qui
 relaie `/api` et `/lun` vers le serveur.
 
+Le premier appareil : tant que rien n'est relié, la page ouverte à `http://127.0.0.1:8789` sur la machine qui héberge
+affiche son code, déjà saisi. Elle le demande par `POST /first-code`, hors de `/api` et du contrat, qui ne répond que
+depuis la boucle locale, à cet hôte et à cette origine, sans en-tête de relais ; sinon un 404, sans créer de code.
+
 La base est copiée une fois par jour dans `backups/`, à côté d'elle (`data/backups/avaritia-AAAA-MM-JJ.db` par défaut) :
 dès que le serveur écoute, puis chaque heure si la copie du jour manque, ce qui rattrape un poste éteint la nuit. Les
 sept dernières restent ; une copie ratée laisse une ligne au journal du serveur et se retente l'heure suivante.
@@ -73,6 +77,7 @@ dans lun-docs.
 | Une clé de fournisseur ne s'enregistre pas | Renseigner `AVARITIA_SECRET_KEY` dans `.env` : 32 octets en base64, la commande est dans `.env.example`. |
 | Le serveur refuse de démarrer sur `AVARITIA_SECRET_KEY` | Elle doit faire exactement 32 octets une fois décodée. |
 | La page racine ne montre pas l'app | Lancer `npm run build`, qui construit `app/dist`. |
+| Le code d'appareil est refusé | Il a expiré, ou 5 codes faux en 10 minutes ont annulé ceux en cours. Sur une installation neuve, « Nouveau code », sur la page ouverte sur la machine qui héberge Avaritia, en remet un ; sinon, un appareil relié en donne un (Réglages › Appareils et applications › Relier un appareil). En recours : `npm run pair-code`. |
 
 ## Dans l'écosystème
 
