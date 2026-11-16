@@ -16,7 +16,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/lun\//],
+        // The server's own paths (SERVER_PATHS, server/src/static.ts): never the app shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/lun\//, /^\/oauth\//, /^\/first-code(\/|$)/],
         runtimeCaching: [],
       },
       manifest: {
