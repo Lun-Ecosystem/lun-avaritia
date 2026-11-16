@@ -6,7 +6,7 @@ import { createApp, startLoops, type AppDeps } from './app.ts';
 import { backupIfMissing } from './backup.ts';
 import { ActionRegistry } from './contract/actions.ts';
 import { bootstrapPairing } from './contract/auth.ts';
-import { isLoopback } from './contract/first-code.ts';
+import { localOriginFor } from './contract/first-code.ts';
 import { openDb } from './db.ts';
 import { isValidDate } from './keys/expiry.ts';
 import { checkWithProvider, configuredProviders, expiresEnvName, llmEnvFrom, PROVIDERS } from './llm/keys.ts';
@@ -40,8 +40,8 @@ const appDeps: AppDeps = {
   llmEnv,
   checkKey: checkWithProvider,
   dataDir: dirname(dbPath),
-  // Avaritia's address (lun-docs, environnements.md); listening elsewhere, no page gets the first code.
-  localOrigin: isLoopback(hostname) || hostname === 'localhost' ? `http://127.0.0.1:${port}` : undefined,
+  // Listening elsewhere than loopback, no page gets the first code.
+  localOrigin: localOriginFor(hostname, port),
 };
 const app = createApp(appDeps);
 

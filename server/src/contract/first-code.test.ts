@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeHarness } from '../testing/harness.ts';
 import { createClient } from './auth.ts';
+import { localOriginFor } from './first-code.ts';
 
 const LOCAL = 'http://127.0.0.1:8789';
 const REFUSED = { error: 'Pas de code ici' };
@@ -37,6 +38,15 @@ const pairWith = (h: Harness, code: string) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code, client: 'navigateur' }),
   });
+
+describe('localOriginFor', () => {
+  it('gives Avaritia’s address only when it listens on a loopback address or localhost', () => {
+    for (const hostname of ['127.0.0.1', 'localhost'])
+      expect(localOriginFor(hostname, 8789), hostname).toBe(LOCAL);
+    for (const hostname of ['0.0.0.0', '::', '192.168.1.2', '127.exemple.org'])
+      expect(localOriginFor(hostname, 8789), hostname).toBeUndefined();
+  });
+});
 
 describe('POST /first-code', () => {
   it('gives the first code to the page of this machine, a code that pairs once', async () => {

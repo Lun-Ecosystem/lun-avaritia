@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import type { AppDeps } from '../app.ts';
@@ -6,9 +7,16 @@ import { codeExpiry, firstPairingCode } from './auth.ts';
 /** The headers a relay sets (`tailscale serve` among them): a relayed request only looks local. */
 const RELAYED = /^(x-forwarded-for|x-forwarded-host|forwarded|tailscale-.*)$/;
 
-/** 127.0.0.0/8 and ::1, IPv4 loopback written as IPv6 included. */
-export const isLoopback = (address: string | undefined): boolean =>
+/** 127.0.0.0/8 and ::1, IPv4 loopback written as IPv6 included; a socket address is always numeric. */
+const isLoopback = (address: string | undefined): boolean =>
   address === '::1' || /^(::ffff:)?127\./.test(address ?? '');
+
+/** Avaritia's address (lun-docs, environnements.md) when it listens on a loopback address or `localhost`. */
+export const localOriginFor = (hostname: string, port: number): string | undefined =>
+  // Listening on ::1, Avaritia is not reached at 127.0.0.1: no page gets the code there.
+  hostname === 'localhost' || (isIP(hostname) !== 0 && isLoopback(hostname))
+    ? `http://127.0.0.1:${port}`
+    : undefined;
 
 function callerAddress(c: Context): string | undefined {
   try {
