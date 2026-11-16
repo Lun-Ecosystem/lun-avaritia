@@ -144,6 +144,11 @@ describe('POST /first-code', () => {
     }
   });
 
+  it('refuses any X-Forwarded- header, X-Forwarded-Proto alone included', async () => {
+    const h = makeHarness({ localOrigin: LOCAL });
+    await expectRefused(h, ask(h, { 'x-forwarded-proto': 'https' }));
+  });
+
   it('refuses when Avaritia does not listen on loopback (no local origin)', async () => {
     const h = makeHarness();
     await expectRefused(h, ask(h));

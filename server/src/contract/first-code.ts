@@ -5,7 +5,7 @@ import type { AppDeps } from '../app.ts';
 import { codeExpiry, firstPairingCode } from './auth.ts';
 
 /** The headers a relay sets (`tailscale serve` among them): a relayed request only looks local. */
-const RELAYED = /^(x-forwarded-for|x-forwarded-host|forwarded|tailscale-.*)$/;
+const RELAYED = /^(x-forwarded-|tailscale-|forwarded$)/;
 
 /** 127.0.0.0/8 and ::1, IPv4 loopback written as IPv6 included; a socket address is always numeric. */
 const isLoopback = (address: string | undefined): boolean =>
