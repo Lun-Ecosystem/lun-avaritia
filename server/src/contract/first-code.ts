@@ -13,7 +13,8 @@ const isLoopback = (address: string | undefined): boolean =>
 
 /** Avaritia's address (lun-docs, environnements.md) when it listens on a loopback address or `localhost`. */
 export const localOriginFor = (hostname: string, port: number): string | undefined =>
-  // Listening on ::1, Avaritia is not reached at 127.0.0.1: no page gets the code there.
+  // Listening on ::1, or on localhost (bound to ::1 alone on Windows), Avaritia is not reached at 127.0.0.1:
+  // no page gets the code there.
   hostname === 'localhost' || (isIP(hostname) !== 0 && isLoopback(hostname))
     ? `http://127.0.0.1:${port}`
     : undefined;

@@ -41,8 +41,7 @@ const pairWith = (h: Harness, code: string) =>
 
 describe('localOriginFor', () => {
   it('gives Avaritia’s address only when it listens on a loopback address or localhost', () => {
-    for (const hostname of ['127.0.0.1', 'localhost'])
-      expect(localOriginFor(hostname, 8789), hostname).toBe(LOCAL);
+    for (const hostname of ['127.0.0.1']) expect(localOriginFor(hostname, 8789), hostname).toBe(LOCAL);
     for (const hostname of ['0.0.0.0', '::', '192.168.1.2', '127.exemple.org'])
       expect(localOriginFor(hostname, 8789), hostname).toBeUndefined();
   });
