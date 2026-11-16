@@ -177,5 +177,11 @@ export function firstPairingCode(db: DatabaseSync, now: Date): string | undefine
 /** First start: with no paired client yet, the pairing code of the first device goes to the logs. */
 export function bootstrapPairing(db: DatabaseSync, now: Date, log: (line: string) => void): void {
   const code = firstPairingCode(db, now);
-  if (code) log(`Aucun appareil appairé. Code d’appairage du premier appareil (10 min) : ${groupCode(code)}`);
+  if (!code) return;
+  // The server's local time: a code given again after a restart has less than its 10 minutes left.
+  const at = new Date(codeExpiry(db, code)!).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  log(`Aucun appareil appairé. Code d’appairage du premier appareil (expire à ${at}) : ${groupCode(code)}`);
 }
