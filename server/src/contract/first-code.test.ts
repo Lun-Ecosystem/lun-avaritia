@@ -84,6 +84,16 @@ describe('POST /first-code', () => {
     await expectRefused(h, ask(h), 1);
   });
 
+  it('never gives the pending code a paired device asked for', async () => {
+    const h = makeHarness({ localOrigin: LOCAL });
+    const token = await h.pairClient('phone');
+    const asked = await h.app.request('/api/pairing-codes', { method: 'POST', headers: h.auth(token) });
+    const { code } = (await asked.json()) as { code: string };
+    const res = await ask(h);
+    expect(await res.clone().text()).not.toContain(code);
+    await expectRefused(h, res, 2);
+  });
+
   it('gives nothing once an app is linked by authorization', async () => {
     const h = makeHarness({ localOrigin: LOCAL });
     createClient(h.db, 'core', 'app', h.clock());
