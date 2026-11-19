@@ -1,6 +1,5 @@
 // DEV ONLY: `npm run demo`. Lun'Avaritia on invented data (in-memory database, no key, no network), port 8798.
-import { existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
@@ -130,7 +129,6 @@ const app = createApp({
   actions: new ActionRegistry(),
   // The built app (`npm run build`), as `npm start` serves it; without it, the API alone.
   staticDir: existsSync(join(appDist, 'index.html')) ? appDist : undefined,
-  dataDir: mkdtempSync(join(tmpdir(), 'avaritia-demo-')),
 });
 const code = issuePairingCode(db, now);
 const browserCode = issuePairingCode(db, now);
