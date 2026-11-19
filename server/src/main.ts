@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp, startLoops, type AppDeps } from './app.ts';
@@ -39,7 +39,6 @@ const appDeps: AppDeps = {
   secretKey,
   llmEnv,
   checkKey: checkWithProvider,
-  dataDir: dirname(dbPath),
   // Listening elsewhere than loopback, no page gets the first code.
   localOrigin: localOriginFor(hostname, port),
 };

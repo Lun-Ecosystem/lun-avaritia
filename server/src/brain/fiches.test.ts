@@ -1,10 +1,9 @@
-import { existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { crc32 } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { brainDeps } from '../app.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { makeHarness } from '../testing/harness.ts';
+import { readZip } from '../testing/read-zip.ts';
 import { setPaused } from '../contract/state.ts';
 import { runPending } from './ingest.ts';
 import { addDraft } from './drafts.ts';
@@ -90,14 +89,44 @@ describe('fiches, settings, dashboard and export API', () => {
     expect(d.pending.drafts).toBe(0);
   });
 
-  it('export writes under the data directory and returns the files', async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), 'avaritia-data-'));
-    const { h, typeId, req } = setup({ dataDir });
-    createFiche(h.db, { typeId, title: 'Client X', synthesis: '' }, h.clock().toISOString());
-    const body = (await (await req('/api/export', 'POST')).json()) as { dir: string; files: string[] };
-    expect(body.files).toEqual(['client-x.md']);
-    expect(body.dir).toBe(join(dataDir, 'export', '2026-11-02'));
-    expect(existsSync(join(body.dir, 'client-x.md'))).toBe(true);
+  it('export answers a stored ZIP as an attachment named after the day, one entry per fiche', async () => {
+    const { h, typeId, req } = setup();
+    const at = h.clock().toISOString();
+    // Accents and a fact beyond ASCII: an entry's size counts bytes, not characters.
+    const cafe = createFiche(h.db, { typeId, title: 'Café Élan', synthesis: 'Un client fictif.' }, at);
+    addFact(h.db, cafe, 'Rendez-vous à 9 h — « Nœud » ✓', { kind: 'core', origin: 'acedia', at }, at);
+    createFiche(h.db, { typeId, title: 'Client Y', synthesis: '' }, at);
+    const res = await req('/api/export', 'POST');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/zip');
+    expect(res.headers.get('content-disposition')).toBe(
+      'attachment; filename="avaritia-export-2026-11-02.zip"',
+    );
+    expect(res.headers.get('x-avaritia-fiches')).toBe('2');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect([...bytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]); // PK
+    const entries = readZip(bytes);
+    expect(entries.map((e) => e.name)).toEqual(['cafe-elan.md', 'client-y.md']);
+    expect(entries[0]!.text).toContain('# Café Élan');
+    expect(entries[0]!.text).toContain('Un client fictif.');
+    expect(entries[0]!.text).toContain('- Rendez-vous à 9 h — « Nœud » ✓\n');
+    for (const e of entries) {
+      expect(e.method).toBe(0); // stored, not deflated
+      expect(e.crc).toBe(crc32(Buffer.from(e.text, 'utf8')));
+    }
+  });
+
+  it('export without a fiche is a valid empty archive, and needs no data directory', async () => {
+    const { req } = setup();
+    const res = await req('/api/export', 'POST');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-avaritia-fiches')).toBe('0');
+    expect(readZip(new Uint8Array(await res.arrayBuffer()))).toEqual([]);
+  });
+
+  it('export is protected like the other routes', async () => {
+    const { h } = setup();
+    expect((await h.app.request('/api/export', { method: 'POST' })).status).toBe(401);
   });
 
   it('a pause during a pass stops before the next lot', async () => {

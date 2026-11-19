@@ -138,6 +138,10 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE facts ADD COLUMN due TEXT;`,
   // A held lot whose tri was paid waits until this instant (ISO) before a pass takes it again.
   `ALTER TABLE lots ADD COLUMN retry_at TEXT;`,
+  // Reading a fiche (and so the export, once per fiche) scanned both tables; with these, `from_id OR to_id`
+  // becomes a multi-index OR over the primary key and `links_to`.
+  `CREATE INDEX IF NOT EXISTS facts_fiche ON facts(fiche_id);
+   CREATE INDEX IF NOT EXISTS links_to ON links(to_id);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

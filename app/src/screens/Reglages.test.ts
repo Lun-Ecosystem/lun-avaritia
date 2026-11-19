@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
 import AgentPanel from '../agent/AgentPanel.svelte';
 import Reglages from './Reglages.svelte';
@@ -27,6 +27,9 @@ function show(
     theme?: string | null;
     refuse?: (body: Record<string, unknown>) => string | null;
     providers?: () => Promise<unknown>;
+    exportFails?: boolean;
+    /** The `x-avaritia-fiches` header of the export: '2' by default, null to leave it out. */
+    fiches?: string | null;
   } = {},
 ) {
   let settings = { ...SETTINGS };
@@ -52,11 +55,19 @@ function show(
       settings = { ...settings, ...(body as object) };
       return { settings };
     }
-    if (path === '/api/export') return { dir: '/data/export/2026-10-28', files: ['a.md', 'b.md'] };
     return { status: 'ok' };
   });
   const onservice = vi.fn(async () => {});
-  const api = { get, send, upload: vi.fn() } as unknown as Api;
+  const download = vi.fn(async (...args: [method: string, path: string]) => {
+    void args;
+    if (opts.exportFails) throw new ApiError(500, 'Export impossible');
+    return {
+      blob: new Blob(['PK']),
+      name: 'avaritia-export-2026-10-28.zip',
+      headers: new Headers(opts.fiches === null ? {} : { 'x-avaritia-fiches': opts.fiches ?? '2' }),
+    };
+  });
+  const api = { get, send, upload: vi.fn(), download } as unknown as Api;
   render(Reglages, {
     props: { paused: opts.paused ?? false, onservice, theme: opts.theme ?? null },
     context: new Map([['api', api]]),
@@ -67,7 +78,7 @@ function show(
     await screen.findByRole('combobox', { name: 'Modèle des lots' }, { timeout: 5000 });
     return screen.getByRole('region', { name: 'Modèle de langage' });
   };
-  return { api, get, send, onservice, card, modelCard, user: userEvent.setup() };
+  return { api, get, send, download, onservice, card, modelCard, user: userEvent.setup() };
 }
 
 const settingsPuts = (send: ReturnType<typeof show>['send']) =>
@@ -250,12 +261,80 @@ describe('Réglages', () => {
     await waitFor(() => expect(bubble.querySelector('svg')?.outerHTML).not.toBe(before));
   });
 
-  it('exports in Markdown and shows the folder written', async () => {
-    const { card, send, user } = show({ theme: 'donnees' });
-    const donnees = await card('Données');
-    await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
-    expect(send).toHaveBeenCalledWith('POST', '/api/export');
-    expect(await within(donnees).findByText('2 fichiers dans /data/export/2026-10-28')).toBeInTheDocument();
+  describe('export', () => {
+    const created = vi.fn(() => 'blob:avaritia-test');
+    const revoked = vi.fn();
+    const clicked: { download: string; href: string }[] = [];
+
+    beforeEach(() => {
+      created.mockClear();
+      revoked.mockClear();
+      clicked.length = 0;
+      // jsdom has no createObjectURL: a URL class of the test, put back by unstubAllGlobals.
+      vi.stubGlobal(
+        'URL',
+        class extends URL {
+          static createObjectURL = created;
+          static revokeObjectURL = revoked;
+        },
+      );
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push({ download: this.download, href: this.href });
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    const exportWith = async (opts: Parameters<typeof show>[0] = {}) => {
+      const shown = show({ theme: 'donnees', ...opts });
+      const donnees = await shown.card('Données');
+      await shown.user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+      return { ...shown, donnees };
+    };
+
+    it('downloads the archive through a download link, then says how many fiches it holds', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { donnees, download, send } = await exportWith();
+      expect(download).toHaveBeenCalledWith('POST', '/api/export');
+      expect(send).not.toHaveBeenCalledWith('POST', '/api/export');
+      expect(await within(donnees).findByText('2 fiches dans l’archive')).toBeInTheDocument();
+      expect(created).toHaveBeenCalledOnce();
+      expect(clicked).toEqual([{ download: 'avaritia-export-2026-10-28.zip', href: 'blob:avaritia-test' }]);
+      // Only Chrome is known to take the Blob at the click: the URL lives a minute.
+      expect(revoked).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(60_000);
+      expect(revoked).toHaveBeenCalledWith('blob:avaritia-test');
+    });
+
+    it('says one fiche in the singular', async () => {
+      const { donnees } = await exportWith({ fiches: '1' });
+      expect(await within(donnees).findByText('1 fiche dans l’archive')).toBeInTheDocument();
+    });
+
+    it('says the archive is empty when it holds no fiche', async () => {
+      const { donnees } = await exportWith({ fiches: '0' });
+      expect(await within(donnees).findByText('Aucune fiche, l’archive est vide')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['missing', null],
+      ['not a number', 'beaucoup'],
+    ])('shows no count when the header is %s', async (_, fiches) => {
+      const { donnees } = await exportWith({ fiches });
+      expect(await within(donnees).findByText('Archive prête')).toBeInTheDocument();
+      expect(within(donnees).queryByText(/Aucune fiche|NaN/)).not.toBeInTheDocument();
+    });
+
+    it('says the error when the export route fails, and downloads nothing', async () => {
+      const { donnees } = await exportWith({ exportFails: true });
+      expect(await within(donnees).findByText('Export impossible')).toBeInTheDocument();
+      expect(clicked).toEqual([]);
+      expect(created).not.toHaveBeenCalled();
+    });
   });
 
   it('Pause posts /lun/v1/pause, then refreshes the service state', async () => {

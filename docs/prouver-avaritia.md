@@ -8,8 +8,7 @@ Recette du serveur v1 et de son front, à la main. Aucune donnée réelle : tout
 npm run demo
 ```
 
-La démo démarre sur `http://127.0.0.1:8798` avec une base en mémoire (rien n’est écrit sur le disque, sauf les exports
-dans un dossier temporaire) et sans réseau. Elle contient des fiches liées et sourcées (Studio Exemple, Jean Martin,
+La démo démarre sur `http://127.0.0.1:8798` avec une base en mémoire (rien n’est écrit sur le disque) et sans réseau. Elle contient des fiches liées et sourcées (Studio Exemple, Jean Martin,
 Refonte du site), un lot déjà traité en brouillons, une contradiction (deux adresses pour le studio) et un doublon
 (« Studio Exemple SAS »). L’appareil est déjà appairé : la commande affichée porte son jeton.
 
@@ -20,7 +19,7 @@ Refonte du site), un lot déjà traité en brouillons, une contradiction (deux a
 - `PATCH /api/fiches/1` avec `{"synthesis":"..."}` : appliqué tout de suite, une version est créée
   (`GET /api/fiches/1`).
 - `PUT /api/settings` avec `{"drafts.cap":0}` : refusé (400) ; avec `{"drafts.cap":20}` : accepté.
-- `POST /api/export` : un fichier `.md` par fiche dans `export/<date>/` ; le fait démenti n’y apparaît barré et daté qu’après avoir accepté la carte de contradiction (`POST /lun/v1/cards/<id>/accept`).
+- `POST /api/export` : une archive `avaritia-export-<date>.zip` en réponse (`curl -X POST -o export.zip`, même en-tête), un fichier `.md` par fiche, le nombre de fiches dans l’en-tête `x-avaritia-fiches` ; rien n’est écrit sur le serveur ; le fait démenti n’y apparaît barré et daté qu’après avoir accepté la carte de contradiction (`POST /lun/v1/cards/<id>/accept`).
 - `POST /lun/v1/pause` puis `GET /lun/v1/health` : l’état passe à `paused` ; `POST /lun/v1/resume` le ramène à `ok`. La démo n’a pas de fournisseur : ses lots restent retenus (`no-provider`) quoi qu’il arrive, la reprise du traitement se vérifie avec le core local (partie 3).
 
 ## 2. Dans le navigateur
@@ -73,4 +72,4 @@ Coût mesuré d’un lot réel : _à renseigner après la passe avec le core loc
 
 ## 5. Limites connues
 
-- L’export écrit un dossier sur le volume du serveur ; il n’y a pas d’archive à télécharger.
+- L’archive de l’export se construit en mémoire, d’un bloc, sans compression ni ZIP64 ; pendant qu’elle se construit, le serveur ne répond à rien d’autre. Mesuré le 19/11 sur un laptop, par la route, sur la démo (données fictives), une fois les faits et les liens indexés : 2 000 fiches, 0,11 à 0,12 s ; 20 000 fiches, 1,9 à 2,2 s, et la route de santé attend autant (seuil visé : 5 s).

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 import { openDb } from '../db.ts';
 import { InvalidInputError } from '../contract/actions.ts';
@@ -95,5 +96,28 @@ describe('store', () => {
     expect(neighbors(db, a)).toEqual([{ id: b, title: 'Bob', relation: 'connaît', direction: 'out' }]);
     expect(neighbors(db, b)[0]).toMatchObject({ id: a, direction: 'in' });
     expect(getFiche(db, a)!.links).toEqual([{ from: a, to: b, relation: 'connaît' }]);
+  });
+});
+
+describe('the schema behind getFiche', () => {
+  it('indexes facts by fiche and links by target, so reading one fiche scans neither table', () => {
+    const db = openDb(':memory:');
+    const indexed = (table: string) =>
+      (db.prepare(`PRAGMA index_list(${table})`).all() as { name: string }[]).map(
+        (i) => (db.prepare(`PRAGMA index_info(${i.name})`).all() as { name: string }[])[0]!.name,
+      );
+    expect(indexed('facts')).toContain('fiche_id');
+    expect(indexed('links')).toContain('to_id');
+    // The two reads of getFiche (store.ts), planned as SQLite runs them.
+    const plan = (sql: string, ...args: number[]) =>
+      (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as { detail: string }[]).map((r) => r.detail);
+    const facts = 'SELECT * FROM facts WHERE fiche_id = ? ORDER BY id';
+    const links = 'SELECT from_id, to_id, relation FROM links WHERE from_id = ? OR to_id = ? ORDER BY rowid';
+    // The plan is of store.ts's own SQL: a query changed there fails here, not silently.
+    const source = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');
+    expect(source).toContain(facts);
+    expect(source).toContain(links);
+    for (const detail of [...plan(facts, 1), ...plan(links, 1, 1)])
+      expect(detail).not.toMatch(/^SCAN (facts|links)\b/);
   });
 });

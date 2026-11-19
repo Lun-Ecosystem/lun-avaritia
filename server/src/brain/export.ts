@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { getFiche } from './store.ts';
 
@@ -20,13 +18,8 @@ const slug = (title: string) => {
   return DEVICE.test(s) ? `${s}-fiche` : s; // Windows refuses these names, even with an extension
 };
 
-/**
- * One Markdown file per live fiche in `dir`; returns the file names.
- * shortcut: a folder on the NAS volume rather than an archive to download; an archive can come with the
- * front if the need arises.
- */
-export function exportMarkdown(db: DatabaseSync, dir: string): string[] {
-  mkdirSync(dir, { recursive: true });
+/** One Markdown file per live fiche, by id, in memory. */
+export function exportMarkdown(db: DatabaseSync): { name: string; text: string }[] {
   const types = new Map(
     (db.prepare('SELECT id, name FROM fiche_types').all() as { id: number; name: string }[]).map((t) => [
       t.id,
@@ -36,14 +29,17 @@ export function exportMarkdown(db: DatabaseSync, dir: string): string[] {
   const rows = db.prepare('SELECT id FROM fiches WHERE merged_into IS NULL ORDER BY id').all() as {
     id: number;
   }[];
-  const titles = new Map(
-    (db.prepare('SELECT id, title FROM fiches').all() as { id: number; title: string }[]).map((f) => [
-      f.id,
-      f.title,
-    ]),
+  const fiches = new Map(
+    (
+      db.prepare('SELECT id, title, merged_into FROM fiches').all() as {
+        id: number;
+        title: string;
+        merged_into: number | null;
+      }[]
+    ).map((f) => [f.id, f]),
   );
   const used = new Set<string>();
-  const files: string[] = [];
+  const files: { name: string; text: string }[] = [];
   for (const { id } of rows) {
     const f = getFiche(db, id)!;
     const sources = [
@@ -51,7 +47,7 @@ export function exportMarkdown(db: DatabaseSync, dir: string): string[] {
         f.facts.map((x) => [x.source.kind, x.source.origin, x.source.ref].filter(Boolean).join(' ')),
       ),
     ];
-    const live = f.links.filter((l) => l.from === id && !getFiche(db, l.to)?.mergedInto);
+    const live = f.links.filter((l) => l.from === id && !fiches.get(l.to)?.merged_into);
     const md = [
       '---',
       `type: ${JSON.stringify(types.get(f.typeId) ?? '')}`,
@@ -69,15 +65,14 @@ export function exportMarkdown(db: DatabaseSync, dir: string): string[] {
       '',
       ...f.facts.map((x) => (x.struckAt ? `- ~~${x.text}~~ (barré le ${day(x.struckAt)})` : `- ${x.text}`)),
       ...(live.length
-        ? ['', '## Liens', '', ...live.map((l) => `- ${l.relation} : [[${titles.get(l.to)}]]`)]
+        ? ['', '## Liens', '', ...live.map((l) => `- ${l.relation} : [[${fiches.get(l.to)?.title}]]`)]
         : []),
       '',
     ].join('\n');
     let name = slug(f.title);
     for (let n = 2; used.has(name); n++) name = `${slug(f.title)}-${n}`;
     used.add(name);
-    writeFileSync(join(dir, `${name}.md`), md);
-    files.push(`${name}.md`);
+    files.push({ name: `${name}.md`, text: md });
   }
   return files;
 }

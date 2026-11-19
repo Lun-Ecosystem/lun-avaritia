@@ -1,7 +1,6 @@
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { join } from 'node:path';
 import { InvalidInputError } from '../contract/actions.ts';
 import { brainDeps, type AppDeps } from '../app.ts';
 import { ask, ChatSchema, keptFiche } from './agent.ts';
@@ -9,6 +8,7 @@ import { addDraft, draftView, queue, type DraftPayload } from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { ACTIVITY_PAGE, activity, dashboard } from './dashboard.ts';
 import { exportMarkdown } from './export.ts';
+import { zip } from './zip.ts';
 import { parseVault } from './obsidian.ts';
 import { readSettings, saveSettings, setting } from './settings.ts';
 import {
@@ -173,10 +173,13 @@ export function brainRoutes(deps: AppDeps): Hono {
   });
 
   r.post('/export', (c) => {
-    if (!deps.dataDir) return c.json({ error: 'Dossier de données inconnu' }, 400);
     const date = deps.clock().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
-    const dir = join(deps.dataDir, 'export', date);
-    return c.json({ dir, files: exportMarkdown(deps.db, dir) });
+    const files = exportMarkdown(deps.db);
+    return c.body(new Uint8Array(zip(files)), 200, {
+      'content-type': 'application/zip',
+      'content-disposition': `attachment; filename="avaritia-export-${date}.zip"`,
+      'x-avaritia-fiches': String(files.length),
+    });
   });
 
   r.post('/notes', limit(1_000_000), async (c) => {
