@@ -92,7 +92,9 @@ describe('fiches, settings, dashboard and export API', () => {
   it('export answers a stored ZIP as an attachment named after the day, one entry per fiche', async () => {
     const { h, typeId, req } = setup();
     const at = h.clock().toISOString();
-    createFiche(h.db, { typeId, title: 'Client X', synthesis: 'Un client fictif.' }, at);
+    // Accents and a fact beyond ASCII: an entry's size counts bytes, not characters.
+    const cafe = createFiche(h.db, { typeId, title: 'Café Élan', synthesis: 'Un client fictif.' }, at);
+    addFact(h.db, cafe, 'Rendez-vous à 9 h — « Nœud » ✓', { kind: 'core', origin: 'acedia', at }, at);
     createFiche(h.db, { typeId, title: 'Client Y', synthesis: '' }, at);
     const res = await req('/api/export', 'POST');
     expect(res.status).toBe(200);
@@ -104,9 +106,10 @@ describe('fiches, settings, dashboard and export API', () => {
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect([...bytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]); // PK
     const entries = readZip(bytes);
-    expect(entries.map((e) => e.name)).toEqual(['client-x.md', 'client-y.md']);
-    expect(entries[0]!.text).toContain('# Client X');
+    expect(entries.map((e) => e.name)).toEqual(['cafe-elan.md', 'client-y.md']);
+    expect(entries[0]!.text).toContain('# Café Élan');
     expect(entries[0]!.text).toContain('Un client fictif.');
+    expect(entries[0]!.text).toContain('- Rendez-vous à 9 h — « Nœud » ✓\n');
     for (const e of entries) {
       expect(e.method).toBe(0); // stored, not deflated
       expect(e.crc).toBe(crc32(Buffer.from(e.text, 'utf8')));
