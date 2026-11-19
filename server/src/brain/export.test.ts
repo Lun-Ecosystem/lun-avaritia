@@ -1,13 +1,10 @@
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { makeHarness } from '../testing/harness.ts';
 import { exportMarkdown } from './export.ts';
 import { addFact, createFiche, link, listTypes, strikeFact } from './store.ts';
 
 describe('exportMarkdown', () => {
-  it('writes one file per live fiche with frontmatter, struck facts, links and unique names', () => {
+  it('returns one file per live fiche, in memory, with frontmatter, struck facts, links and unique names', () => {
     const { db } = makeHarness();
     const typeId = listTypes(db)[0]!.id;
     const at = '2026-10-01T10:00:00.000Z';
@@ -21,11 +18,9 @@ describe('exportMarkdown', () => {
     strikeFact(db, old, now, '2026-11-02T08:00:00.000Z');
     link(db, a, same, 'partenaire de');
 
-    const dir = mkdtempSync(join(tmpdir(), 'avaritia-export-'));
-    const files = exportMarkdown(db, dir);
-    expect(readdirSync(dir).sort()).toEqual(['studio-exemple-2.md', 'studio-exemple.md']);
-    expect([...files].sort()).toEqual(['studio-exemple-2.md', 'studio-exemple.md']);
-    const md = readFileSync(join(dir, 'studio-exemple.md'), 'utf8');
+    const files = exportMarkdown(db);
+    expect(files.map((f) => f.name).sort()).toEqual(['studio-exemple-2.md', 'studio-exemple.md']);
+    const md = files.find((f) => f.name === 'studio-exemple.md')!.text;
     expect(md).toMatch(/^---\ntype: "Personne"\n/);
     expect(md).toContain('acedia');
     expect(md).toContain('Un studio fictif.');
@@ -41,7 +36,7 @@ describe('exportMarkdown', () => {
     const at = '2026-10-01T10:00:00.000Z';
     for (const title of ['CON', 'Com1', 'x'.repeat(300)])
       createFiche(db, { typeId, title, synthesis: '' }, at);
-    const files = exportMarkdown(db, mkdtempSync(join(tmpdir(), 'avaritia-export-')));
+    const files = exportMarkdown(db).map((f) => f.name);
     expect(files).toEqual(['con-fiche.md', 'com1-fiche.md', `${'x'.repeat(80)}.md`]);
   });
 });

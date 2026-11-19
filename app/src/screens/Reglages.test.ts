@@ -27,6 +27,7 @@ function show(
     theme?: string | null;
     refuse?: (body: Record<string, unknown>) => string | null;
     providers?: () => Promise<unknown>;
+    exportFails?: boolean;
   } = {},
 ) {
   let settings = { ...SETTINGS };
@@ -52,11 +53,19 @@ function show(
       settings = { ...settings, ...(body as object) };
       return { settings };
     }
-    if (path === '/api/export') return { dir: '/data/export/2026-10-28', files: ['a.md', 'b.md'] };
     return { status: 'ok' };
   });
   const onservice = vi.fn(async () => {});
-  const api = { get, send, upload: vi.fn() } as unknown as Api;
+  const download = vi.fn(async (...args: [method: string, path: string]) => {
+    void args;
+    if (opts.exportFails) throw new ApiError(500, 'Export impossible');
+    return {
+      blob: new Blob(['PK']),
+      name: 'avaritia-export-2026-10-28.zip',
+      headers: new Headers({ 'x-avaritia-fiches': '2' }),
+    };
+  });
+  const api = { get, send, upload: vi.fn(), download } as unknown as Api;
   render(Reglages, {
     props: { paused: opts.paused ?? false, onservice, theme: opts.theme ?? null },
     context: new Map([['api', api]]),
@@ -67,7 +76,7 @@ function show(
     await screen.findByRole('combobox', { name: 'Modèle des lots' }, { timeout: 5000 });
     return screen.getByRole('region', { name: 'Modèle de langage' });
   };
-  return { api, get, send, onservice, card, modelCard, user: userEvent.setup() };
+  return { api, get, send, download, onservice, card, modelCard, user: userEvent.setup() };
 }
 
 const settingsPuts = (send: ReturnType<typeof show>['send']) =>
@@ -250,12 +259,44 @@ describe('Réglages', () => {
     await waitFor(() => expect(bubble.querySelector('svg')?.outerHTML).not.toBe(before));
   });
 
-  it('exports in Markdown and shows the folder written', async () => {
-    const { card, send, user } = show({ theme: 'donnees' });
-    const donnees = await card('Données');
-    await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
-    expect(send).toHaveBeenCalledWith('POST', '/api/export');
-    expect(await within(donnees).findByText('2 fichiers dans /data/export/2026-10-28')).toBeInTheDocument();
+  it('exports in Markdown: downloads the archive through a download link, then says how many fiches', async () => {
+    const created = vi.fn(() => 'blob:avaritia-test');
+    const revoked = vi.fn();
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked }));
+    const clicked: { download: string; href: string }[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      clicked.push({ download: this.download, href: this.href });
+    });
+    try {
+      const { card, download, send, user } = show({ theme: 'donnees' });
+      const donnees = await card('Données');
+      await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+      expect(download).toHaveBeenCalledWith('POST', '/api/export');
+      expect(send).not.toHaveBeenCalledWith('POST', '/api/export');
+      expect(await within(donnees).findByText('2 fiches téléchargées')).toBeInTheDocument();
+      expect(created).toHaveBeenCalledOnce();
+      expect(click).toHaveBeenCalledOnce();
+      expect(clicked).toEqual([{ download: 'avaritia-export-2026-10-28.zip', href: 'blob:avaritia-test' }]);
+      expect(revoked).toHaveBeenCalledWith('blob:avaritia-test');
+    } finally {
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('says the error when the export route fails, and downloads nothing', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      const { card, user } = show({ theme: 'donnees', exportFails: true });
+      const donnees = await card('Données');
+      await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+      expect(await within(donnees).findByText('Export impossible')).toBeInTheDocument();
+      expect(click).not.toHaveBeenCalled();
+    } finally {
+      click.mockRestore();
+    }
   });
 
   it('Pause posts /lun/v1/pause, then refreshes the service state', async () => {

@@ -67,4 +67,53 @@ describe('createApi', () => {
     const api = createApi('', 'tok-1', { fetch });
     expect(await api.send('DELETE', '/api/depots/d1')).toBeUndefined();
   });
+
+  describe('download', () => {
+    const zip = (init: ResponseInit = {}) =>
+      vi.fn<typeof globalThis.fetch>(
+        async () =>
+          new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+            status: 200,
+            headers: {
+              'content-type': 'application/zip',
+              'content-disposition': 'attachment; filename="avaritia-export-2026-11-02.zip"',
+              'x-avaritia-fiches': '3',
+            },
+            ...init,
+          }),
+      );
+
+    it('sends the token and the method, and gives the bytes, the file name and the headers', async () => {
+      const fetch = zip();
+      const api = createApi('http://avaritia.test/', 'tok-1', { fetch });
+      const got = await api.download('POST', '/api/export');
+      const [url, init] = fetch.mock.calls[0]!;
+      expect(url).toBe('http://avaritia.test/api/export');
+      expect(init?.method).toBe('POST');
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer tok-1');
+      expect(got.name).toBe('avaritia-export-2026-11-02.zip');
+      expect(got.blob).toBeInstanceOf(Blob);
+      expect([...new Uint8Array(await got.blob.arrayBuffer())]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+      expect(got.headers.get('x-avaritia-fiches')).toBe('3');
+    });
+
+    it('a 401 calls onUnauthorized once and throws UnauthorizedError', async () => {
+      const onUnauthorized = vi.fn();
+      const api = createApi('', 'tok-1', {
+        fetch: reply({ error: 'Jeton absent, invalide ou révoqué' }, 401),
+        onUnauthorized,
+      });
+      const err = await api.download('POST', '/api/export').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(UnauthorizedError);
+      expect(onUnauthorized).toHaveBeenCalledOnce();
+    });
+
+    it('an error answer throws ApiError with the server message', async () => {
+      const api = createApi('', 'tok-1', { fetch: reply({ error: 'Trop gros' }, 413) });
+      await expect(api.download('POST', '/api/export')).rejects.toMatchObject({
+        status: 413,
+        message: 'Trop gros',
+      });
+    });
+  });
 });
