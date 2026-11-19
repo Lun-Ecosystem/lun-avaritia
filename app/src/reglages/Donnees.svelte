@@ -20,12 +20,17 @@
       link.download = name;
       link.href = url;
       link.click();
-      URL.revokeObjectURL(url);
-      const n = Number(headers.get('x-avaritia-fiches') ?? 0);
+      // Only Chrome is known to take the Blob at the click: the URL lives a minute.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // The save dialog can still be cancelled: say what the archive holds, not that it was saved.
+      const fiches = headers.get('x-avaritia-fiches') ?? '';
+      const n = /^\d+$/.test(fiches) ? Number(fiches) : null;
       written =
-        n === 0
-          ? 'Aucune fiche, l’archive est vide'
-          : `${n} fiche${n > 1 ? 's' : ''} téléchargée${n > 1 ? 's' : ''}`;
+        n === null
+          ? 'Archive prête'
+          : n === 0
+            ? 'Aucune fiche, l’archive est vide'
+            : `${n} fiche${n > 1 ? 's' : ''} dans l’archive`;
     } catch (e) {
       error = e instanceof Error && e.message ? e.message : 'L’export a échoué.';
     } finally {
