@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 import { openDb } from '../db.ts';
 import { InvalidInputError } from '../contract/actions.ts';
@@ -110,14 +111,13 @@ describe('the schema behind getFiche', () => {
     // The two reads of getFiche (store.ts), planned as SQLite runs them.
     const plan = (sql: string, ...args: number[]) =>
       (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as { detail: string }[]).map((r) => r.detail);
-    for (const detail of [
-      ...plan('SELECT * FROM facts WHERE fiche_id = ? ORDER BY id', 1),
-      ...plan(
-        'SELECT from_id, to_id, relation FROM links WHERE from_id = ? OR to_id = ? ORDER BY rowid',
-        1,
-        1,
-      ),
-    ])
+    const facts = 'SELECT * FROM facts WHERE fiche_id = ? ORDER BY id';
+    const links = 'SELECT from_id, to_id, relation FROM links WHERE from_id = ? OR to_id = ? ORDER BY rowid';
+    // The plan is of store.ts's own SQL: a query changed there fails here, not silently.
+    const source = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');
+    expect(source).toContain(facts);
+    expect(source).toContain(links);
+    for (const detail of [...plan(facts, 1), ...plan(links, 1, 1)])
       expect(detail).not.toMatch(/^SCAN (facts|links)\b/);
   });
 });

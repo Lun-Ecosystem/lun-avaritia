@@ -72,4 +72,4 @@ Coût mesuré d’un lot réel : _à renseigner après la passe avec le core loc
 
 ## 5. Limites connues
 
-- L’archive de l’export se construit en mémoire, d’un bloc, sans compression ni ZIP64 ; pendant qu’elle se construit, le serveur ne répond à rien d’autre. Mesuré le 19/11 sur un laptop, par la route, sur la démo (données fictives), une fois les faits et les liens indexés : 2 000 fiches, 0,11 à 0,12 s ; 20 000 fiches, 1,9 à 2,2 s, autant que la route de santé attend (seuil visé : 5 s).
+- L’archive de l’export se construit en mémoire, d’un bloc, sans compression ni ZIP64 ; pendant qu’elle se construit, le serveur ne répond à rien d’autre. Mesuré le 19/11 sur un laptop, par la route, sur la démo (données fictives), une fois les faits et les liens indexés : 2 000 fiches, 0,11 à 0,12 s ; 20 000 fiches, 1,9 à 2,2 s, et la route de santé attend autant (seuil visé : 5 s).
