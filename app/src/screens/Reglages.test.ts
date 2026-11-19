@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
 import AgentPanel from '../agent/AgentPanel.svelte';
 import Reglages from './Reglages.svelte';
@@ -28,6 +28,8 @@ function show(
     refuse?: (body: Record<string, unknown>) => string | null;
     providers?: () => Promise<unknown>;
     exportFails?: boolean;
+    /** The `x-avaritia-fiches` header of the export: '2' by default, null to leave it out. */
+    fiches?: string | null;
   } = {},
 ) {
   let settings = { ...SETTINGS };
@@ -62,7 +64,7 @@ function show(
     return {
       blob: new Blob(['PK']),
       name: 'avaritia-export-2026-10-28.zip',
-      headers: new Headers({ 'x-avaritia-fiches': '2' }),
+      headers: new Headers(opts.fiches === null ? {} : { 'x-avaritia-fiches': opts.fiches ?? '2' }),
     };
   });
   const api = { get, send, upload: vi.fn(), download } as unknown as Api;
@@ -259,44 +261,80 @@ describe('Réglages', () => {
     await waitFor(() => expect(bubble.querySelector('svg')?.outerHTML).not.toBe(before));
   });
 
-  it('exports in Markdown: downloads the archive through a download link, then says how many fiches', async () => {
+  describe('export', () => {
     const created = vi.fn(() => 'blob:avaritia-test');
     const revoked = vi.fn();
-    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked }));
     const clicked: { download: string; href: string }[] = [];
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement,
-    ) {
-      clicked.push({ download: this.download, href: this.href });
+
+    beforeEach(() => {
+      created.mockClear();
+      revoked.mockClear();
+      clicked.length = 0;
+      // jsdom has no createObjectURL: a URL class of the test, put back by unstubAllGlobals.
+      vi.stubGlobal(
+        'URL',
+        class extends URL {
+          static createObjectURL = created;
+          static revokeObjectURL = revoked;
+        },
+      );
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push({ download: this.download, href: this.href });
+      });
     });
-    try {
-      const { card, download, send, user } = show({ theme: 'donnees' });
-      const donnees = await card('Données');
-      await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    const exportWith = async (opts: Parameters<typeof show>[0] = {}) => {
+      const shown = show({ theme: 'donnees', ...opts });
+      const donnees = await shown.card('Données');
+      await shown.user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+      return { ...shown, donnees };
+    };
+
+    it('downloads the archive through a download link, then says how many fiches it holds', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { donnees, download, send } = await exportWith();
       expect(download).toHaveBeenCalledWith('POST', '/api/export');
       expect(send).not.toHaveBeenCalledWith('POST', '/api/export');
-      expect(await within(donnees).findByText('2 fiches téléchargées')).toBeInTheDocument();
+      expect(await within(donnees).findByText('2 fiches dans l’archive')).toBeInTheDocument();
       expect(created).toHaveBeenCalledOnce();
-      expect(click).toHaveBeenCalledOnce();
       expect(clicked).toEqual([{ download: 'avaritia-export-2026-10-28.zip', href: 'blob:avaritia-test' }]);
+      // Only Chrome is known to take the Blob at the click: the URL lives a minute.
+      expect(revoked).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(60_000);
       expect(revoked).toHaveBeenCalledWith('blob:avaritia-test');
-    } finally {
-      click.mockRestore();
-      vi.unstubAllGlobals();
-    }
-  });
+    });
 
-  it('says the error when the export route fails, and downloads nothing', async () => {
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    try {
-      const { card, user } = show({ theme: 'donnees', exportFails: true });
-      const donnees = await card('Données');
-      await user.click(within(donnees).getByRole('button', { name: 'Exporter' }));
+    it('says one fiche in the singular', async () => {
+      const { donnees } = await exportWith({ fiches: '1' });
+      expect(await within(donnees).findByText('1 fiche dans l’archive')).toBeInTheDocument();
+    });
+
+    it('says the archive is empty when it holds no fiche', async () => {
+      const { donnees } = await exportWith({ fiches: '0' });
+      expect(await within(donnees).findByText('Aucune fiche, l’archive est vide')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['missing', null],
+      ['not a number', 'beaucoup'],
+    ])('shows no count when the header is %s', async (_, fiches) => {
+      const { donnees } = await exportWith({ fiches });
+      expect(await within(donnees).findByText('Archive prête')).toBeInTheDocument();
+      expect(within(donnees).queryByText(/Aucune fiche|NaN/)).not.toBeInTheDocument();
+    });
+
+    it('says the error when the export route fails, and downloads nothing', async () => {
+      const { donnees } = await exportWith({ exportFails: true });
       expect(await within(donnees).findByText('Export impossible')).toBeInTheDocument();
-      expect(click).not.toHaveBeenCalled();
-    } finally {
-      click.mockRestore();
-    }
+      expect(clicked).toEqual([]);
+      expect(created).not.toHaveBeenCalled();
+    });
   });
 
   it('Pause posts /lun/v1/pause, then refreshes the service state', async () => {
