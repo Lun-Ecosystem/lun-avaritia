@@ -65,6 +65,7 @@
     send: <T,>(method: string, path: string, body?: unknown) =>
       api!.send<T>(method, path, body).finally(() => void readCounts()),
     upload: <T,>(path: string, form: FormData) => api!.upload<T>(path, form).finally(() => void readCounts()),
+    download: (method: string, path: string) => api!.download(method, path),
   } satisfies Api);
 
   let status = $state<ServiceStatus>({

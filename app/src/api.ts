@@ -21,6 +21,8 @@ export interface Api {
   send<T>(method: string, path: string, body?: unknown): Promise<T>;
   /** Posts a form (files): the browser sets its multipart type. */
   upload<T>(path: string, form: FormData): Promise<T>;
+  /** Fetches a file: its bytes, the name from `content-disposition`, and the answer's headers. */
+  download(method: string, path: string): Promise<{ blob: Blob; name: string; headers: Headers }>;
 }
 
 export interface ApiOptions {
@@ -35,25 +37,30 @@ export function createApi(baseUrl: string, token: string, opts: ApiOptions = {})
   const doFetch = opts.fetch ?? ((input, init) => fetch(input, init));
   const auth = { authorization: `Bearer ${token}` };
 
-  async function call<T>(path: string, init: RequestInit): Promise<T> {
-    const res = await doFetch(`${base}${path}`, init);
-    const text = await res.text();
-    let json: unknown;
+  const parse = (text: string): unknown => {
     try {
-      json = text ? JSON.parse(text) : undefined;
+      return text ? JSON.parse(text) : undefined;
     } catch {
-      json = undefined;
+      return undefined;
     }
-    if (!res.ok) {
-      const message =
-        (json as { error?: string } | undefined)?.error ?? (res.statusText || `Erreur ${res.status}`);
-      if (res.status === 401) {
-        opts.onUnauthorized?.();
-        throw new UnauthorizedError(message);
-      }
-      throw new ApiError(res.status, message);
+  };
+
+  /** Fetches, and turns an error answer into ApiError (401: UnauthorizedError). */
+  async function request(path: string, init: RequestInit): Promise<Response> {
+    const res = await doFetch(`${base}${path}`, init);
+    if (res.ok) return res;
+    const json = parse(await res.text()) as { error?: string } | undefined;
+    const message = json?.error ?? (res.statusText || `Erreur ${res.status}`);
+    if (res.status === 401) {
+      opts.onUnauthorized?.();
+      throw new UnauthorizedError(message);
     }
-    return json as T;
+    throw new ApiError(res.status, message);
+  }
+
+  async function call<T>(path: string, init: RequestInit): Promise<T> {
+    const res = await request(path, init);
+    return parse(await res.text()) as T;
   }
 
   return {
@@ -65,5 +72,10 @@ export function createApi(baseUrl: string, token: string, opts: ApiOptions = {})
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       }),
     upload: (path, form) => call(path, { method: 'POST', headers: auth, body: form }),
+    download: async (method, path) => {
+      const res = await request(path, { method, headers: auth });
+      const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+      return { blob: await res.blob(), name: name ?? 'avaritia-export.zip', headers: res.headers };
+    },
   };
 }
