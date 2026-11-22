@@ -10,6 +10,7 @@ import { ActionRegistry } from '../contract/actions.ts';
 import { groupCode, issuePairingCode } from '../contract/auth.ts';
 import { recordCost } from '../contract/costs.ts';
 import { openDb } from '../db.ts';
+import { envOf } from '../util.ts';
 
 // No network at all: nothing here may reach a provider.
 globalThis.fetch = () => Promise.reject(new Error('demo : réseau interdit'));
@@ -132,7 +133,7 @@ const app = createApp({
 });
 const code = issuePairingCode(db, now);
 const browserCode = issuePairingCode(db, now);
-const port = Number(process.env.DEMO_PORT ?? 8798);
+const port = Number(envOf('DEMO_PORT') ?? 8798);
 serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, async () => {
   const res = await app.request('/lun/v1/pair', {
     method: 'POST',

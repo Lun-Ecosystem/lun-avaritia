@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parisMonthStart, startLoop } from './util.ts';
+import { envOf, parisMonthStart, startLoop } from './util.ts';
 
 describe('startLoop', () => {
   it('runs at once, never twice at a time, and keeps going after an error', async () => {
@@ -29,5 +29,15 @@ describe('parisMonthStart', () => {
     expect(parisMonthStart(new Date('2026-11-02T04:00:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
     expect(parisMonthStart(new Date('2026-03-31T21:30:00Z')).toISOString()).toBe('2026-02-28T23:00:00.000Z');
     expect(parisMonthStart(new Date('2026-10-31T23:30:00Z')).toISOString()).toBe('2026-10-31T23:00:00.000Z');
+  });
+});
+
+describe('envOf', () => {
+  it('takes a variable set but empty, or blank, for an absent one', () => {
+    const env = { EMPTY: '', BLANK: ' 	', SET: ' ./data/x.db ' };
+    expect(envOf('EMPTY', env)).toBeUndefined();
+    expect(envOf('BLANK', env)).toBeUndefined();
+    expect(envOf('ABSENT', env)).toBeUndefined();
+    expect(envOf('SET', env)).toBe('./data/x.db');
   });
 });

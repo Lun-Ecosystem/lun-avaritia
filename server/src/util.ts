@@ -78,3 +78,7 @@ export function parisMonthStart(now: Date): Date {
   // From noon of today, whole days back land on noon of the 1st whatever the clock changes.
   return parisDayStart(new Date(parisDayStart(now).getTime() + 12 * 3_600_000 - (day - 1) * 86_400_000));
 }
+
+/** An environment variable. Set but empty, or blank, counts as absent: an empty line of an env file gives ''. */
+export const envOf = (name: string, env: NodeJS.ProcessEnv = process.env): string | undefined =>
+  env[name]?.trim() || undefined;

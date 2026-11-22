@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { codeExpiry, groupCode, issuePairingCode } from '../contract/auth.ts';
 import { openDb } from '../db.ts';
+import { envOf } from '../util.ts';
 
 /** Issues a pairing code, whether clients exist or not, and returns the line to print. */
 export function pairCodeLine(db: DatabaseSync, now: Date): string {
@@ -20,7 +21,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const root = fileURLToPath(new URL('../../../', import.meta.url));
   const envFile = resolve(root, '.env');
   if (existsSync(envFile)) process.loadEnvFile(envFile);
-  const db = openDb(resolve(root, process.env.DB_PATH ?? 'data/avaritia.db'));
+  const db = openDb(resolve(root, envOf('DB_PATH') ?? 'data/avaritia.db'));
   try {
     console.log(pairCodeLine(db, new Date()));
   } finally {
