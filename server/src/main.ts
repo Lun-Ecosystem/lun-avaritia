@@ -10,6 +10,7 @@ import { localOriginFor } from './contract/first-code.ts';
 import { openDb } from './db.ts';
 import { isValidDate } from './keys/expiry.ts';
 import { checkWithProvider, configuredProviders, expiresEnvName, llmEnvFrom, PROVIDERS } from './llm/keys.ts';
+import { envOf } from './util.ts';
 
 // Paths are resolved from the repository root, whatever the working directory (npm -w runs in server/).
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -19,7 +20,7 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
-const dbPath = resolve(root, process.env.DB_PATH ?? 'data/avaritia.db');
+const dbPath = resolve(root, envOf('DB_PATH') ?? 'data/avaritia.db');
 const db = openDb(dbPath);
 const clock = () => new Date();
 const actions = new ActionRegistry();
@@ -27,7 +28,7 @@ const appDist = resolve(root, 'app/dist');
 const staticDir = existsSync(resolve(appDist, 'index.html')) ? appDist : undefined;
 const secretKey = process.env.AVARITIA_SECRET_KEY || undefined;
 const llmEnv = llmEnvFrom(process.env);
-const port = Number(process.env.PORT ?? 8789);
+const port = Number(envOf('PORT') ?? 8789);
 // Loopback by default: a deployment that must be reachable gives its address explicitly.
 const hostname = process.env.HOST?.trim() || '127.0.0.1';
 const appDeps: AppDeps = {

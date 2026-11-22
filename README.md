@@ -55,7 +55,8 @@ npm run pair-code    # dans un autre terminal, le code à saisir dans le front
 ```
 
 Aucune dépendance au NAS : tout tourne sur le poste. En développement, `npm run dev -w @lun-avaritia/app` lance Vite, qui
-relaie `/api` et `/lun` vers le serveur.
+relaie `/api` et `/lun` vers le serveur. Une variable laissée vide dans `.env` vaut absente : sa valeur par défaut
+s'applique.
 
 Le premier appareil : tant que rien n'est relié, la page ouverte à `http://127.0.0.1:8789` sur la machine qui héberge
 affiche son code, déjà saisi. Elle le demande par `POST /first-code`, hors de `/api` et du contrat, qui ne répond que
