@@ -18,5 +18,5 @@ USER node
 EXPOSE 8789
 # The front answers as soon as the server listens.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8789)+'/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+((process.env.PORT||'').trim()||8789)+'/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "--experimental-strip-types", "--no-warnings", "server/src/main.ts"]
