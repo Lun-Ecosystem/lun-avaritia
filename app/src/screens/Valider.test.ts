@@ -378,7 +378,9 @@ describe('Valider, undoing a refusal', () => {
     expect(toasts()[0]!.undo).toBeTypeOf('function');
     await user.click(screen.getByRole('button', { name: 'Annuler' }));
     await waitFor(() => expect(restore(send, 1)).toBe(true));
-    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(get.mock.calls.filter((c: unknown[]) => c[0] === '/api/drafts')).toHaveLength(2),
+    );
     expect(await screen.findByText('Client Exemple')).toBeInTheDocument();
   });
 
