@@ -23,6 +23,8 @@
   let route = $state(routeFromPath(window.location.pathname));
   // `?filtre=` of the queue: a link to the same screen changes it without a new screen.
   let filtre = $state(new URLSearchParams(window.location.search).get('filtre'));
+  // `?brouillon=` names a draft to put in focus (the link of a card in the core).
+  let brouillon = $state(new URLSearchParams(window.location.search).get('brouillon'));
   let fiche = $state(new URLSearchParams(window.location.search).get('fiche'));
   let mode = $state(new URLSearchParams(window.location.search).get('mode'));
   let theme = $state(new URLSearchParams(window.location.search).get('theme'));
@@ -31,6 +33,7 @@
     route = routeFromPath(window.location.pathname);
     const q = new URLSearchParams(window.location.search);
     filtre = q.get('filtre');
+    brouillon = q.get('brouillon');
     fiche = q.get('fiche');
     mode = q.get('mode');
     theme = q.get('theme');
@@ -213,7 +216,7 @@
         {#if route === 'tableau'}
           <Tableau />
         {:else if route === 'valider'}
-          <Valider {filtre} />
+          <Valider {filtre} {brouillon} />
         {:else if route === 'memoire'}
           <Memoire {fiche} {mode} q={search} />
         {:else if route === 'depots'}
