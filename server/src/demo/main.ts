@@ -98,6 +98,20 @@ addDraft(
   { lot: 1, source: 'core' },
   at,
 );
+// A new fiche from the conversation, outside the lot: its card links to the draft in À valider.
+addDraft(
+  db,
+  {
+    kind: 'fiche',
+    typeId: type('Projet'),
+    title: 'Salon du design',
+    synthesis: 'Salon professionnel où le studio expose ses maquettes en mars.',
+    facts: [{ text: 'Stand réservé pour le 14 mars.', source: { kind: 'core', ref: 'm1', at } }],
+    links: [{ to: 'Studio Exemple', relation: 'expose' }],
+  },
+  { source: 'core' },
+  at,
+);
 
 // DEMO_FICHES=<n>: n more invented fiches, linked, to try the graph under load. A fixed seed keeps
 // every run identical.

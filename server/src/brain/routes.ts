@@ -4,7 +4,15 @@ import { bodyLimit } from 'hono/body-limit';
 import { InvalidInputError } from '../contract/actions.ts';
 import { brainDeps, type AppDeps } from '../app.ts';
 import { ask, ChatSchema, keptFiche } from './agent.ts';
-import { addDraft, draftView, queue, type DraftPayload } from './drafts.ts';
+import {
+  addDraft,
+  ConflictError,
+  draftView,
+  NotFoundError,
+  queue,
+  restoreDraft,
+  type DraftPayload,
+} from './drafts.ts';
 import { MAX_DEPOT_CHARS, addDepot, addNote, deleteDepot, InputError, listDepots } from './inputs.ts';
 import { ACTIVITY_PAGE, activity, dashboard } from './dashboard.ts';
 import { exportMarkdown } from './export.ts';
@@ -62,6 +70,17 @@ export function brainRoutes(deps: AppDeps): Hono {
       .prepare("SELECT COUNT(*) AS n FROM drafts WHERE status IN ('pending', 'applying')")
       .get() as { n: number };
     return c.json({ drafts: shown.map((d) => draftView(deps.db, d)), held: n - shown.length });
+  });
+
+  r.post('/drafts/:id/restore', (c) => {
+    try {
+      const d = restoreDraft(deps.db, Number(c.req.param('id')), deps.clock().toISOString());
+      return c.json({ draft: draftView(deps.db, d) });
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+      if (err instanceof ConflictError) return c.json({ error: err.message }, 409);
+      throw err;
+    }
   });
 
   // A link of a merged fiche counts for the kept one (one hop, as merges are flattened on apply).

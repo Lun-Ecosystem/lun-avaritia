@@ -281,9 +281,9 @@ describe('reads for the app: drafts, graph, neighbors', () => {
     refuseDraft(t.h.db, id, t.h.clock().toISOString());
     const ok = await restore(id);
     expect(ok.status).toBe(200);
-    expect(((await ok.json()) as { draft: { id: number; status: string } }).draft).toMatchObject({
+    expect(((await ok.json()) as { draft: { id: number; card: { status: string } } }).draft).toMatchObject({
       id,
-      status: 'pending',
+      card: { status: 'pending' },
     });
     expect(getDraft(t.h.db, id)!.status).toBe('pending');
     // too old
