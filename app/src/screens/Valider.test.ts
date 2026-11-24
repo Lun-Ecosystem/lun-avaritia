@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Api } from '../api.ts';
 import { dismissAll, toasts } from '../lib/ui/toasts.svelte.ts';
 import AgentPanel from '../agent/AgentPanel.svelte';
+import Toaster from '../lib/ui/Toaster.svelte';
 import Valider from './Valider.svelte';
 
 const src = { kind: 'core', at: '2026-10-27T22:00:00Z' };
@@ -60,16 +61,22 @@ const replacing = fiche(9, 'Projet Test', {
 
 function show(
   queues: { drafts: unknown[]; held: number }[],
-  { filtre = null as string | null, fail = undefined as ApiError | undefined } = {},
+  {
+    filtre = null as string | null,
+    brouillon = null as string | null,
+    fail = undefined as ApiError | undefined,
+    sendWith = undefined as ((method: string, path: string) => Promise<unknown>) | undefined,
+  } = {},
 ) {
   let n = 0;
   const get = vi.fn(async () => queues[Math.min(n++, queues.length - 1)]);
-  const send = vi.fn(async () => {
+  const send = vi.fn(async (method: string, path: string) => {
+    if (sendWith) return sendWith(method, path);
     if (fail) throw fail;
     return {};
   });
   const api = { get, send } as unknown as Api;
-  render(Valider, { props: { filtre }, context: new Map([['api', api]]) });
+  render(Valider, { props: { filtre, brouillon }, context: new Map([['api', api]]) });
   return { api, get, send };
 }
 
@@ -166,25 +173,84 @@ describe('Valider', () => {
     expect(messages()).toContain('Refusé');
   });
 
-  it('V and R act on the active item', async () => {
+  // A click inside a card puts the focus in it; the card holding the focus is the one V and R act on.
+  const cardsOf = async () => screen.findAllByRole('region');
+  const kbdIn = (card: HTMLElement) => card.querySelectorAll('kbd').length;
+  const clickInside = (user: ReturnType<typeof userEvent.setup>, card: HTMLElement) =>
+    user.click(within(card).getByRole('heading'));
+
+  it('V and R act on the card that holds the focus, none at load', async () => {
     const user = userEvent.setup();
     const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }]);
-    const cards = await screen.findAllByRole('region');
-    expect(within(cards[0]!).getByRole('button', { name: 'Valider' })).toHaveAttribute(
+    const cards = await cardsOf();
+    // At load nothing holds the focus: the keys do nothing and no card shows them.
+    await user.keyboard('v');
+    await user.keyboard('r');
+    expect(send).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('[aria-keyshortcuts]')).toHaveLength(0);
+    expect(cards.map(kbdIn)).toEqual([0, 0]);
+    // The focus enters the second card: it is the active one, and the only one to say so.
+    await clickInside(user, cards[1]!);
+    expect(within(cards[1]!).getByRole('button', { name: 'Valider' })).toHaveAttribute(
       'aria-keyshortcuts',
       'V',
     );
-    expect(within(cards[1]!).getByRole('button', { name: 'Valider' })).not.toHaveAttribute(
+    expect(within(cards[1]!).getByRole('button', { name: 'Refuser' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'R',
+    );
+    expect(within(cards[0]!).getByRole('button', { name: 'Valider' })).not.toHaveAttribute(
       'aria-keyshortcuts',
     );
-    expect(within(cards[1]!).getByRole('button', { name: 'Refuser' })).not.toHaveAttribute(
+    expect(within(cards[0]!).getByRole('button', { name: 'Refuser' })).not.toHaveAttribute(
       'aria-keyshortcuts',
     );
-    await user.keyboard('v');
-    expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/1/accept', {});
-    await waitFor(() => expect(screen.getAllByRole('region')).toHaveLength(1));
+    expect(cards.map(kbdIn)).toEqual([0, 2]);
     await user.keyboard('r');
+    expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/3/refuse', {});
+  });
+
+  it('with the focus out of the cards, V does nothing', async () => {
+    const user = userEvent.setup();
+    const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }]);
+    const cards = await cardsOf();
+    await clickInside(user, cards[0]!);
+    await user.click(document.body);
+    await user.keyboard('v');
+    expect(send).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('[aria-keyshortcuts]')).toHaveLength(0);
+  });
+
+  it('after R the focus passes to the next card, and R refuses it', async () => {
+    const user = userEvent.setup();
+    const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon, importDraft], held: 0 }]);
+    const cards = await cardsOf();
+    await clickInside(user, cards[0]!);
+    await user.keyboard('r');
+    expect(send).toHaveBeenLastCalledWith('POST', '/lun/v1/cards/1/refuse', {});
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName('Société A et Société A SARL'));
+    await user.keyboard('r');
+    expect(send).toHaveBeenLastCalledWith('POST', '/lun/v1/cards/3/refuse', {});
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName('Carte 8'));
+  });
+
+  it('the card holding the focus is named by its title', async () => {
+    const user = userEvent.setup();
+    show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }]);
+    const cards = await cardsOf();
+    await clickInside(user, cards[0]!);
+    expect(document.activeElement).toHaveAccessibleName('Client Exemple');
+    expect(cards[0]!.contains(document.activeElement)).toBe(true);
+  });
+
+  it('when the queue is emptied the focus goes to the title « À valider »', async () => {
+    const user = userEvent.setup();
+    show([{ drafts: [fiche(1, 'Client Exemple')], held: 0 }]);
+    await clickInside(user, (await cardsOf())[0]!);
+    await user.keyboard('r');
+    expect(await screen.findByText('Rien à valider.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'À valider' })).toHaveFocus());
   });
 
   it('V and R typed inside the agent panel stay there', async () => {
@@ -292,6 +358,90 @@ describe('Valider', () => {
   it('empty queue', async () => {
     show([{ drafts: [], held: 0 }]);
     expect(await screen.findByText('Rien à valider.')).toBeInTheDocument();
+  });
+});
+
+describe('Valider, undoing a refusal', () => {
+  const restore = (send: { mock: { calls: unknown[][] } }, id: number) =>
+    send.mock.calls.some((c) => c[0] === 'POST' && c[1] === `/api/drafts/${id}/restore`);
+
+  it('« Refusé » offers Annuler, which restores the draft and reads the queue again', async () => {
+    const user = userEvent.setup();
+    render(Toaster);
+    const { send, get } = show([
+      { drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 },
+      { drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 },
+    ]);
+    const first = (await screen.findAllByRole('region'))[0]!;
+    await user.click(within(first).getByRole('button', { name: 'Refuser' }));
+    await waitFor(() => expect(messages()).toContain('Refusé'));
+    expect(toasts()[0]!.undo).toBeTypeOf('function');
+    await user.click(screen.getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => expect(restore(send, 1)).toBe(true));
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Client Exemple')).toBeInTheDocument();
+  });
+
+  it('Ctrl Z does the same', async () => {
+    const user = userEvent.setup();
+    render(Toaster);
+    const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }]);
+    const first = (await screen.findAllByRole('region'))[0]!;
+    await user.click(within(first).getByRole('button', { name: 'Refuser' }));
+    await waitFor(() => expect(messages()).toContain('Refusé'));
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => expect(restore(send, 1)).toBe(true));
+  });
+
+  it('a 409 of the undo becomes the error toast, with the server message', async () => {
+    const user = userEvent.setup();
+    render(Toaster);
+    const late = 'Trop tard pour annuler : le refus est fait.';
+    show([{ drafts: [fiche(1, 'Client Exemple')], held: 0 }], {
+      sendWith: async (_method, path) => {
+        if (path.endsWith('/restore')) throw new ApiError(409, late);
+        return {};
+      },
+    });
+    const card = (await screen.findAllByRole('region'))[0]!;
+    await user.click(within(card).getByRole('button', { name: 'Refuser' }));
+    await waitFor(() => expect(messages()).toContain('Refusé'));
+    await user.click(screen.getByRole('button', { name: 'Annuler' }));
+    await waitFor(() => expect(messages()).toContain(late));
+    expect(toasts()[0]!.tone).toBe('danger');
+  });
+
+  it('« Appliqué » stays without Annuler', async () => {
+    const user = userEvent.setup();
+    show([{ drafts: [fiche(1, 'Client Exemple')], held: 0 }]);
+    await user.click(await screen.findByRole('button', { name: 'Valider' }));
+    await waitFor(() => expect(messages()).toContain('Appliqué'));
+    expect(toasts()[0]!.undo).toBeUndefined();
+  });
+});
+
+describe('Valider, a draft named in the address', () => {
+  afterEach(() => history.replaceState(null, '', '/'));
+
+  it('?brouillon=3 puts the focus on that draft, R refuses it, the address is cleaned', async () => {
+    history.replaceState(null, '', '/valider?brouillon=3');
+    const user = userEvent.setup();
+    const { send } = show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }], { brouillon: '3' });
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName('Société A et Société A SARL'));
+    expect(window.location.pathname + window.location.search).toBe('/valider');
+    await user.keyboard('r');
+    expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/3/refuse', {});
+  });
+
+  it('a draft that is not in the queue gives a toast and no focus', async () => {
+    history.replaceState(null, '', '/valider?brouillon=99');
+    const user = userEvent.setup();
+    const { send } = show([{ drafts: [fiche(1, 'Client Exemple')], held: 0 }], { brouillon: '99' });
+    await screen.findAllByRole('region');
+    await waitFor(() => expect(messages().join('|')).toMatch(/Ce brouillon n.attend plus de décision\./));
+    expect(document.body).toHaveFocus();
+    await user.keyboard('r');
+    expect(send).not.toHaveBeenCalled();
   });
 });
 

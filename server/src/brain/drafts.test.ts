@@ -4,7 +4,18 @@ import { openDb, putSetting } from '../db.ts';
 import { InvalidInputError } from '../contract/actions.ts';
 import { makeHarness } from '../testing/harness.ts';
 import { addFact, createFiche, editFiche, getFiche, link, listTypes, searchFiches } from './store.ts';
-import { addDraft, applyDraft, cardOf, ConflictError, getDraft, queue, refuseDraft } from './drafts.ts';
+import {
+  addDraft,
+  applyDraft,
+  cardOf,
+  ConflictError,
+  getDraft,
+  NotFoundError,
+  queue,
+  refuseDraft,
+  restoreDraft,
+} from './drafts.ts';
+import { digestAction } from './digest.ts';
 
 const src = { kind: 'note', at: '2026-10-28T10:00:00Z' } as const;
 const origin = { source: 'core' } as const;
@@ -296,11 +307,12 @@ describe('card links', () => {
     expect(cardOf(db, getDraft(db, draft({ ficheId: f }))!).link).toBe(`/memoire?fiche=${f}`);
   });
 
-  it('a new fiche card has no link', () => {
-    expect(cardOf(db, getDraft(db, draft())!)).not.toHaveProperty('link');
+  it('a new fiche card links to its draft in the validation screen', () => {
+    const id = draft();
+    expect(cardOf(db, getDraft(db, id)!).link).toBe(`/valider?brouillon=${id}`);
   });
 
-  it('contradiction and doublon cards link to the fiche they keep, an import to none', () => {
+  it('contradiction and doublon cards link to the fiche they keep, an import to its draft', () => {
     const f = fiche('Fay');
     const g = fiche('Fayy');
     const a = addFact(db, f, 'vieux', src, 't0');
@@ -309,7 +321,64 @@ describe('card links', () => {
       `/memoire?fiche=${f}`,
     );
     expect(cardFor({ kind: 'doublon', keep: f, merge: g, reason: 'r' }).link).toBe(`/memoire?fiche=${f}`);
-    expect(cardFor({ kind: 'import', fiches: [], warnings: [] })).not.toHaveProperty('link');
+    const imp = addDraft(db, { kind: 'import', fiches: [], warnings: [] }, origin, 't1');
+    expect(cardOf(db, getDraft(db, imp)!).link).toBe(`/valider?brouillon=${imp}`);
+  });
+});
+
+describe('restoreDraft', () => {
+  const T0 = '2026-11-24T10:00:00.000Z';
+  const at = (ms: number) => new Date(Date.parse(T0) + ms).toISOString();
+
+  it('puts a fresh refusal back to pending, without decidedAt, at its place in the queue', () => {
+    const a = draft({ title: 'A' });
+    const b = draft({ title: 'B' });
+    const c = draft({ title: 'C' });
+    refuseDraft(db, b, T0);
+    expect(queue(db, 10).map((d) => d.id)).toEqual([a, c]);
+    const back = restoreDraft(db, b, at(10_000));
+    expect(back.status).toBe('pending');
+    expect(back.decidedAt).toBeUndefined();
+    expect(queue(db, 10).map((d) => d.id)).toEqual([a, b, c]);
+  });
+
+  it('is too late at 30 s: ConflictError, the draft stays refused', () => {
+    const id = draft();
+    refuseDraft(db, id, T0);
+    expect(() => restoreDraft(db, id, at(30_000))).toThrow(ConflictError);
+    expect(getDraft(db, id)!.status).toBe('refused');
+    expect(() => restoreDraft(db, id, at(120_000))).toThrow(ConflictError);
+  });
+
+  it('is still possible just before 30 s', () => {
+    const id = draft();
+    refuseDraft(db, id, T0);
+    expect(restoreDraft(db, id, at(29_999)).status).toBe('pending');
+  });
+
+  it('refuses a draft that is pending or done, and an unknown one', () => {
+    const p = draft();
+    expect(() => restoreDraft(db, p, T0)).toThrow(ConflictError);
+    const d = draft();
+    applyDraft(db, d, undefined, T0);
+    expect(() => restoreDraft(db, d, at(1000))).toThrow(ConflictError);
+    expect(getDraft(db, d)!.status).toBe('done');
+    expect(() => restoreDraft(db, 999, T0)).toThrow(NotFoundError);
+  });
+
+  it('refuses a draft being applied', () => {
+    const id = draft();
+    db.prepare("UPDATE drafts SET status = 'applying' WHERE id = ?").run(id);
+    expect(() => restoreDraft(db, id, T0)).toThrow(ConflictError);
+  });
+
+  it('the day digest no longer cites a refusal that was undone', () => {
+    const id = draft();
+    refuseDraft(db, id, T0);
+    const range = { since: '2026-11-24T00:00:00Z', until: '2026-11-25T00:00:00Z' };
+    expect(digestAction(range, db).done.map((x) => x.type)).toEqual(['draft.refused']);
+    restoreDraft(db, id, at(5000));
+    expect(digestAction(range, db).done).toEqual([]);
   });
 });
 
