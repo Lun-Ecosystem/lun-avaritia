@@ -31,9 +31,13 @@
   let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactive, ids }: Props = $props();
 
   // The card itself takes the focus (not « Valider »: one Enter too many validates nothing), named by its
-  // title (aria-labelledby of the kit's card). The kit's card takes no tabindex: it is set here.
+  // title (aria-labelledby of the kit's card), and says V and R while active. The kit's card takes no
+  // attributes: they are set here, again when `active` changes.
   const focusable = (node: HTMLElement) => {
-    (node.firstElementChild as HTMLElement).tabIndex = -1;
+    const card = node.firstElementChild as HTMLElement;
+    card.tabIndex = -1;
+    if (active) card.setAttribute('aria-keyshortcuts', 'V R');
+    else card.removeAttribute('aria-keyshortcuts');
   };
 
   function openTitle(title: string) {
@@ -129,7 +133,6 @@
             size="petit"
             icon={icons.Check}
             loading={busy}
-            aria-keyshortcuts={active ? 'V' : undefined}
             onclick={() => onaccept()}>Valider</Button
           >
           {#if other}
@@ -145,13 +148,7 @@
               onclick={() => onedit(true)}>Modifier</Button
             >
           {/if}
-          <Button
-            variant="fantome"
-            size="petit"
-            disabled={busy}
-            aria-keyshortcuts={active ? 'R' : undefined}
-            onclick={onrefuse}>Refuser</Button
-          >
+          <Button variant="fantome" size="petit" disabled={busy} onclick={onrefuse}>Refuser</Button>
           {#if active}<span class="touches" aria-hidden="true"><Kbd>V</Kbd><Kbd>R</Kbd></span>{/if}
         </div>
       {/if}

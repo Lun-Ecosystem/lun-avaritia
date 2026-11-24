@@ -191,20 +191,9 @@ describe('Valider', () => {
     expect(cards.map(kbdIn)).toEqual([0, 0]);
     // The focus enters the second card: it is the active one, and the only one to say so.
     await clickInside(user, cards[1]!);
-    expect(within(cards[1]!).getByRole('button', { name: 'Valider' })).toHaveAttribute(
-      'aria-keyshortcuts',
-      'V',
-    );
-    expect(within(cards[1]!).getByRole('button', { name: 'Refuser' })).toHaveAttribute(
-      'aria-keyshortcuts',
-      'R',
-    );
-    expect(within(cards[0]!).getByRole('button', { name: 'Valider' })).not.toHaveAttribute(
-      'aria-keyshortcuts',
-    );
-    expect(within(cards[0]!).getByRole('button', { name: 'Refuser' })).not.toHaveAttribute(
-      'aria-keyshortcuts',
-    );
+    expect(cards[1]).toHaveFocus();
+    expect(cards[1]).toHaveAttribute('aria-keyshortcuts', 'V R');
+    expect(document.querySelectorAll('[aria-keyshortcuts]')).toHaveLength(1);
     expect(cards.map(kbdIn)).toEqual([0, 2]);
     await user.keyboard('r');
     expect(send).toHaveBeenCalledTimes(1);
@@ -395,6 +384,25 @@ describe('Valider, undoing a refusal', () => {
     await waitFor(() => expect(restore(send, 1)).toBe(true));
   });
 
+  it('the last card refused then restored comes back without the focus, R does nothing', async () => {
+    const user = userEvent.setup();
+    render(Toaster);
+    const { send } = show([
+      { drafts: [fiche(1, 'Client Exemple')], held: 0 },
+      { drafts: [fiche(1, 'Client Exemple')], held: 0 },
+    ]);
+    await user.click(await screen.findByRole('heading', { name: 'Client Exemple' }));
+    await user.keyboard('r');
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'À valider' })).toHaveFocus());
+    await user.keyboard('{Control>}z{/Control}');
+    const card = (await screen.findAllByRole('region'))[0]!;
+    expect(card).not.toHaveFocus();
+    expect(document.querySelectorAll('[aria-keyshortcuts]')).toHaveLength(0);
+    expect(card.querySelectorAll('kbd')).toHaveLength(0);
+    await user.keyboard('r');
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it('a 409 of the undo becomes the error toast, with the server message', async () => {
     const user = userEvent.setup();
     render(Toaster);
@@ -433,6 +441,16 @@ describe('Valider, a draft named in the address', () => {
     expect(window.location.pathname + window.location.search).toBe('/valider');
     await user.keyboard('r');
     expect(send).toHaveBeenCalledWith('POST', '/lun/v1/cards/3/refuse', {});
+  });
+
+  it('?brouillon= leaves the address, ?filtre= stays', async () => {
+    history.replaceState(null, '', '/valider?filtre=doublons&brouillon=3');
+    show([{ drafts: [fiche(1, 'Client Exemple'), doublon], held: 0 }], {
+      filtre: 'doublons',
+      brouillon: '3',
+    });
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName('Société A et Société A SARL'));
+    expect(window.location.pathname + window.location.search).toBe('/valider?filtre=doublons');
   });
 
   it('a draft that is not in the queue gives a toast and no focus', async () => {

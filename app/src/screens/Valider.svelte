@@ -45,7 +45,9 @@
   // A draft named in the address (a card of the core links here): in focus once the queue is read.
   void load().then(async () => {
     if (!brouillon || !queue) return;
-    history.replaceState(null, '', window.location.pathname);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('brouillon');
+    history.replaceState(null, '', url);
     await tick();
     const frame = frameOf(Number(brouillon));
     if (!frame) return toast('Ce brouillon n’attend plus de décision.');
@@ -83,6 +85,8 @@
       const next = shown[i + 1] ?? shown[i - 1];
       queue = queue?.filter((x) => x.id !== d.id) ?? null;
       if (editing === d.id) editing = null;
+      // A focused card leaving the DOM sends no focusout: restored later, it must not come back chosen.
+      if (chosen === d.id) chosen = null;
       // A fresh refusal can be put back in the queue by the server; a validation stays.
       if (verb === 'accept') toast('Appliqué');
       else toast('Refusé', { undo: () => api.send('POST', `/api/drafts/${d.id}/restore`).then(load) });
