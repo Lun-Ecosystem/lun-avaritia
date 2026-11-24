@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, tick } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { ApiError, type Api } from '../api.ts';
   import { Banner, bindShortcuts, Chip, EmptyState, icons, Skeleton, toast } from '../lib/ui/index.ts';
@@ -9,11 +9,11 @@
 
   /*
    * The drafts to validate, one card each, in the order served (contradictions first). Nothing enters
-   * the memory but by « Valider » here; V and R act on the active card.
+   * the memory but by « Valider » here; V and R act on the card that holds the focus, none at load.
    */
 
-  type Props = { filtre?: string | null | undefined };
-  let { filtre = null }: Props = $props();
+  type Props = { filtre?: string | null | undefined; brouillon?: string | null | undefined };
+  let { filtre = null, brouillon = null }: Props = $props();
 
   const api = getContext<Api>('api');
   let queue = $state<DraftView[] | null>(null);
@@ -23,18 +23,37 @@
   const errors = new SvelteMap<number, string>();
   let chosen = $state<number | null>(null);
   let editing = $state<number | null>(null);
+  let heading = $state<HTMLElement | null>(null);
 
   function load() {
-    api
+    return api
       .get<{ drafts: DraftView[]; held: number }>('/api/drafts')
       .then((q) => {
         queue = q.drafts;
         held = q.held;
         failure = null;
       })
-      .catch((e: Error) => (failure = e.message));
+      .catch((e: Error) => {
+        failure = e.message;
+      });
   }
-  load();
+
+  /** The focusable frame of a draft's card (DraftItem). */
+  const frameOf = (id: number) =>
+    document.querySelector<HTMLElement>(`[data-brouillon="${id}"] > [tabindex]`);
+
+  // A draft named in the address (a card of the core links here): in focus once the queue is read.
+  void load().then(async () => {
+    if (!brouillon || !queue) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('brouillon');
+    history.replaceState(null, '', url);
+    await tick();
+    const frame = frameOf(Number(brouillon));
+    if (!frame) return toast('Ce brouillon n’attend plus de décision.');
+    frame.focus({ preventScroll: true });
+    frame.scrollIntoView({ block: 'nearest' });
+  });
 
   // The titles of the memory, read once when a fiche draft first links to another ([[Fiche]]).
   let ids = $state(new Map<string, number>());
@@ -47,7 +66,7 @@
   });
 
   const shown = $derived((queue ?? []).filter((d) => matches(d, filtre)));
-  const active = $derived(shown.find((d) => d.id === chosen) ?? shown[0]);
+  const active = $derived(shown.find((d) => d.id === chosen));
   const scope = $derived(FILTRES.find((f) => f.value === filtre));
   // A filter with nothing in it is not offered, unless it is the one on.
   const offerts = $derived(
@@ -62,9 +81,18 @@
     errors.delete(d.id);
     try {
       await api.send('POST', `/lun/v1/cards/${d.id}/${verb}`, input ? { input } : {});
+      const i = shown.findIndex((x) => x.id === d.id);
+      const next = shown[i + 1] ?? shown[i - 1];
       queue = queue?.filter((x) => x.id !== d.id) ?? null;
       if (editing === d.id) editing = null;
-      toast(verb === 'accept' ? 'Appliqué' : 'Refusé');
+      // A focused card leaving the DOM sends no focusout: restored later, it must not come back chosen.
+      if (chosen === d.id) chosen = null;
+      // A fresh refusal can be put back in the queue by the server; a validation stays.
+      if (verb === 'accept') toast('Appliqué');
+      else toast('Refusé', { undo: () => api.send('POST', `/api/drafts/${d.id}/restore`).then(load) });
+      // The next card takes the focus, so V and R go on; an emptied queue gives it to the title.
+      await tick();
+      (next ? frameOf(next.id) : heading)?.focus();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         toast('Déjà tranché ailleurs');
@@ -90,7 +118,7 @@
 
 <div class="ecran" aria-busy={!queue && !failure}>
   <header class="entete">
-    <h1>À valider</h1>
+    <h1 tabindex="-1" bind:this={heading}>À valider</h1>
     {#if queue}
       <span class="muted">
         {shown.length} brouillon{shown.length > 1 ? 's' : ''}
@@ -125,7 +153,7 @@
         onaccept={(input) => decide(d, 'accept', input)}
         onrefuse={() => decide(d, 'refuse')}
         onedit={(on) => (editing = on ? d.id : null)}
-        onactivate={() => (chosen = d.id)}
+        onactive={(on) => (chosen = on ? d.id : null)}
         {ids}
       />
     {:else}
@@ -160,6 +188,10 @@
     margin: 0;
     font: 400 26px/1.2 var(--serif);
     font-variant-numeric: lining-nums;
+  }
+  /* Focused when the queue empties, not by the user: no ring around a title. */
+  h1:focus {
+    outline: none;
   }
   .muted {
     color: var(--texte-2);

@@ -94,7 +94,7 @@ export interface Card {
   status: 'pending' | 'done' | 'refused' | 'failed' | 'expired';
   at: string;
   error?: string;
-  /** Path in this satellite's own front (contract v1.3), only when the card targets an existing fiche. */
+  /** Path in this satellite's own front (contract v1.3): the targeted fiche, or the draft itself in À valider. */
   link?: string;
   /** Contract v1.4: what the card is, why it asks, and the answers it proposes (questions only). */
   kind?: string;
@@ -327,6 +327,24 @@ export function refuseDraft(db: DatabaseSync, draftId: number, now: string): Dra
   return getDraft(db, draftId)!;
 }
 
+/** Wider than the 5 s undo toast, for the way back over the network. */
+export const UNDO_MS = 30_000;
+
+/** Puts a refusal younger than UNDO_MS back in the queue, at its place. */
+export function restoreDraft(db: DatabaseSync, draftId: number, now: string): Draft {
+  const since = new Date(Date.parse(now) - UNDO_MS).toISOString();
+  const r = db
+    .prepare(
+      "UPDATE drafts SET status = 'pending', decided_at = NULL WHERE id = ? AND status = 'refused' AND decided_at > ?",
+    )
+    .run(draftId, since);
+  if (!r.changes)
+    throw getDraft(db, draftId)
+      ? new ConflictError('Trop tard pour annuler : le refus est fait.')
+      : new NotFoundError();
+  return getDraft(db, draftId)!;
+}
+
 const CARD_STATUS: Record<DraftStatus, Card['status']> = {
   pending: 'pending',
   applying: 'pending',
@@ -415,7 +433,7 @@ export function cardOf(db: DatabaseSync, d: Draft): Card {
     status: CARD_STATUS[d.status],
     at: d.createdAt,
     ...(d.error && { error: d.error }),
-    ...(target !== undefined && { link: `/memoire?fiche=${target}` }),
+    link: target !== undefined ? `/memoire?fiche=${target}` : `/valider?brouillon=${d.id}`,
     kind:
       p.kind === 'fiche'
         ? p.ficheId === undefined

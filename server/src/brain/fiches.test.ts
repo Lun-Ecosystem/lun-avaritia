@@ -6,7 +6,8 @@ import { makeHarness } from '../testing/harness.ts';
 import { readZip } from '../testing/read-zip.ts';
 import { setPaused } from '../contract/state.ts';
 import { runPending } from './ingest.ts';
-import { addDraft } from './drafts.ts';
+import { addDraft, getDraft, refuseDraft } from './drafts.ts';
+import { createClient } from '../contract/auth.ts';
 import { addFact, createFiche, getFiche, link, listTypes, versions } from './store.ts';
 
 function setup(extra: Parameters<typeof makeHarness>[0] = {}) {
@@ -259,6 +260,49 @@ describe('reads for the app: drafts, graph, neighbors', () => {
     const capped = (await (await t.req('/api/drafts')).json()) as R;
     expect(capped.drafts).toHaveLength(1);
     expect(capped.held).toBe(2);
+  });
+
+  it('POST /api/drafts/:id/restore: 200 and the draft, 404, 409 in plain words, devices only', async () => {
+    const t = fill();
+    const fiche = {
+      kind: 'fiche' as const,
+      typeId: t.typeId,
+      title: 'Nouvelle',
+      synthesis: '',
+      facts: [],
+      links: [],
+    };
+    const id = addDraft(t.h.db, fiche, { source: 'note' }, t.now);
+    const restore = (n: number) => t.req(`/api/drafts/${n}/restore`, 'POST');
+    // pending: nothing to undo
+    const pending = await restore(id);
+    expect(pending.status).toBe(409);
+    expect(((await pending.json()) as { error: string }).error).toMatch(/Trop tard/);
+    refuseDraft(t.h.db, id, t.h.clock().toISOString());
+    const ok = await restore(id);
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { draft: { id: number; card: { status: string } } }).draft).toMatchObject({
+      id,
+      card: { status: 'pending' },
+    });
+    expect(getDraft(t.h.db, id)!.status).toBe('pending');
+    // too old
+    refuseDraft(t.h.db, id, t.h.clock().toISOString());
+    t.h.advance(31_000);
+    const late = await restore(id);
+    expect(late.status).toBe(409);
+    expect(((await late.json()) as { error: string }).error).toBe(
+      'Trop tard pour annuler : le refus est fait.',
+    );
+    expect((await restore(999)).status).toBe(404);
+    // the core's token (an app, not a device) is refused like on any /api route
+    const app = createClient(t.h.db, 'core', 'app', t.h.clock());
+    const asApp = await t.h.app.request(`/api/drafts/${id}/restore`, {
+      method: 'POST',
+      headers: t.h.auth(app),
+    });
+    expect(asApp.status).toBe(403);
+    expect((await t.h.app.request(`/api/drafts/${id}/restore`, { method: 'POST' })).status).toBe(401);
   });
 
   it('GET /api/graph: nodes, degree, edges, merged excluded, flagged by a pending contradiction', async () => {

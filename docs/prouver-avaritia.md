@@ -36,8 +36,13 @@ appareil). Sous 768 px, le rail laisse place à la barre du bas.
 2. **Tableau de bord** : l’en-tête de la dernière nuit, les cartes de compte (brouillons, contradictions, doublons),
    l’activité récente. Chaque carte mène à « À valider », filtrée au besoin.
 3. **À valider** : les quatre sortes de brouillons (fiche nouvelle, fiche enrichie, contradiction, doublon), la
-   contradiction d’abord. `V` valide et `R` refuse la carte active ; « Modifier » ouvre l’édition d’une fiche avant
-   de la valider ; « Garder l’autre » inverse un choix. Un `[[Titre]]` connu de la synthèse ouvre la fiche.
+   contradiction d’abord. `V` valide et `R` refuse la seule carte au focus : aucune au chargement, un clic dans une
+   carte la choisit, et après une décision le focus passe à la suivante (au titre quand la file est vide). Après un
+   refus, « Annuler » ou `Ctrl Z` le défait pendant 5 s : la carte revient, sans le focus. « Modifier » ouvre
+   l’édition d’une fiche avant de la valider ; « Garder l’autre » inverse un choix. Un `[[Titre]]` connu de la
+   synthèse ouvre la fiche. `/valider?brouillon=<id>` (le lien d’une nouvelle fiche dans le core ; « Salon du
+   design » dans la démo) ouvre la file avec ce brouillon au focus, puis `brouillon` quitte l’adresse ; un brouillon
+   déjà tranché donne « Ce brouillon n’attend plus de décision. ».
 4. **Mémoire, arborescence** : les fiches par type, la recherche, la fiche ouverte à droite (`?fiche=<id>` dans
    l’adresse) avec sa synthèse, ses faits sourcés, ses liens et son historique ; l’édition crée une version.
 5. **Mémoire, graphe** : le mode graphe charge la base de démo (plus de 3000 fiches) ; un nœud ouvre son panneau,

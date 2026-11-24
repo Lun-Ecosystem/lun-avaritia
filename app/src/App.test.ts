@@ -201,6 +201,45 @@ describe('App', () => {
     await waitFor(() => expect(link()).not.toHaveTextContent(/\d/));
   });
 
+  it('/valider?brouillon=3 opens the queue with that draft in focus, R refuses it', async () => {
+    const json = (body: unknown) => new Response(JSON.stringify(body));
+    const mk = (id: number, title: string) => ({
+      id,
+      kind: 'fiche',
+      card: { title: `Carte ${id}` },
+      payload: { kind: 'fiche', typeId: 1, title, synthesis: '', facts: [], links: [] },
+      names: {},
+      facts: {},
+      createdAt: '2026-10-27T22:00:00Z',
+      origin: { source: 'core' },
+    });
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`;
+      if (key === 'GET /api/drafts')
+        return json({ drafts: [mk(1, 'Client Un'), mk(3, 'Client Trois')], held: 0 });
+      if (key === 'GET /api/dashboard')
+        return json({ pending: { drafts: 2 }, fiches: 5, monthSpend: 0, monthlyCap: 1 });
+      if (key === 'GET /lun/v1/health') return json({ status: 'ok' });
+      if (key === 'POST /lun/v1/cards/3/refuse') return json({ status: 'refused' });
+      return new Response('{"error":"Introuvable"}', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    localStorage.setItem(TOKEN_KEY, 'tok-1');
+    history.replaceState(null, '', '/valider?brouillon=3');
+    const user = userEvent.setup();
+    render(App);
+    await waitFor(() => expect(document.activeElement).toHaveAccessibleName('Client Trois'));
+    expect(window.location.pathname + window.location.search).toBe('/valider');
+    await user.keyboard('r');
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([u, i]) => String(u).endsWith('/lun/v1/cards/3/refuse') && i?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
+
   it('a degraded service is not shown as active in the rail', async () => {
     const json = (body: unknown) => new Response(JSON.stringify(body));
     vi.stubGlobal(

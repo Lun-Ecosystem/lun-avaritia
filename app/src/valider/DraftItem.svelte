@@ -22,12 +22,23 @@
     onaccept: (input?: DraftPayload) => void;
     onrefuse: () => void;
     onedit: (on: boolean) => void;
-    onactivate: () => void;
+    /** The focus enters the card (true) or leaves it (false). */
+    onactive: (on: boolean) => void;
     /** Id by title of the memory, read once by the queue: a known [[Fiche]] opens that fiche. */
     ids: Map<string, number>;
   };
 
-  let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactivate, ids }: Props = $props();
+  let { draft, active, editing, busy, error, onaccept, onrefuse, onedit, onactive, ids }: Props = $props();
+
+  // The card itself takes the focus (not « Valider »: one Enter too many validates nothing), named by its
+  // title (aria-labelledby of the kit's card), and says V and R while active. The kit's card takes no
+  // attributes: they are set here, again when `active` changes.
+  const focusable = (node: HTMLElement) => {
+    const card = node.firstElementChild as HTMLElement;
+    card.tabIndex = -1;
+    if (active) card.setAttribute('aria-keyshortcuts', 'V R');
+    else card.removeAttribute('aria-keyshortcuts');
+  };
 
   function openTitle(title: string) {
     const id = ids.get(titleKey(title));
@@ -50,7 +61,15 @@
   const other = $derived(swapped(p));
 </script>
 
-<div class={['item', { active }]} onfocusin={onactivate}>
+<div
+  class={['item', { active }]}
+  data-brouillon={draft.id}
+  {@attach focusable}
+  onfocusin={() => onactive(true)}
+  onfocusout={(e) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onactive(false);
+  }}
+>
   <SettingsCard {title}>
     {#snippet aside()}<Badge tone={kind.tone}>{kind.label}</Badge>{/snippet}
     <div class="corps">
@@ -114,7 +133,6 @@
             size="petit"
             icon={icons.Check}
             loading={busy}
-            aria-keyshortcuts={active ? 'V' : undefined}
             onclick={() => onaccept()}>Valider</Button
           >
           {#if other}
@@ -130,13 +148,7 @@
               onclick={() => onedit(true)}>Modifier</Button
             >
           {/if}
-          <Button
-            variant="fantome"
-            size="petit"
-            disabled={busy}
-            aria-keyshortcuts={active ? 'R' : undefined}
-            onclick={onrefuse}>Refuser</Button
-          >
+          <Button variant="fantome" size="petit" disabled={busy} onclick={onrefuse}>Refuser</Button>
           {#if active}<span class="touches" aria-hidden="true"><Kbd>V</Kbd><Kbd>R</Kbd></span>{/if}
         </div>
       {/if}
@@ -151,6 +163,11 @@
   }
   .item.active {
     box-shadow: 0 0 0 1px var(--accent-bord);
+  }
+  /* The kit's focus frame, on the card that holds the focus. */
+  .item > :global(section:focus-visible) {
+    outline: 2px solid var(--accent-bord);
+    outline-offset: 1px;
   }
   .corps {
     display: grid;
