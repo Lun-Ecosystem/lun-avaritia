@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
  * Ordered schema migrations. Adding one means appending to the list, never editing a past entry:
  * `schema_version` records how many have run.
  */
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
    CREATE TABLE clients (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +142,9 @@ const MIGRATIONS: string[] = [
   // becomes a multi-index OR over the primary key and `links_to`.
   `CREATE INDEX IF NOT EXISTS facts_fiche ON facts(fiche_id);
    CREATE INDEX IF NOT EXISTS links_to ON links(to_id);`,
+  // What a lot sets aside: why an observation was left out (NULL while kept), the questions dropped (JSON).
+  `ALTER TABLE observations ADD COLUMN dropped_reason TEXT;
+   ALTER TABLE lots ADD COLUMN dropped_questions TEXT NOT NULL DEFAULT '[]';`,
 ];
 
 export function openDb(path: string): DatabaseSync {
