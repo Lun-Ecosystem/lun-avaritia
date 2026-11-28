@@ -5,7 +5,8 @@ import { recordCost } from '../contract/costs.ts';
 import { brainDeps } from '../app.ts';
 import { fakeProvider } from '../testing/fake-provider.ts';
 import { makeHarness } from '../testing/harness.ts';
-import { listTypes } from './store.ts';
+import { addFact, createFiche, listTypes } from './store.ts';
+import { ProviderError } from '../llm/types.ts';
 import { lastRun, runPending } from './ingest.ts';
 
 const obs = (text: string, ref = 'm1') => ({
@@ -211,5 +212,220 @@ describe('brain.ingest', () => {
       await new Promise((r) => setTimeout(r, 5));
     }
     throw new Error('lot never held');
+  });
+});
+
+describe('brain.lot and the trace of what a lot sets aside', () => {
+  type T = ReturnType<typeof prepare>;
+  const A = 'Le client X a signé le devis.';
+  const B = 'Le café était froid ce matin.';
+  const C = 'Le projet Y démarre lundi.';
+  const post = async (t: T, name: string, body: unknown) =>
+    t.h.app.request(`/lun/v1/actions/${name}`, {
+      method: 'POST',
+      headers: t.h.auth(await t.h.pairClient()),
+      body: JSON.stringify(body),
+    });
+  const lotOf = async (t: T, lot: number) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((await (await post(t, 'brain.lot', { lot })).json()) as any).result;
+  const send = async (t: T, ...texts: string[]) => {
+    await post(t, 'brain.ingest', {
+      version: 1,
+      observations: texts.map((x, i) => obs(x, `m${i}`)),
+    });
+    await t.settle();
+  };
+  const fact = (observation: number) => ({
+    text: `Fait ${observation}.`,
+    observation,
+    replaces: null,
+    due: null,
+  });
+  const prepare = (replies: unknown[]) => {
+    const t = setup(replies);
+    return Object.assign(t, { typeId: listTypes(t.h.db)[0]!.id });
+  };
+  const tri = (t: T, ...groups: { observations: number[]; title: string; ficheId?: number }[]) => ({
+    groups: groups.map((g) => ({ ficheId: null, typeId: t.typeId, ...g })),
+  });
+  /** A fiche with eight facts, so that contradictions between them can be asked. */
+  const withFacts = (t: T) => {
+    const x = createFiche(t.h.db, { typeId: t.typeId, title: 'Client X', synthesis: 'connu' }, 't0');
+    const ids = Array.from({ length: 8 }, (_, i) =>
+      addFact(t.h.db, x, `Fait ancien ${i}.`, { kind: 'note', at: '2026-11-01T18:00:00Z' }, 't0'),
+    );
+    const contradiction = (strike: number, reason: string) => ({
+      kind: 'contradiction',
+      ficheId: x,
+      keep: ids[0],
+      strike: ids[strike],
+      reason,
+    });
+    return { x, contradiction };
+  };
+  const passOver = (t: T) =>
+    runPending(
+      brainDeps({
+        db: t.h.db,
+        clock: t.h.clock,
+        version: 'x',
+        actions: t.h.actions,
+        brainProvider: (use) => ({
+          provider: t.fake.provider,
+          model: use === 'tri' ? 'claude-haiku-5-5' : 'claude-sonnet-5-5',
+        }),
+      }),
+    );
+
+  it('sets aside an observation the tri left out of every group as hors-sujet', async () => {
+    const t = prepare([]);
+    t.replies.push(tri(t, { observations: [0], title: 'Client X' }), {
+      fiches: [{ group: 0, synthesis: 's', facts: [fact(0)], links: [] }],
+      questions: [],
+    });
+    await send(t, A, B);
+    expect((await lotOf(t, 1)).dropped).toEqual([{ kind: 'observation', text: B, reason: 'hors-sujet' }]);
+  });
+
+  it('sets aside as sans-fait an observation no fact cites, and every observation of a group with no fiche', async () => {
+    const t = prepare([]);
+    t.replies.push(
+      tri(t, { observations: [0, 1], title: 'Client X' }, { observations: [2], title: 'Projet Y' }),
+      { fiches: [{ group: 0, synthesis: 's', facts: [fact(0)], links: [] }], questions: [] },
+    );
+    await send(t, A, B, C);
+    expect((await lotOf(t, 1)).dropped).toEqual([
+      { kind: 'observation', text: B, reason: 'sans-fait' },
+      { kind: 'observation', text: C, reason: 'sans-fait' },
+    ]);
+  });
+
+  it('does not set aside an observation a fact cites', async () => {
+    const t = prepare([]);
+    t.replies.push(tri(t, { observations: [0, 1], title: 'Client X' }), {
+      fiches: [{ group: 0, synthesis: 's', facts: [fact(0), fact(1)], links: [] }],
+      questions: [],
+    });
+    await send(t, A, B);
+    expect((await lotOf(t, 1)).dropped).toEqual([]);
+  });
+
+  it('sets aside a question already asked as deja-posee, with the model reason as its text', async () => {
+    const t = prepare([]);
+    const { x, contradiction } = withFacts(t);
+    const reply = (reason: string) => [
+      tri(t, { observations: [0], title: 'Client X', ficheId: x }),
+      {
+        fiches: [{ group: 0, synthesis: '', facts: [fact(0)], links: [] }],
+        questions: [contradiction(1, reason)],
+      },
+    ];
+    t.replies.push(...reply('Premier avis.'), ...reply('Même paire, redite.'));
+    await send(t, A);
+    await send(t, A);
+    expect((await lotOf(t, 1)).dropped).toEqual([]);
+    const second = await lotOf(t, 2);
+    expect(second.questions).toEqual([]);
+    expect(second.dropped).toEqual([{ kind: 'question', text: 'Même paire, redite.', reason: 'deja-posee' }]);
+  });
+
+  it('sets aside the sixth new question as au-dela', async () => {
+    const t = prepare([]);
+    const { x, contradiction } = withFacts(t);
+    t.replies.push(tri(t, { observations: [0], title: 'Client X', ficheId: x }), {
+      fiches: [{ group: 0, synthesis: '', facts: [fact(0)], links: [] }],
+      questions: [1, 2, 3, 4, 5, 6].map((i) => contradiction(i, `Raison ${i}.`)),
+    });
+    await send(t, A);
+    const lot = await lotOf(t, 1);
+    expect(lot.questions).toHaveLength(5);
+    expect(lot.dropped).toEqual([{ kind: 'question', text: 'Raison 6.', reason: 'au-dela' }]);
+  });
+
+  it('serves the bilan of a done lot', async () => {
+    const t = prepare([]);
+    const { x, contradiction } = withFacts(t);
+    t.replies.push(tri(t, { observations: [0], title: 'Client X', ficheId: x }), {
+      fiches: [{ group: 0, synthesis: '', facts: [fact(0)], links: [] }],
+      questions: [contradiction(1, 'Les deux faits se contredisent.')],
+    });
+    await send(t, A, B);
+    expect(await lotOf(t, 1)).toEqual({
+      lot: 1,
+      status: 'done',
+      receivedAt: '2026-11-02T08:00:00.000Z',
+      observations: 2,
+      fiches: [{ title: 'Client X', status: 'pending' }],
+      questions: [{ kind: 'contradiction', status: 'pending' }],
+      dropped: [{ kind: 'observation', text: B, reason: 'hors-sujet' }],
+    });
+  });
+
+  it('serves a held lot with its motif and nothing set aside', async () => {
+    const t = prepare([]);
+    recordCost(t.h.db, { provider: 'anthropic', amount: 9, calls: 1 }, t.h.clock(), 'tri');
+    await send(t, A);
+    const lot = await lotOf(t, 1);
+    expect(lot).toMatchObject({ lot: 1, status: 'held', reason: 'cost-cap', observations: 1 });
+    expect(lot).toMatchObject({ fiches: [], questions: [], dropped: [] });
+  });
+
+  it('serves a failed lot with its motif and nothing set aside', async () => {
+    const t = prepare([{ nope: 1 }, { nope: 2 }]);
+    await send(t, A, B);
+    const lot = await lotOf(t, 1);
+    expect(lot.status).toBe('failed');
+    expect(lot.reason).toContain('Réponse invalide');
+    expect(lot).toMatchObject({ fiches: [], questions: [], dropped: [] });
+  });
+
+  it('serves a queued lot, with no motif', async () => {
+    const t = prepare([]);
+    setPaused(t.h.db, true, 'core');
+    await post(t, 'brain.ingest', { version: 1, observations: [obs(A)] });
+    await new Promise((r) => setTimeout(r, 20));
+    const lot = await lotOf(t, 1);
+    expect(lot).toMatchObject({ status: 'queued', observations: 1, fiches: [], questions: [], dropped: [] });
+    expect(lot).not.toHaveProperty('reason');
+  });
+
+  it('answers 400 for an unknown lot', async () => {
+    const t = prepare([]);
+    const res = await post(t, 'brain.lot', { lot: 99 });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(await res.json())).toContain('Lot inconnu');
+  });
+
+  it('writes the trace once when a lot is replayed after a stop', async () => {
+    const t = prepare([]);
+    const reply = () => [
+      tri(t, { observations: [0], title: 'Client X' }),
+      { fiches: [{ group: 0, synthesis: 's', facts: [fact(0)], links: [] }], questions: [] },
+    ];
+    t.replies.push(...reply(), ...reply());
+    await send(t, A, B);
+    expect((await lotOf(t, 1)).dropped).toHaveLength(1);
+    t.h.db.prepare("UPDATE lots SET status = 'running' WHERE id = 1").run();
+    await passOver(t);
+    const lot = await lotOf(t, 1);
+    expect(lot.status).toBe('done');
+    expect(lot.dropped).toEqual([{ kind: 'observation', text: B, reason: 'hors-sujet' }]);
+  });
+
+  it('keeps nothing set aside when a lot is held after its tri, then fails at the second try', async () => {
+    const t = prepare([]);
+    // First pass: the tri leaves B out, then the provider goes down: the lot is held, nothing written.
+    t.replies.push(
+      tri(t, { observations: [0], title: 'Client X' }),
+      new ProviderError('unavailable', 'down'),
+    );
+    await send(t, A, B);
+    expect(await lotOf(t, 1)).toMatchObject({ status: 'held', dropped: [] });
+    // Second pass, a day on: the answers stay invalid.
+    t.h.advance(26 * 3_600_000);
+    t.replies.push({ nope: 1 }, { nope: 2 });
+    await passOver(t);
+    expect(await lotOf(t, 1)).toMatchObject({ status: 'failed', dropped: [] });
   });
 });
