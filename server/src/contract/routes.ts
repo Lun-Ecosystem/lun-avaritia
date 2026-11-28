@@ -9,6 +9,7 @@ import {
   cardOf,
   ConflictError,
   draftsByStatus,
+  getDraft,
   NotFoundError,
   queue,
   refuseDraft,
@@ -33,7 +34,8 @@ const tooBig = bodyLimit({
 const STATUSES = ['pending', 'done', 'refused', 'failed', 'expired'];
 const PauseBody = z.object({ reason: z.string().max(500).optional(), by: z.literal('core').optional() });
 const ResumeBody = z.object({ by: z.literal('core').optional() });
-const Accept = z.object({ input: z.unknown().optional() });
+// Strict: a `values` is a 400, no card here has `fields`.
+const Accept = z.strictObject({ input: z.unknown().optional() });
 
 async function readJson(req: Request): Promise<unknown> {
   const text = await req.text();
@@ -181,6 +183,11 @@ export function contractRoutes(deps: AppDeps): Hono {
           ? []
           : draftsByStatus(db, status as DraftStatus);
     return c.json({ cards: drafts.map((x) => cardOf(db, x)) });
+  });
+
+  r.get('/cards/:id', (c) => {
+    const d = getDraft(db, Number(c.req.param('id')));
+    return d ? c.json({ card: cardOf(db, d) }) : c.json({ error: 'Carte inconnue' }, 404);
   });
 
   const decide = async (c: Context, run: (id: number, input: unknown) => ReturnType<typeof applyDraft>) => {

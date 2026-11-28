@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { InvalidInputError } from '../contract/actions.ts';
+import { emitEvent } from '../contract/events.ts';
 import type { Source } from '../types.ts';
 import { parisDay } from '../util.ts';
 import { ImportedNoteSchema } from './obsidian.ts';
@@ -277,6 +278,20 @@ function applyDoublon(db: DatabaseSync, p: Extract<DraftPayload, { kind: 'doublo
   reindex(db, p.keep);
 }
 
+/** The one signal for a card that left (or came back to) the queue: the id only, never the decision. */
+function signal(db: DatabaseSync, draftId: number, now: string): void {
+  emitEvent(
+    db,
+    {
+      type: 'card.changed',
+      importance: 'log',
+      title: 'Une carte a changé d’état',
+      data: { id: String(draftId) },
+    },
+    new Date(now),
+  );
+}
+
 /** Validates, then writes in one transaction; the claim on `pending` makes a second caller fail. */
 export function applyDraft(
   db: DatabaseSync,
@@ -316,6 +331,7 @@ export function applyDraft(
     db.exec('ROLLBACK');
     throw err;
   }
+  signal(db, draftId, now);
   return getDraft(db, draftId)!;
 }
 
@@ -324,6 +340,7 @@ export function refuseDraft(db: DatabaseSync, draftId: number, now: string): Dra
     .prepare("UPDATE drafts SET status = 'refused', decided_at = ? WHERE id = ? AND status = 'pending'")
     .run(now, draftId);
   if (!r.changes) throw getDraft(db, draftId) ? new ConflictError() : new NotFoundError();
+  signal(db, draftId, now);
   return getDraft(db, draftId)!;
 }
 
@@ -342,6 +359,7 @@ export function restoreDraft(db: DatabaseSync, draftId: number, now: string): Dr
     throw getDraft(db, draftId)
       ? new ConflictError('Trop tard pour annuler : le refus est fait.')
       : new NotFoundError();
+  signal(db, draftId, now);
   return getDraft(db, draftId)!;
 }
 
