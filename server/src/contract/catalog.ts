@@ -8,7 +8,7 @@ import {
   searchAction,
 } from '../brain/agent.ts';
 import { DigestSchema, digestAction } from '../brain/digest.ts';
-import { IngestSchema, ingestLot, runPending } from '../brain/ingest.ts';
+import { IngestSchema, ingestLot, LotSchema, lotAction, runPending } from '../brain/ingest.ts';
 import type { BrainDeps } from '../brain/process.ts';
 import type { ActionRegistry } from './actions.ts';
 
@@ -45,6 +45,13 @@ export function registerCatalog(actions: ActionRegistry, deps: BrainDeps, log: (
     'Les faits actifs dont l’échéance tombe au plus tard ce jour (AAAA-MM-JJ), la plus ancienne d’abord.',
     DueSchema,
     async (input) => dueAction(input, deps),
+    'read',
+  );
+  actions.register(
+    'brain.lot',
+    'Le bilan d’un lot : son état et son motif, ce qu’il contient, les brouillons proposés et ce qui a été écarté, avec la raison.',
+    LotSchema,
+    async (input) => lotAction(input, deps),
     'read',
   );
   actions.register(

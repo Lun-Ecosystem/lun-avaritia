@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
+import { InvalidInputError } from '../contract/actions.ts';
 import { getState } from '../contract/state.ts';
 import { overCap, processLot, type BrainDeps, type Observation } from './process.ts';
 
@@ -85,12 +86,12 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
       .prepare('UPDATE lots SET status = ?, reason = ?, retry_at = ? WHERE id = ?')
       .run(status, reason, retryAt, id);
   set('running', null);
-  const observations = (
-    db.prepare('SELECT text, source FROM observations WHERE lot = ? ORDER BY id').all(id) as {
-      text: string;
-      source: string;
-    }[]
-  ).map((o): Observation => ({ text: o.text, source: JSON.parse(o.source) }));
+  const rows = db.prepare('SELECT id, text, source FROM observations WHERE lot = ? ORDER BY id').all(id) as {
+    id: number;
+    text: string;
+    source: string;
+  }[];
+  const observations = rows.map((o): Observation => ({ text: o.text, source: JSON.parse(o.source) }));
   const start = deps.clock().getTime();
   const r = await processLot(deps, observations, { lot: id, source: 'core' }).catch(
     (err): Awaited<ReturnType<typeof processLot>> => ({
@@ -108,6 +109,15 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
       r.afterTri ? new Date(deps.clock().getTime() + DAY).toISOString() : null,
     );
   set(r.status, r.status === 'failed' ? r.reason : null);
+  // A replayed lot overwrites its trace; a held or failed one sets nothing aside.
+  const dropped = r.status === 'done' ? r.dropped : undefined;
+  db.prepare('UPDATE observations SET dropped_reason = NULL WHERE lot = ?').run(id);
+  for (const o of dropped?.observations ?? [])
+    db.prepare('UPDATE observations SET dropped_reason = ? WHERE id = ?').run(o.reason, rows[o.index]!.id);
+  db.prepare('UPDATE lots SET dropped_questions = ? WHERE id = ?').run(
+    JSON.stringify(dropped?.questions ?? []),
+    id,
+  );
   const at = deps.clock();
   db.prepare(
     'INSERT INTO runs (lot, at, duration_ms, cost, observations, drafts, questions) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -138,4 +148,39 @@ export function lastRun(db: DatabaseSync): LastRun | undefined {
        FROM runs ORDER BY id DESC LIMIT 1`,
     )
     .get() as LastRun | undefined;
+}
+
+export const LotSchema = z.strictObject({ lot: z.number().int() });
+
+/** The bilan of one lot: its state, what it holds, and what the pass set aside. */
+export function lotAction({ lot }: z.infer<typeof LotSchema>, { db }: Pick<BrainDeps, 'db'>) {
+  const row = db
+    .prepare('SELECT status, reason, created_at AS receivedAt, dropped_questions AS q FROM lots WHERE id = ?')
+    .get(lot) as { status: string; reason: string | null; receivedAt: string; q: string } | undefined;
+  if (!row) throw new InvalidInputError('Lot inconnu');
+  const obs = db
+    .prepare('SELECT text, dropped_reason AS reason FROM observations WHERE lot = ? ORDER BY id')
+    .all(lot) as {
+    text: string;
+    reason: string | null;
+  }[];
+  const drafts = (kinds: string) =>
+    db
+      .prepare(
+        `SELECT kind, status, json_extract(payload, '$.title') AS title FROM drafts WHERE lot = ? AND kind ${kinds} ORDER BY id`,
+      )
+      .all(lot) as { kind: string; status: string; title: string }[];
+  return {
+    lot,
+    status: row.status,
+    ...(row.reason && { reason: row.reason }),
+    receivedAt: row.receivedAt,
+    observations: obs.length,
+    fiches: drafts("= 'fiche'").map((d) => ({ title: d.title, status: d.status })),
+    questions: drafts("<> 'fiche'").map((d) => ({ kind: d.kind, status: d.status })),
+    dropped: [
+      ...obs.flatMap((o) => (o.reason ? [{ kind: 'observation', text: o.text, reason: o.reason }] : [])),
+      ...(JSON.parse(row.q) as { text: string; reason: string }[]).map((q) => ({ kind: 'question', ...q })),
+    ],
+  };
 }

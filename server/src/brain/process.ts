@@ -34,7 +34,7 @@ export interface BrainDeps {
  * the pass paid, in dollars.
  */
 export type ProcessResult =
-  | { status: 'done'; drafts: number; questions: number; cost: number }
+  | { status: 'done'; drafts: number; questions: number; cost: number; dropped?: Dropped }
   | {
       status: 'pending';
       reason: 'cost-cap' | 'no-provider' | `provider-${Exclude<ProviderError['kind'], 'format'>}`;
@@ -43,6 +43,12 @@ export type ProcessResult =
       afterTri?: true;
     }
   | { status: 'failed'; reason: string; cost: number };
+
+/** What a pass set aside: observations by index in the lot, questions by the model's own reason text. */
+export interface Dropped {
+  observations: { index: number; reason: 'hors-sujet' | 'sans-fait' }[];
+  questions: { text: string; reason: 'deja-posee' | 'au-dela' }[];
+}
 
 const MAX_QUESTIONS = 5;
 
@@ -369,10 +375,27 @@ export async function processLot(
     });
     const asked = askedBefore(db);
     // Over the cap, contradictions go first (the stable sort keeps the model's order otherwise).
-    const questions = agentOut.questions
+    const fresh = agentOut.questions
       .sort((a, b) => Number(a.kind !== 'contradiction') - Number(b.kind !== 'contradiction'))
-      .filter((q) => !asked.has(questionKey(q)) && asked.add(questionKey(q)))
-      .slice(0, MAX_QUESTIONS);
+      .filter((q) => !asked.has(questionKey(q)) && asked.add(questionKey(q)));
+    const questions = fresh.slice(0, MAX_QUESTIONS);
+    const inGroup = new Set(groups.flatMap((g) => g.observations));
+    const cited = new Set(agentOut.fiches.flatMap((f) => f.facts.map((x) => x.observation)));
+    const dropped: Dropped = {
+      observations: observations.flatMap((_, index): Dropped['observations'] =>
+        !inGroup.has(index)
+          ? [{ index, reason: 'hors-sujet' as const }]
+          : cited.has(index)
+            ? []
+            : [{ index, reason: 'sans-fait' as const }],
+      ),
+      questions: [
+        ...agentOut.questions
+          .filter((q) => !fresh.includes(q))
+          .map((q) => ({ text: q.reason, reason: 'deja-posee' as const })),
+        ...fresh.slice(MAX_QUESTIONS).map((q) => ({ text: q.reason, reason: 'au-dela' as const })),
+      ],
+    };
     const now = deps.clock().toISOString();
     db.exec('BEGIN');
     try {
@@ -382,7 +405,7 @@ export async function processLot(
       db.exec('ROLLBACK');
       throw err;
     }
-    return { status: 'done', drafts: drafts.length, questions: questions.length, cost: paid.cost };
+    return { status: 'done', drafts: drafts.length, questions: questions.length, cost: paid.cost, dropped };
   } catch (err) {
     if (err instanceof InvalidAnswer) return { status: 'failed', reason: err.message, cost: paid.cost };
     if (err instanceof ProviderError) {

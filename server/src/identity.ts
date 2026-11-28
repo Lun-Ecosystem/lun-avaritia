@@ -2,4 +2,4 @@
 export const SATELLITE = { id: 'lunavaritia', nom: "Lun'Avaritia" } as const;
 
 /** The satellite contract version this satellite speaks. */
-export const CONTRACT = '1.6';
+export const CONTRACT = '1.7';
