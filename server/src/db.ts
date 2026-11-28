@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
  * Ordered schema migrations. Adding one means appending to the list, never editing a past entry:
  * `schema_version` records how many have run.
  */
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
    CREATE TABLE clients (
      id INTEGER PRIMARY KEY AUTOINCREMENT,

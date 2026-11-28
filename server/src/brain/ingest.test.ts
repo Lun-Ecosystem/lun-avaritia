@@ -397,20 +397,44 @@ describe('brain.lot and the trace of what a lot sets aside', () => {
     expect(JSON.stringify(await res.json())).toContain('Lot inconnu');
   });
 
-  it('writes the trace once when a lot is replayed after a stop', async () => {
+  it('overwrites the trace when a lot is replayed after a stop', async () => {
     const t = prepare([]);
-    const reply = () => [
+    // First pass sets B aside; the replay attaches it, so the trace must no longer show it.
+    t.replies.push(
       tri(t, { observations: [0], title: 'Client X' }),
       { fiches: [{ group: 0, synthesis: 's', facts: [fact(0)], links: [] }], questions: [] },
-    ];
-    t.replies.push(...reply(), ...reply());
+      tri(t, { observations: [0, 1], title: 'Client X' }),
+      { fiches: [{ group: 0, synthesis: 's', facts: [fact(0), fact(1)], links: [] }], questions: [] },
+    );
     await send(t, A, B);
-    expect((await lotOf(t, 1)).dropped).toHaveLength(1);
+    expect((await lotOf(t, 1)).dropped).toEqual([{ kind: 'observation', text: B, reason: 'hors-sujet' }]);
     t.h.db.prepare("UPDATE lots SET status = 'running' WHERE id = 1").run();
     await passOver(t);
     const lot = await lotOf(t, 1);
     expect(lot.status).toBe('done');
-    expect(lot.dropped).toEqual([{ kind: 'observation', text: B, reason: 'hors-sujet' }]);
+    expect(lot.dropped).toEqual([]);
+  });
+
+  it('sets aside a question repeated in the same answer as deja-posee', async () => {
+    const t = prepare([]);
+    const { x, contradiction } = withFacts(t);
+    t.replies.push(tri(t, { observations: [0], title: 'Client X', ficheId: x }), {
+      fiches: [{ group: 0, synthesis: '', facts: [fact(0)], links: [] }],
+      questions: [contradiction(1, 'Première.'), contradiction(1, 'Redite.')],
+    });
+    await send(t, A);
+    const lot = await lotOf(t, 1);
+    expect(lot.questions).toHaveLength(1);
+    expect(lot.dropped).toEqual([{ kind: 'question', text: 'Redite.', reason: 'deja-posee' }]);
+  });
+
+  it('declares brain.lot as a read action', async () => {
+    const t = prepare([]);
+    const token = await t.h.pairClient();
+    const list = (await (await t.h.app.request('/lun/v1/actions', { headers: t.h.auth(token) })).json()) as {
+      actions: { name: string; effect: string }[];
+    };
+    expect(list.actions.find((a) => a.name === 'brain.lot')?.effect).toBe('read');
   });
 
   it('keeps nothing set aside when a lot is held after its tri, then fails at the second try', async () => {

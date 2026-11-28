@@ -108,16 +108,24 @@ async function runLot(deps: BrainDeps, id: number): Promise<void> {
       r.reason,
       r.afterTri ? new Date(deps.clock().getTime() + DAY).toISOString() : null,
     );
-  set(r.status, r.status === 'failed' ? r.reason : null);
-  // A replayed lot overwrites its trace; a held or failed one sets nothing aside.
+  // The state and the trace go together: a stop between them must not leave a done lot with no trace.
   const dropped = r.status === 'done' ? r.dropped : undefined;
-  db.prepare('UPDATE observations SET dropped_reason = NULL WHERE lot = ?').run(id);
-  for (const o of dropped?.observations ?? [])
-    db.prepare('UPDATE observations SET dropped_reason = ? WHERE id = ?').run(o.reason, rows[o.index]!.id);
-  db.prepare('UPDATE lots SET dropped_questions = ? WHERE id = ?').run(
-    JSON.stringify(dropped?.questions ?? []),
-    id,
-  );
+  db.exec('BEGIN');
+  try {
+    set(r.status, r.status === 'failed' ? r.reason : null);
+    // A replayed lot overwrites its trace; a held or failed one sets nothing aside.
+    db.prepare('UPDATE observations SET dropped_reason = NULL WHERE lot = ?').run(id);
+    const drop = db.prepare('UPDATE observations SET dropped_reason = ? WHERE id = ?');
+    for (const o of dropped?.observations ?? []) drop.run(o.reason, rows[o.index]!.id);
+    db.prepare('UPDATE lots SET dropped_questions = ? WHERE id = ?').run(
+      JSON.stringify(dropped?.questions ?? []),
+      id,
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
   const at = deps.clock();
   db.prepare(
     'INSERT INTO runs (lot, at, duration_ms, cost, observations, drafts, questions) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -177,7 +185,7 @@ export function lotAction({ lot }: z.infer<typeof LotSchema>, { db }: Pick<Brain
     receivedAt: row.receivedAt,
     observations: obs.length,
     fiches: drafts("= 'fiche'").map((d) => ({ title: d.title, status: d.status })),
-    questions: drafts("<> 'fiche'").map((d) => ({ kind: d.kind, status: d.status })),
+    questions: drafts("IN ('contradiction', 'doublon')").map((d) => ({ kind: d.kind, status: d.status })),
     dropped: [
       ...obs.flatMap((o) => (o.reason ? [{ kind: 'observation', text: o.text, reason: o.reason }] : [])),
       ...(JSON.parse(row.q) as { text: string; reason: string }[]).map((q) => ({ kind: 'question', ...q })),
