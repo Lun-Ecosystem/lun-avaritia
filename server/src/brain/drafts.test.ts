@@ -44,7 +44,7 @@ const draft = (over: Record<string, unknown> = {}) =>
 
 describe('drafts', () => {
   it('creates a fiche and its facts', () => {
-    const d = applyDraft(db, draft(), undefined, 't2');
+    const d = applyDraft(db, draft(), undefined, '2026-11-02T08:00:02.000Z');
     expect(d.status).toBe('done');
     const f = getFiche(db, 1)!;
     expect(f.title).toBe('Alice');
@@ -55,7 +55,7 @@ describe('drafts', () => {
     const f = fiche('Bob');
     const id = draft({ ficheId: f, title: 'Bob', synthesis: 'agent' });
     editFiche(db, f, { synthesis: 'humaine' }, 't1b');
-    const d = applyDraft(db, id, undefined, 't2');
+    const d = applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z');
     expect(d.skippedSynthesis).toBe(true);
     expect(getFiche(db, f)!.synthesis).toBe('humaine');
     expect(getFiche(db, f)!.facts).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('drafts', () => {
 
   it('applies the synthesis when the fiche is untouched', () => {
     const f = fiche('Bob');
-    applyDraft(db, draft({ ficheId: f, synthesis: 'agent' }), undefined, 't2');
+    applyDraft(db, draft({ ficheId: f, synthesis: 'agent' }), undefined, '2026-11-02T08:00:02.000Z');
     expect(getFiche(db, f)!.synthesis).toBe('agent');
   });
 
@@ -73,7 +73,7 @@ describe('drafts', () => {
     const g = fiche('Carl');
     const foreign = addFact(db, g, 'ailleurs', src, 't0');
     const id = draft({ ficheId: f, title: 'Bob', facts: [{ text: 'neuf', source: src, replaces: foreign }] });
-    expect(() => applyDraft(db, id, undefined, 't2')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z')).toThrow(InvalidInputError);
     expect(getDraft(db, id)!.status).toBe('pending');
     expect(getFiche(db, f)!.facts).toHaveLength(0);
   });
@@ -88,8 +88,8 @@ describe('drafts', () => {
       origin,
       't1',
     );
-    applyDraft(db, id, undefined, 't2');
-    expect(getFiche(db, f)!.facts[0]).toMatchObject({ struckAt: 't2', struckBy: b });
+    applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z');
+    expect(getFiche(db, f)!.facts[0]).toMatchObject({ struckAt: '2026-11-02T08:00:02.000Z', struckBy: b });
   });
 
   it('refuses a contradiction that is self-referent, already struck or whose keep is struck', () => {
@@ -100,13 +100,13 @@ describe('drafts', () => {
     const add = (keep: number, strike: number) =>
       addDraft(db, { kind: 'contradiction', ficheId: f, keep, strike, reason: 'r' }, origin, 't1');
     const same = add(b, b);
-    expect(() => applyDraft(db, same, undefined, 't2')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, same, undefined, '2026-11-02T08:00:02.000Z')).toThrow(InvalidInputError);
     expect(getDraft(db, same)!.status).toBe('pending');
-    applyDraft(db, add(b, a), undefined, 't2');
+    applyDraft(db, add(b, a), undefined, '2026-11-02T08:00:02.000Z');
     const again = add(c, a);
-    expect(() => applyDraft(db, again, undefined, 't3')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, again, undefined, '2026-11-02T08:00:03.000Z')).toThrow(InvalidInputError);
     const dead = add(a, c);
-    expect(() => applyDraft(db, dead, undefined, 't3')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, dead, undefined, '2026-11-02T08:00:03.000Z')).toThrow(InvalidInputError);
     expect(getDraft(db, dead)!.status).toBe('pending');
     expect(getFiche(db, f)!.facts.find((x) => x.id === c)!.struckAt).toBeUndefined();
   });
@@ -120,7 +120,7 @@ describe('drafts', () => {
     link(db, other, gone, 'cite');
     link(db, keep, gone, 'même que');
     const id = addDraft(db, { kind: 'doublon', keep, merge: gone, reason: 'r' }, origin, 't1');
-    applyDraft(db, id, undefined, 't2');
+    applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z');
     const k = getFiche(db, keep)!;
     expect(k.facts.map((x) => x.text)).toEqual(['un fait']);
     expect(k.links).toEqual(
@@ -138,19 +138,26 @@ describe('drafts', () => {
 
   it('refuses a card already treated', () => {
     const id = draft();
-    applyDraft(db, id, undefined, 't2');
-    expect(() => applyDraft(db, id, undefined, 't3')).toThrow(ConflictError);
+    applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z');
+    expect(() => applyDraft(db, id, undefined, '2026-11-02T08:00:03.000Z')).toThrow(ConflictError);
     const id2 = draft();
-    refuseDraft(db, id2, 't2');
-    expect(() => refuseDraft(db, id2, 't3')).toThrow(ConflictError);
-    expect(() => applyDraft(db, id2, undefined, 't3')).toThrow(ConflictError);
+    refuseDraft(db, id2, '2026-11-02T08:00:02.000Z');
+    expect(() => refuseDraft(db, id2, '2026-11-02T08:00:03.000Z')).toThrow(ConflictError);
+    expect(() => applyDraft(db, id2, undefined, '2026-11-02T08:00:03.000Z')).toThrow(ConflictError);
   });
 
   it('replaces the payload by a valid input, rejects an invalid one and leaves it pending', () => {
     const id = draft();
-    expect(() => applyDraft(db, id, { kind: 'fiche', title: 3 }, 't2')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, id, { kind: 'fiche', title: 3 }, '2026-11-02T08:00:02.000Z')).toThrow(
+      InvalidInputError,
+    );
     expect(queue(db, 10)).toHaveLength(1);
-    applyDraft(db, id, { kind: 'fiche', typeId, title: 'Autre', synthesis: '', facts: [], links: [] }, 't2');
+    applyDraft(
+      db,
+      id,
+      { kind: 'fiche', typeId, title: 'Autre', synthesis: '', facts: [], links: [] },
+      '2026-11-02T08:00:02.000Z',
+    );
     expect(getFiche(db, 1)!.title).toBe('Autre');
   });
 
@@ -182,7 +189,7 @@ describe('drafts', () => {
         ],
       }),
       undefined,
-      't2',
+      '2026-11-02T08:00:02.000Z',
     );
     expect(
       getFiche(db, 2)!
@@ -206,7 +213,7 @@ describe('drafts', () => {
       { source: 'import', lot: 4 },
       't1',
     );
-    const d = applyDraft(db, id, undefined, 't2');
+    const d = applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z');
     expect(getFiche(db, 1)!.links).toEqual([{ from: 1, to: 2, relation: 'mentionne' }]);
     expect(d.warnings).toEqual(['w', expect.stringContaining('Z')]);
   });
@@ -222,7 +229,7 @@ describe('due dates', () => {
   const dated = { text: 'rappeler Paul', source: src, due: '2026-11-05' };
 
   it('a fiche draft with a due date writes it on the fact', () => {
-    applyDraft(db, draft({ facts: [dated] }), undefined, 't2');
+    applyDraft(db, draft({ facts: [dated] }), undefined, '2026-11-02T08:00:02.000Z');
     expect(getFiche(db, 1)!.facts[0]!.due).toBe('2026-11-05');
   });
 
@@ -241,26 +248,26 @@ describe('drafts review fixes', () => {
     const f = fiche('Bob');
     const a = draft({ ficheId: f, synthesis: 'A' });
     const b = draft({ ficheId: f, synthesis: 'B' });
-    applyDraft(db, a, undefined, 't2');
-    const d = applyDraft(db, b, undefined, 't3');
+    applyDraft(db, a, undefined, '2026-11-02T08:00:02.000Z');
+    const d = applyDraft(db, b, undefined, '2026-11-02T08:00:03.000Z');
     expect(d.skippedSynthesis).toBe(false);
     expect(getFiche(db, f)!.synthesis).toBe('B');
   });
 
   it('rolls back a failing apply, stays pending, then accepts a corrected input', () => {
     const id = draft({ ficheId: 999 });
-    expect(() => applyDraft(db, id, undefined, 't2')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, id, undefined, '2026-11-02T08:00:02.000Z')).toThrow(InvalidInputError);
     expect(getDraft(db, id)!.status).toBe('pending');
     const ok = applyDraft(
       db,
       id,
       { kind: 'fiche', typeId, title: 'Bon', synthesis: '', facts: [], links: [] },
-      't3',
+      '2026-11-02T08:00:03.000Z',
     );
     expect(ok.status).toBe('done');
     const id2 = draft({ ficheId: 999 });
-    expect(() => applyDraft(db, id2, undefined, 't2')).toThrow(InvalidInputError);
-    expect(refuseDraft(db, id2, 't3').status).toBe('refused');
+    expect(() => applyDraft(db, id2, undefined, '2026-11-02T08:00:02.000Z')).toThrow(InvalidInputError);
+    expect(refuseDraft(db, id2, '2026-11-02T08:00:03.000Z').status).toBe('refused');
   });
 
   it('writes human lines for a contradiction, a doublon and a numeric link', () => {
@@ -291,9 +298,9 @@ describe('drafts review fixes', () => {
     const m = fiche('M');
     const n = fiche('N');
     const first = addDraft(db, { kind: 'doublon', keep: k, merge: m, reason: 'r' }, origin, 't1');
-    applyDraft(db, first, undefined, 't2');
+    applyDraft(db, first, undefined, '2026-11-02T08:00:02.000Z');
     const id = addDraft(db, { kind: 'doublon', keep: n, merge: m, reason: 'r' }, origin, 't1');
-    expect(() => applyDraft(db, id, undefined, 't3')).toThrow(InvalidInputError);
+    expect(() => applyDraft(db, id, undefined, '2026-11-02T08:00:03.000Z')).toThrow(InvalidInputError);
     expect(getDraft(db, id)!.status).toBe('pending');
   });
 });
@@ -468,20 +475,20 @@ describe('questions and answers (v1.4)', () => {
 
   it('an answer naming the proposed loser swaps the contradiction', () => {
     const { f, old, neu, id } = seedContradiction();
-    applyDraft(db, id, { answer: 'vieux fait' }, 't2');
+    applyDraft(db, id, { answer: 'vieux fait' }, '2026-11-02T08:00:02.000Z');
     const facts = getFiche(db, f)!.facts;
     expect(facts.find((x) => x.id === neu)!.struckBy).toBe(old);
   });
 
   it('an answer naming the proposed winner keeps the proposal', () => {
     const { f, old, neu, id } = seedContradiction();
-    applyDraft(db, id, { answer: 'neuf fait' }, 't2');
+    applyDraft(db, id, { answer: 'neuf fait' }, '2026-11-02T08:00:02.000Z');
     expect(getFiche(db, f)!.facts.find((x) => x.id === old)!.struckBy).toBe(neu);
   });
 
   it('a free answer replaces both facts with the answer', () => {
     const { f, old, neu, id } = seedContradiction();
-    applyDraft(db, id, { answer: 'Chez Lulu' }, 't2');
+    applyDraft(db, id, { answer: 'Chez Lulu' }, '2026-11-02T08:00:02.000Z');
     const facts = getFiche(db, f)!.facts;
     const added = facts.find((x) => x.text === 'Chez Lulu')!;
     expect(added.struckBy).toBeUndefined();
@@ -491,16 +498,20 @@ describe('questions and answers (v1.4)', () => {
 
   it('an answer naming the other fiche merges the doublon the other way', () => {
     const { a, b, id } = seedDoublon();
-    applyDraft(db, id, { answer: 'Dorah' }, 't2');
+    applyDraft(db, id, { answer: 'Dorah' }, '2026-11-02T08:00:02.000Z');
     expect(getFiche(db, a)!.mergedInto).toBe(b);
   });
 
   it('refuses a free answer to a doublon and any answer to a fiche, writing nothing', () => {
     const { id: dup } = seedDoublon();
-    expect(() => applyDraft(db, dup, { answer: 'Autre' }, 't2')).toThrow('Choisis l’une des deux fiches.');
+    expect(() => applyDraft(db, dup, { answer: 'Autre' }, '2026-11-02T08:00:02.000Z')).toThrow(
+      'Choisis l’une des deux fiches.',
+    );
     expect(getDraft(db, dup)!.status).toBe('pending');
     const fd = draft();
-    expect(() => applyDraft(db, fd, { answer: 'x' }, 't2')).toThrow('Cette carte n’attend pas de réponse.');
+    expect(() => applyDraft(db, fd, { answer: 'x' }, '2026-11-02T08:00:02.000Z')).toThrow(
+      'Cette carte n’attend pas de réponse.',
+    );
     expect(getDraft(db, fd)!.status).toBe('pending');
   });
 });

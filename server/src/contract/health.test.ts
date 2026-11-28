@@ -8,7 +8,7 @@ describe('GET /lun/v1/health', () => {
     const h = makeHarness();
     const token = await h.pairClient();
     const res = await h.app.request('/lun/v1/health', { headers: h.auth(token) });
-    expect(await res.json()).toEqual({ status: 'ok', version: '0.0.0-test', contract: '1.4', agent: true });
+    expect(await res.json()).toEqual({ status: 'ok', version: '0.0.0-test', contract: '1.6', agent: true });
   });
 
   it('reports paused', async () => {
@@ -31,7 +31,7 @@ describe('GET /lun/v1/health', () => {
       paused: true,
       pausedBy: 'local',
       version: '0.0.0-test',
-      contract: '1.4',
+      contract: '1.6',
       agent: true,
     });
   });
@@ -47,7 +47,7 @@ describe('GET /lun/v1/health', () => {
       status: 'degraded',
       reason: 'key-refused',
       version: '0.0.0-test',
-      contract: '1.4',
+      contract: '1.6',
       agent: true,
     });
     clearDegraded(h.db, 'key-refused');

@@ -3,6 +3,7 @@ import { makeHarness } from '../testing/harness.ts';
 import { issuePairingCode } from './auth.ts';
 import { addDraft } from '../brain/drafts.ts';
 import { addFact, createFiche, listTypes } from '../brain/store.ts';
+import { eventsSince } from './events.ts';
 
 const json = { 'content-type': 'application/json' };
 
@@ -69,5 +70,80 @@ describe('answers to questions', () => {
     const bad = await post(dup, 'Autre');
     expect(bad.status).toBe(400);
     expect(await bad.json()).toEqual({ error: 'Choisis l’une des deux fiches.' });
+  });
+});
+
+describe('one card, and the signal when it leaves the queue', () => {
+  const setup = async () => {
+    const h = makeHarness();
+    const token = await h.pairClient();
+    const t = listTypes(h.db)[0]!.id;
+    const draft = () =>
+      addDraft(
+        h.db,
+        { kind: 'fiche', typeId: t, title: 'Exemple', synthesis: '', facts: [], links: [] },
+        { source: 'core' },
+        't0',
+      );
+    const call = (path: string, body?: unknown) =>
+      h.app.request(`/lun/v1/${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: h.auth(token),
+        ...(body !== undefined && { body: JSON.stringify(body) }),
+      });
+    return { h, token, draft, call, signals: () => eventsSince(h.db) };
+  };
+
+  it('reads a card whatever its status, 404 when unknown, 401 without a token', async () => {
+    const { h, draft, call } = await setup();
+    const [a, b, c] = [draft(), draft(), draft()];
+    await call(`cards/${b}/accept`, {});
+    await call(`cards/${c}/refuse`, {});
+    const status = async (id: number) =>
+      ((await (await call(`cards/${id}`)).json()) as { card: { id: string; status: string } }).card.status;
+    expect([await status(a), await status(b), await status(c)]).toEqual(['pending', 'done', 'refused']);
+    expect(((await (await call(`cards/${a}`)).json()) as { card: { id: string } }).card.id).toBe(String(a));
+    expect((await call('cards/999')).status).toBe(404);
+    expect((await h.app.request(`/lun/v1/cards/${a}`)).status).toBe(401);
+  });
+
+  it('emits one log event per card accepted or refused, without the decision', async () => {
+    const { draft, call, signals } = await setup();
+    const [a, b] = [draft(), draft()];
+    expect(signals()).toEqual([]);
+    await call(`cards/${a}/accept`, {});
+    await call(`cards/${b}/refuse`, {});
+    const events = signals();
+    expect(events.map((e) => [e.type, e.importance])).toEqual([
+      ['card.changed', 'log'],
+      ['card.changed', 'log'],
+    ]);
+    expect(events.map((e) => e.data)).toEqual([{ id: String(a) }, { id: String(b) }]);
+    expect(JSON.stringify(events)).not.toMatch(/done|refused/);
+  });
+
+  it('emits one event when a refusal is taken back, none for a failed gesture', async () => {
+    const { h, token, draft, call, signals } = await setup();
+    const a = draft();
+    await call(`cards/${a}/refuse`, {});
+    const restored = await h.app.request(`/api/drafts/${a}/restore`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(restored.status).toBe(200);
+    expect(signals()).toHaveLength(2);
+    const before = signals().length;
+    expect((await call(`cards/${a}/refuse`, {})).status).toBe(200);
+    expect((await call(`cards/${a}/accept`, {})).status).toBe(409);
+    expect((await call(`cards/999/refuse`, {})).status).toBe(404);
+    expect(signals()).toHaveLength(before + 1);
+  });
+
+  it('answers 400, with no signal, to values in a gesture body', async () => {
+    const { draft, call, signals } = await setup();
+    const a = draft();
+    expect((await call(`cards/${a}/accept`, { values: { x: ['y'] } })).status).toBe(400);
+    expect((await call(`cards/${a}/refuse`, { values: {} })).status).toBe(400);
+    expect(signals()).toEqual([]);
   });
 });
