@@ -56,4 +56,16 @@ describe('day.digest', () => {
     };
     expect(list.actions.find((a) => a.name === 'day.digest')?.effect).toBe('read');
   });
+
+  it('ignores the box filter a core sends to a post that declares 1.5 or more', async () => {
+    const h = makeHarness();
+    const token = await h.pairClient();
+    const res = await h.app.request('/lun/v1/actions/day.digest', {
+      method: 'POST',
+      headers: h.auth(token),
+      body: JSON.stringify({ since: '2026-10-28T00:00:00Z', until: '2026-10-29T00:00:00Z', boxes: ['b1'] }),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { ok: boolean }).ok).toBe(true);
+  });
 });
